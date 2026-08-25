@@ -1,0 +1,62 @@
+# applland default config — copied to ~/.config/applland/applland.toml on first run
+
+[general]
+gaps-inner = 8
+gaps-outer = 8
+animations = true
+animation-duration-ms = 180
+default-layout = "dwindle"   # dwindle | scroll
+
+[hyper]
+# Physical key remapped to act as the hyper modifier.
+key = "caps_lock"
+
+[keybindings]
+"hyper-h" = "focus left"
+"hyper-j" = "focus down"
+"hyper-k" = "focus up"
+"hyper-l" = "focus right"
+"hyper-shift-h" = "move left"
+"hyper-shift-j" = "move down"
+"hyper-shift-k" = "move up"
+"hyper-shift-l" = "move right"
+"hyper-left" = "resize width -50"
+"hyper-right" = "resize width +50"
+"hyper-up" = "resize height +50"
+"hyper-down" = "resize height -50"
+"hyper-1" = "workspace 1"
+"hyper-2" = "workspace 2"
+"hyper-3" = "workspace 3"
+"hyper-4" = "workspace 4"
+"hyper-5" = "workspace 5"
+"hyper-6" = "workspace 6"
+"hyper-7" = "workspace 7"
+"hyper-8" = "workspace 8"
+"hyper-9" = "workspace 9"
+"hyper-shift-1" = "move-to-workspace 1"
+"hyper-shift-2" = "move-to-workspace 2"
+"hyper-shift-3" = "move-to-workspace 3"
+"hyper-shift-4" = "move-to-workspace 4"
+"hyper-shift-5" = "move-to-workspace 5"
+"hyper-shift-6" = "move-to-workspace 6"
+"hyper-shift-7" = "move-to-workspace 7"
+"hyper-shift-8" = "move-to-workspace 8"
+"hyper-shift-9" = "move-to-workspace 9"
+"hyper-v" = "toggle-floating"
+"hyper-f" = "toggle-fullscreen"
+"hyper-comma" = "focus-monitor previous"
+"hyper-period" = "focus-monitor next"
+
+# Pin workspaces to a display. The value is either the stable monitor id
+# (vendor:model:serial, logged at startup) or part of the display name.
+# Unlisted workspaces are spread over the remaining displays; a workspace whose
+# display is disconnected moves to a connected one and returns on replug.
+[workspaces]
+# "1" = "Built-in"
+# "9" = "P34w-20"
+
+# [[rules]] — Milestone 6
+
+[bar]
+enabled = true
+position = "top"
