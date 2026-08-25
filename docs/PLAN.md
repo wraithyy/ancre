@@ -175,7 +175,7 @@ prázdné stuby. LaunchAgent plist ještě nevznikl.
 - **Acceptance**: bar na každém monitoru živě ukazuje workspaces + ikony appek, klik přepne
 - **Prompt seed**: NSWindow (borderless, .statusBar level, canJoinAllSpaces) per monitor, SwiftUI obsah odebírající WMCore state stream, NSRunningApplication.icon.
 
-## Task 3.2: Bar interakce — drag&drop + right-click menu
+## Task 3.2: Bar interakce — drag&drop + right-click menu — HOTOVO (kód, runtime ověření uživatelem probíhá)
 - **Agent**: claude
 - **Files**: Sources/Bar/
 - **Depends on**: 3.1

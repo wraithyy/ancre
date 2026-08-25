@@ -110,3 +110,26 @@ final class WindowResizedByUserTests: XCTestCase {
         XCTAssertTrue(WM.windowResizedByUser(WindowID(99), to: .zero, state: &state).isEmpty)
     }
 }
+
+final class MoveWindowTests: XCTestCase {
+    // Bar drag&drop moves arbitrary windows, not just the focused one.
+    func testMoveUnfocusedWindowToOtherWorkspaceKeepsSourceFocus() {
+        var (state, ids) = makeState(windowCount: 3)
+        state.monitors[0].workspaces.append(Workspace(name: "2", layout: DwindleLayout()))
+        state.monitors[0].workspaces[0].focusedWindow = ids[0]
+
+        let effects = WM.moveWindow(ids[2], toWorkspace: "2", state: &state)
+
+        XCTAssertEqual(state.windowLocation[ids[2]], WindowLocation(monitorIndex: 0, workspaceName: "2"))
+        XCTAssertFalse(state.monitors[0].workspaces[0].tiledWindows.contains(ids[2]))
+        XCTAssertTrue(state.monitors[0].workspaces[1].tiledWindows.contains(ids[2]))
+        XCTAssertEqual(state.monitors[0].workspaces[0].focusedWindow, ids[0], "focus in source must not change")
+        // Target is hidden, so the moved window must be parked.
+        XCTAssertTrue(effects.contains { if case .hideWorkspace(let wins) = $0 { return wins == [ids[2]] } else { return false } })
+    }
+
+    func testMoveToSameWorkspaceIsNoOp() {
+        var (state, ids) = makeState(windowCount: 2)
+        XCTAssertTrue(WM.moveWindow(ids[0], toWorkspace: "1", state: &state).isEmpty)
+    }
+}

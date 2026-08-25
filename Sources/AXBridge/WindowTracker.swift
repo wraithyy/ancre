@@ -103,7 +103,7 @@ public final class WindowTracker {
         let app = AXApplication(pid: pid, tracker: self)
         apps[pid] = app
         app.startObserving()
-        for window in app.currentWindows() where window.isStandardWindow {
+        for window in app.currentWindows() where window.isTileable {
             registerDiscovered(window, pid: pid)
         }
     }
@@ -150,8 +150,28 @@ public final class WindowTracker {
     }
 
     func handleWindowFocused(element: AXUIElement) {
-        guard let id = resolveWindowID(element), windowCache[id] != nil else { return }
+        guard let id = resolveWindowID(element) else { return }
+        if windowCache[id] == nil {
+            // Auto-heal: a window whose ID didn't resolve at creation (skipped
+            // by discovery) gets registered on first focus instead of staying
+            // invisible to the WM forever.
+            var pid: pid_t = 0
+            guard AXUIElementGetPid(element, &pid) == .success,
+                  let window = AXWindow(element: element, pid: pid), window.isTileable else { return }
+            registerDiscovered(window, pid: pid)
+        }
         delegate?.windowFocused(id: id)
+    }
+
+    /// axQueue only. The frontmost app's focused standard window, registering
+    /// it (and the app) if discovery missed them. For the adopt-window command.
+    public func frontmostFocusedWindowID() -> AXWindowID? {
+        guard let app = NSWorkspace.shared.frontmostApplication else { return nil }
+        let pid = app.processIdentifier
+        if apps[pid] == nil { attach(pid: pid) }
+        guard let window = apps[pid]?.focusedWindow(), window.isTileable else { return nil }
+        if windowCache[window.id] == nil { registerDiscovered(window, pid: pid) }
+        return window.id
     }
 
     func handleWindowGeometryChanged(element: AXUIElement, moved: Bool) {

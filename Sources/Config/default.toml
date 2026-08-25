@@ -44,6 +44,7 @@ key = "caps_lock"
 "hyper-shift-9" = "move-to-workspace 9"
 "hyper-v" = "toggle-floating"
 "hyper-f" = "toggle-fullscreen"
+"hyper-a" = "adopt-window"
 "hyper-comma" = "focus-monitor previous"
 "hyper-period" = "focus-monitor next"
 
@@ -63,3 +64,13 @@ position = "top"
 # Pill background opacity 0..1 and bar strip height in points.
 opacity = 0.35
 height = 28
+
+# Per-workspace bar appearance. All keys optional.
+# [workspace-labels]
+# "1" = { icon = "🌐", name = "web", show-number = false }
+# "2" = { name = "code" }
+
+# New windows of an app go straight to a workspace (bundle id -> workspace).
+# [app-workspaces]
+# "com.spotify.client" = "9"
+# "com.microsoft.teams2" = "5"

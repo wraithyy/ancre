@@ -196,7 +196,7 @@ public struct WMState {
 
     /// Workspace names are globally unique, so a name resolves to exactly one
     /// (monitor, workspace) pair regardless of which display hosts it.
-    func locate(workspace name: String) -> (monitor: Int, workspace: Int)? {
+    public func locate(workspace name: String) -> (monitor: Int, workspace: Int)? {
         for (monitorIndex, monitor) in monitors.enumerated() {
             if let workspaceIndex = monitor.workspaces.firstIndex(where: { $0.name == name }) {
                 return (monitorIndex, workspaceIndex)
@@ -218,6 +218,9 @@ public enum Command: Equatable {
     case toggleFloating
     case toggleFullscreen
     case focusMonitor(MonitorTarget)
+    /// Handled by the controller (needs AX to find the frontmost window);
+    /// dispatch() treats it as a no-op.
+    case adoptWindow
 
     /// Parses the command grammar used by `Sources/Config/default.toml`'s
     /// `[keybindings]` values. Keep this in sync with that file.
@@ -246,6 +249,9 @@ public enum Command: Equatable {
         case "toggle-fullscreen":
             guard parts.count == 1 else { return nil }
             return .toggleFullscreen
+        case "adopt-window":
+            guard parts.count == 1 else { return nil }
+            return .adoptWindow
         case "focus-monitor":
             guard parts.count == 2, let target = MonitorTarget(rawValue: parts[1]) else { return nil }
             return .focusMonitor(target)
@@ -287,6 +293,8 @@ public enum WM {
             return toggleFullscreen(state: &state)
         case .focusMonitor(let target):
             return focusMonitor(target, state: &state)
+        case .adoptWindow:
+            return [] // AX-side, handled by the controller before dispatch
         }
     }
 
@@ -312,8 +320,16 @@ public enum WM {
         monitor.workspaces[wsIdx] = workspace
         state.monitors[monitorIndex] = monitor
 
-        guard monitorIndex == state.focusedMonitorIndex, wsIdx == monitor.activeWorkspaceIndex else { return [] }
-        return frameEffects(for: workspace, monitor: monitor, state: state) + [.focusWindow(node.id)]
+        guard wsIdx == monitor.activeWorkspaceIndex else {
+            // Hidden target (per-app workspace rule) — park the window instead
+            // of leaving it visible on top of whatever is on screen.
+            return [.hideWorkspace([node.id])]
+        }
+        // Active workspace tiles on ANY monitor, not just the focused one;
+        // AX focus follows only on the focused monitor.
+        var effects = frameEffects(for: workspace, monitor: monitor, state: state)
+        if monitorIndex == state.focusedMonitorIndex { effects.append(.focusWindow(node.id)) }
+        return effects
     }
 
     public static func windowRemoved(_ id: WindowID, state: inout WMState) -> [Effect] {
@@ -403,11 +419,18 @@ public enum WM {
     }
 
     private static func moveFocusedWindow(toWorkspace name: String, state: inout WMState) -> [Effect] {
-        let sourceMonitorIdx = state.focusedMonitorIndex
-        let sourceWsIdx = state.monitors[sourceMonitorIdx].activeWorkspaceIndex
-        guard let window = state.monitors[sourceMonitorIdx].activeWorkspace.focusedWindow,
+        guard let window = state.monitors[state.focusedMonitorIndex].activeWorkspace.focusedWindow else { return [] }
+        return moveWindow(window, toWorkspace: name, state: &state)
+    }
+
+    /// Moves any window (not just the focused one — bar drag&drop needs this)
+    /// to the named workspace, wherever both live.
+    public static func moveWindow(_ window: WindowID, toWorkspace name: String, state: inout WMState) -> [Effect] {
+        guard let location = state.windowLocation[window],
+              let sourceWsIdx = state.workspaceIndex(location),
               let (targetMonitorIdx, targetWsIdx) = state.locate(workspace: name),
-              (targetMonitorIdx, targetWsIdx) != (sourceMonitorIdx, sourceWsIdx) else { return [] }
+              (targetMonitorIdx, targetWsIdx) != (location.monitorIndex, sourceWsIdx) else { return [] }
+        let sourceMonitorIdx = location.monitorIndex
 
         let wasFloating = state.windows[window]?.isFloating ?? false
 
@@ -417,7 +440,9 @@ public enum WM {
         } else {
             source.layout.remove(window)
         }
-        source.focusedWindow = source.tiledWindows.first ?? source.floatingFrames.keys.first
+        if source.focusedWindow == window {
+            source.focusedWindow = source.tiledWindows.first ?? source.floatingFrames.keys.first
+        }
         state.monitors[sourceMonitorIdx].workspaces[sourceWsIdx] = source
 
         let targetMonitor = state.monitors[targetMonitorIdx]

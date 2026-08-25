@@ -90,6 +90,16 @@ public final class AXWindow {
         role == kAXWindowRole && (subrole == nil || subrole == kAXStandardWindowSubrole)
     }
 
+    /// A window the WM should manage: standard AND resizable. Notification
+    /// toasts (Outlook, Teams) report a standard subrole but are fixed-size;
+    /// tiling them leaves phantom slots when they vanish.
+    var isTileable: Bool {
+        guard isStandardWindow else { return false }
+        var settable = DarwinBoolean(false)
+        AXUIElementIsAttributeSettable(element, kAXSizeAttribute as CFString, &settable)
+        return settable.boolValue
+    }
+
     public var isMinimized: Bool {
         guard let value = copyAttribute(kAXMinimizedAttribute) else { return false }
         return (value as? Bool) ?? false

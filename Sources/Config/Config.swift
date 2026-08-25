@@ -77,6 +77,27 @@ public struct AppConfig: Codable {
         }
     }
 
+    /// Per-workspace appearance in the bar. All fields optional: `name` is a
+    /// custom label, `icon` a short string (emoji) shown before it,
+    /// `show-number` toggles the workspace number (default on).
+    public struct WorkspaceLabel: Codable {
+        public var name: String?
+        public var icon: String?
+        public var showNumber: Bool
+
+        enum CodingKeys: String, CodingKey {
+            case name, icon
+            case showNumber = "show-number"
+        }
+
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            name = try c.decodeIfPresent(String.self, forKey: .name)
+            icon = try c.decodeIfPresent(String.self, forKey: .icon)
+            showNumber = try c.decodeIfPresent(Bool.self, forKey: .showNumber) ?? true
+        }
+    }
+
     public var general: General
     public var hyper: Hyper
     public var keybindings: [String: String]
@@ -85,6 +106,17 @@ public struct AppConfig: Codable {
     /// (case-insensitive substring of) the display name. Optional: absent means
     /// "spread workspaces across whatever is connected".
     public var workspaces: [String: String]?
+    /// `[workspace-labels]`: workspace name -> bar appearance.
+    public var workspaceLabels: [String: WorkspaceLabel]?
+    /// `[app-workspaces]`: bundle id -> workspace name new windows of that
+    /// app are placed on.
+    public var appWorkspaces: [String: String]?
+
+    enum CodingKeys: String, CodingKey {
+        case general, hyper, keybindings, bar, workspaces
+        case workspaceLabels = "workspace-labels"
+        case appWorkspaces = "app-workspaces"
+    }
 }
 
 public enum ConfigLoader {

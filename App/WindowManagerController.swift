@@ -64,10 +64,35 @@ final class WindowManagerController: WindowTrackerDelegate {
         bindings = resolved.bindings
 
         if config.bar.enabled {
-            bar = BarController(opacity: config.bar.opacity) { [weak self] workspaceName in
-                guard let self else { return }
-                self.tracker.perform { self.run(.workspace(workspaceName)) }
-            }
+            bar = BarController(
+                opacity: config.bar.opacity,
+                onSelect: { [weak self] name in
+                    guard let self else { return }
+                    self.tracker.perform { self.run(.workspace(name)) }
+                },
+                onMoveWindow: { [weak self] windowID, name in
+                    guard let self else { return }
+                    self.tracker.perform {
+                        self.execute(WM.moveWindow(WindowID(windowID), toWorkspace: name, state: &self.state))
+                    }
+                },
+                onMoveFocusedWindow: { [weak self] name in
+                    guard let self else { return }
+                    self.tracker.perform { self.run(.moveToWorkspace(name)) }
+                },
+                onFocusWindow: { [weak self] windowID in
+                    guard let self else { return }
+                    self.tracker.perform {
+                        let wid = WindowID(windowID)
+                        guard let location = self.state.windowLocation[wid] else { return }
+                        // Activate its workspace first (no-op if already active),
+                        // then move WM focus and raise the window.
+                        self.run(.workspace(location.workspaceName))
+                        _ = WM.focusChangedExternally(wid, state: &self.state)
+                        self.execute([.focusWindow(wid)])
+                    }
+                }
+            )
         }
 
         // Displays first: window discovery needs monitors to place windows on.
@@ -124,6 +149,9 @@ final class WindowManagerController: WindowTrackerDelegate {
     /// Snapshot of workspaces per monitor for the bar, marshaled to main.
     private func updateBar() {
         guard let bar else { return }
+        let globallyFocused: WindowID? = state.monitors.indices.contains(state.focusedMonitorIndex)
+            ? state.monitors[state.focusedMonitorIndex].activeWorkspace.focusedWindow
+            : nil
         let snapshots = state.monitors.enumerated().map { index, monitor -> (String, CGRect, [BarWorkspaceItem], Bool) in
             let strip = CGRect(
                 x: monitor.visibleFrame.minX,
@@ -132,14 +160,18 @@ final class WindowManagerController: WindowTrackerDelegate {
                 height: config.bar.height
             )
             let items = monitor.workspaces.enumerated().map { wsIndex, workspace -> BarWorkspaceItem in
-                var pids: [pid_t] = []
-                for wid in workspace.tiledWindows + Array(workspace.floatingFrames.keys) {
-                    if let pid = state.windows[wid]?.pid, !pids.contains(pid) { pids.append(pid) }
+                let windows = (workspace.tiledWindows + Array(workspace.floatingFrames.keys)).compactMap { wid -> BarWindowItem? in
+                    guard let pid = state.windows[wid]?.pid else { return nil }
+                    return BarWindowItem(windowID: wid.rawValue, pid: pid, isFocused: wid == globallyFocused)
                 }
+                let label = config.workspaceLabels?[workspace.name]
                 return BarWorkspaceItem(
                     name: workspace.name,
+                    displayName: label?.name,
+                    icon: label?.icon,
+                    showNumber: label?.showNumber ?? true,
                     isActive: wsIndex == monitor.activeWorkspaceIndex,
-                    appPids: pids
+                    windows: windows
                 )
             }
             return (monitor.id, strip, items, index == state.focusedMonitorIndex)
@@ -160,7 +192,22 @@ final class WindowManagerController: WindowTrackerDelegate {
     // MARK: - Command / effect pipeline (axQueue)
 
     private func run(_ command: Command) {
+        if command == .adoptWindow { adoptFrontmostWindow(); return }
         execute(WM.dispatch(command, state: &state))
+    }
+
+    /// adopt-window: pull the frontmost app's focused window into the focused
+    /// workspace — manual rescue for windows discovery missed, and a quick
+    /// "bring that here".
+    private func adoptFrontmostWindow() {
+        guard let id = tracker.frontmostFocusedWindowID(),
+              state.monitors.indices.contains(state.focusedMonitorIndex) else { return }
+        let wid = WindowID(id)
+        let target = state.monitors[state.focusedMonitorIndex].activeWorkspace.name
+        execute(WM.moveWindow(wid, toWorkspace: target, state: &state))
+        _ = WM.focusChangedExternally(wid, state: &state)
+        updateFocusBorder()
+        updateBar()
     }
 
     /// Windows whose setFrame result diverged substantially from their tile —
@@ -283,6 +330,15 @@ final class WindowManagerController: WindowTrackerDelegate {
 
     func windowDiscovered(_ window: AXWindow, app: AXAppInfo) {
         guard axWindows[window.id] == nil, !state.monitors.isEmpty else { return }
+        // Native tabs: every tab is its own AXWindow sharing the tab group's
+        // frame. A new same-pid window at an existing tracked window's exact
+        // frame is a tab, not a new tile. ponytail: if the tracked sibling
+        // closes, the remaining tab stays unmanaged until adopt-window.
+        let newFrame = window.frame
+        if axWindows.values.contains(where: { $0.pid == app.pid && $0.id != window.id && !$0.frame.diverges(from: newFrame, tolerance: 2) }) {
+            NSLog("applland: window %u looks like a tab sibling of %@, not tiling it", window.id, app.name ?? "?")
+            return
+        }
         axWindows[window.id] = window
         windowPids[window.id] = app.pid
         let frame = window.frame.cgRect
@@ -304,6 +360,7 @@ final class WindowManagerController: WindowTrackerDelegate {
         guard axWindows[id] != nil else { return }
         _ = WM.focusChangedExternally(WindowID(id), state: &state)
         updateFocusBorder()
+        updateBar()
     }
 
     func windowMoved(id: AXWindowID, newFrame: AXFrame) {
@@ -350,6 +407,13 @@ final class WindowManagerController: WindowTrackerDelegate {
     /// restoring its window on the external screen shouldn't jump to whichever
     /// display happens to be focused.
     private func adopt(_ node: WindowNode, frame: CGRect) {
+        // Per-app rule wins: [app-workspaces] sends the window straight to its
+        // configured workspace (parked if that workspace is hidden).
+        if let ruled = config.appWorkspaces?[node.appBundleID],
+           let (monitorIdx, _) = state.locate(workspace: ruled) {
+            execute(WM.windowAdded(node, toWorkspace: ruled, onMonitor: monitorIdx, state: &state))
+            return
+        }
         let center = CGPoint(x: frame.midX, y: frame.midY)
         let monitorIdx = state.monitors.firstIndex { $0.frame.contains(center) } ?? state.focusedMonitorIndex
         guard state.monitors.indices.contains(monitorIdx) else { return }

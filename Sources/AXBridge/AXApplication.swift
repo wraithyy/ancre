@@ -101,7 +101,7 @@ final class AXApplication {
         switch notification {
         case kAXCreatedNotification:
             // Filter to windows: role check before treating as a window creation.
-            guard let window = AXWindow(element: element, pid: pid), window.isStandardWindow else { return }
+            guard let window = AXWindow(element: element, pid: pid), window.isTileable else { return }
             tracker.handleWindowDiscovered(window, pid: pid)
         case kAXUIElementDestroyedNotification:
             tracker.handleWindowDestroyed(elementForID: element)
