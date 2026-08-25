@@ -184,7 +184,7 @@ prázdné stuby. LaunchAgent plist ještě nevznikl.
 
 ### Milestone 4 — Animace
 
-## Task 4.1: Animator — adaptivní interpolace
+## Task 4.1: Animator — adaptivní interpolace — HOTOVO (kód; DispatchSourceTimer 60 Hz místo CVDisplayLink — timer běží jen během animací, idle 0 %)
 - **Agent**: claude
 - **Files**: Sources/Animator/
 - **Depends on**: 1.R

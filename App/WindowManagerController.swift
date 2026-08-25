@@ -5,6 +5,7 @@
 // callbacks already arrive on it; hotkey handling marshals in via
 // tracker.perform. Never touch `state` from any other context.
 
+import Animator
 import AppKit
 import AXBridge
 import Bar
@@ -55,9 +56,16 @@ final class WindowManagerController: WindowTrackerDelegate {
     /// Keybind cheatsheet (main thread only). Nil when disabled in config.
     private var helpOverlay: HelpOverlay?
     private var helpTimer: Timer?
+    /// Eases frame changes (axQueue). Slow apps auto-fall back to instant.
+    private let animator: Animator
 
     init(config: AppConfig) {
         self.config = config
+        animator = Animator(settings: .init(
+            enabled: config.general.animations,
+            duration: min(max(Double(config.general.animationDurationMs) / 1000, 0.05), 0.5),
+            excluded: Set(config.general.animationsExclude)
+        ))
         if config.border?.enabled ?? true {
             let color = (config.border?.color ?? config.theme?.accent)
                 .flatMap { NSColor(hex: $0) } ?? .controlAccentColor
@@ -366,8 +374,16 @@ final class WindowManagerController: WindowTrackerDelegate {
                 }
             }
         }
-        // Recursion is bounded: adoptions by adoptAttempts, floats by the
-        // floatWindow no-op on already-floating windows.
+        if executeDepth == 1 {
+            drainPendingPlacements()
+            updateFocusBorder()
+            updateBar()
+        }
+    }
+
+    /// Resolves queued refusals. Recursion is bounded: adoptions by
+    /// adoptAttempts, floats by the floatWindow no-op on floating windows.
+    private func drainPendingPlacements() {
         while let (wid, frame) = pendingAdoptions.popLast() {
             execute(WM.windowResizedByUser(wid, to: frame, state: &state))
         }
@@ -375,8 +391,6 @@ final class WindowManagerController: WindowTrackerDelegate {
             NSLog("applland: window %u can't fit its tile, floating it", wid.rawValue)
             execute(WM.floatWindow(wid, frame: frame, state: &state))
         }
-        updateFocusBorder()
-        updateBar()
     }
 
     /// Outlines the focused window; hides the border when nothing is focused.
@@ -408,7 +422,14 @@ final class WindowManagerController: WindowTrackerDelegate {
         guard let ax = axWindows[wid.rawValue] else { return }
         parkedWindows.remove(wid.rawValue)
         snapBackAttempts.removeValue(forKey: wid.rawValue)
-        let actual = ax.setFrame(target)
+        animator.setFrame(ax, bundleID: state.windows[wid]?.appBundleID ?? "", to: target) { [weak self] actual in
+            self?.finishAssign(wid: wid, target: target, actual: actual)
+        }
+    }
+
+    /// Bookkeeping after the frame settled. Runs synchronously for instant
+    /// placements, later (axQueue) for animated ones.
+    private func finishAssign(wid: WindowID, target: AXFrame, actual: AXFrame) {
         if state.windows[wid]?.isFloating == true {
             expectedFrames.removeValue(forKey: wid.rawValue)
             return
@@ -432,10 +453,17 @@ final class WindowManagerController: WindowTrackerDelegate {
             NSLog("applland: window %u refused frame (wanted %@, got %@)",
                   wid.rawValue, String(describing: target), String(describing: actual))
         }
+        // Animated completions arrive outside execute() — resolve refusals now.
+        if executeDepth == 0 {
+            drainPendingPlacements()
+            updateFocusBorder()
+            updateBar()
+        }
     }
 
     private func park(_ wid: WindowID) {
         guard let ax = axWindows[wid.rawValue], !parkingBounds.isEmpty else { return }
+        animator.cancel(wid.rawValue) // parking is instant and offscreen
         expectedFrames.removeValue(forKey: wid.rawValue)
         snapBackAttempts.removeValue(forKey: wid.rawValue)
         parkedWindows.insert(wid.rawValue)
@@ -565,11 +593,14 @@ final class WindowManagerController: WindowTrackerDelegate {
         snapBackAttempts.removeValue(forKey: id)
         adoptAttempts.removeValue(forKey: id)
         parkedWindows.remove(id)
+        animator.cancel(id)
         execute(WM.windowRemoved(WindowID(id), state: &state))
     }
 
     private func enforceTiling(id: AXWindowID, newFrame: AXFrame) {
         guard let ax = axWindows[id] else { return }
+        // Mid-animation geometry events are our own setFrames, not the app's.
+        guard !animator.animatingWindows.contains(id) else { return }
         if parkedWindows.contains(id) {
             guard !parkingBounds.isEmpty,
                   !OffscreenParking.isParked(newFrame, bounds: parkingBounds) else { return }

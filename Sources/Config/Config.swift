@@ -16,6 +16,8 @@ public struct AppConfig: Codable {
         public var animations: Bool
         public var animationDurationMs: Int
         public var defaultLayout: String
+        /// Bundle ids that always place instantly (apps that animate badly).
+        public var animationsExclude: [String]
 
         enum CodingKeys: String, CodingKey {
             case gapsInner = "gaps-inner"
@@ -23,6 +25,7 @@ public struct AppConfig: Codable {
             case animations
             case animationDurationMs = "animation-duration-ms"
             case defaultLayout = "default-layout"
+            case animationsExclude = "animations-exclude"
         }
 
         public init(from decoder: Decoder) throws {
@@ -34,6 +37,7 @@ public struct AppConfig: Codable {
             animations = try c.decode(Bool.self, forKey: .animations)
             animationDurationMs = try c.decode(Int.self, forKey: .animationDurationMs)
             defaultLayout = try c.decode(String.self, forKey: .defaultLayout)
+            animationsExclude = try c.decodeIfPresent([String].self, forKey: .animationsExclude) ?? []
         }
 
         private static func lenientDouble(

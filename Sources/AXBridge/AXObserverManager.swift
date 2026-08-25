@@ -1,6 +1,12 @@
 import ApplicationServices
 import Foundation
 
+/// The serial queue all WM state and AX work lives on — exposed for sibling
+/// modules (Animator) that schedule their ticks on it.
+public enum AXQueue {
+    public static var shared: DispatchQueue { AXRunLoopThread.shared.queue }
+}
+
 /// Owns the single dedicated thread + CFRunLoop that all AXObserver callbacks
 /// run on. AXObserver requires its run loop source to be attached to a
 /// running CFRunLoop for notifications to fire.
