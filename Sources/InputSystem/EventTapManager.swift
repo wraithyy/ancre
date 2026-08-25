@@ -12,6 +12,9 @@ final class EventTapManager {
     private var tap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var hyperActive = false
+    /// Fires on the tap thread when the carrier key goes down/up. Receivers
+    /// must only dispatch async — anything heavier risks the tap timeout.
+    var onHyperStateChange: ((Bool) -> Void)?
 
     private let hyperKeycode: Int64
     private let handler: Handler
@@ -81,8 +84,12 @@ final class EventTapManager {
 
         if keycode == hyperKeycode {
             switch type {
-            case .keyDown: hyperActive = true
-            case .keyUp: hyperActive = false
+            case .keyDown:
+                if !hyperActive { onHyperStateChange?(true) }
+                hyperActive = true
+            case .keyUp:
+                hyperActive = false
+                onHyperStateChange?(false)
             default: break
             }
             return nil // always swallow the carrier key itself

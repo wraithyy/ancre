@@ -52,6 +52,9 @@ final class WindowManagerController: WindowTrackerDelegate {
     /// Current layout name per workspace, for the bar (Workspace itself only
     /// stores the layout instance, not its config name).
     private var workspaceLayoutNames: [String: String] = [:]
+    /// Keybind cheatsheet (main thread only). Nil when disabled in config.
+    private var helpOverlay: HelpOverlay?
+    private var helpTimer: Timer?
 
     init(config: AppConfig) {
         self.config = config
@@ -147,13 +150,40 @@ final class WindowManagerController: WindowTrackerDelegate {
         tracker.delegate = self
         tracker.start()
 
+        if config.help?.enabled ?? true {
+            helpOverlay = HelpOverlay(
+                bindings: config.keybindings,
+                hyperKeyName: config.hyper.key,
+                opacity: config.help?.opacity ?? 0.85
+            )
+        }
+        let helpDelay = (config.help?.delayMs ?? 2000) / 1000
+
         // `bindings` is immutable after this point, so reading it from the
         // event tap thread without marshaling is safe.
-        input.start(hyperKeyName: config.hyper.key) { [weak self] combo in
-            guard let self, let command = self.bindings[combo] else { return false }
-            self.tracker.perform { self.run(command) }
-            return true
-        }
+        input.start(
+            hyperKeyName: config.hyper.key,
+            handler: { [weak self] combo in
+                guard let self, let command = self.bindings[combo] else { return false }
+                self.tracker.perform { self.run(command) }
+                return true
+            },
+            onHyperStateChange: { [weak self] down in
+                // Tap thread — only dispatch. Held past the delay -> show help.
+                DispatchQueue.main.async {
+                    guard let self, let helpOverlay = self.helpOverlay else { return }
+                    self.helpTimer?.invalidate()
+                    if down {
+                        self.helpTimer = Timer.scheduledTimer(withTimeInterval: helpDelay, repeats: false) { _ in
+                            helpOverlay.show()
+                        }
+                    } else {
+                        self.helpTimer = nil
+                        helpOverlay.hide()
+                    }
+                }
+            }
+        )
     }
 
     func stop() {
@@ -202,7 +232,11 @@ final class WindowManagerController: WindowTrackerDelegate {
         let globallyFocused: WindowID? = state.monitors.indices.contains(state.focusedMonitorIndex)
             ? state.monitors[state.focusedMonitorIndex].activeWorkspace.focusedWindow
             : nil
-        let allWorkspaceNames = state.monitors.flatMap { $0.workspaces.map(\.name) }.sorted()
+        let allWorkspaceNames = state.monitors.flatMap { $0.workspaces.map(\.name) }.sorted().map { name -> BarWorkspaceRef in
+            let label = config.workspaceLabels?[name]
+            let title = [name, label?.icon, label?.name].compactMap { $0 }.joined(separator: " ")
+            return BarWorkspaceRef(name: name, title: title)
+        }
         let availableLayouts = ["dwindle", "scroll"] + (config.customLayouts?.keys.sorted() ?? [])
         let snapshots = state.monitors.enumerated().map { index, monitor -> (String, CGRect, [BarWorkspaceItem], Bool) in
             let strip = CGRect(

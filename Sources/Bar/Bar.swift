@@ -49,18 +49,30 @@ public struct BarWorkspaceItem: Equatable {
     }
 }
 
+/// Workspace reference for menus: raw `name` for commands, `title` with
+/// icon/custom label for display.
+public struct BarWorkspaceRef: Equatable {
+    public let name: String
+    public let title: String
+
+    public init(name: String, title: String) {
+        self.name = name
+        self.title = title
+    }
+}
+
 public struct BarMonitorSnapshot: Equatable {
     public let monitorID: String
     /// Bar strip in NSScreen (bottom-left origin) coordinates.
     public let barFrame: NSRect
     public let workspaces: [BarWorkspaceItem]
     public let isFocusedMonitor: Bool
-    /// Every workspace name across all monitors, for the "move to" menu.
-    public let allWorkspaceNames: [String]
+    /// Every workspace across all monitors, for the "move to" menu.
+    public let allWorkspaceNames: [BarWorkspaceRef]
     /// Layout names offered in the context menu (built-ins + custom).
     public let availableLayouts: [String]
 
-    public init(monitorID: String, barFrame: NSRect, workspaces: [BarWorkspaceItem], isFocusedMonitor: Bool, allWorkspaceNames: [String], availableLayouts: [String]) {
+    public init(monitorID: String, barFrame: NSRect, workspaces: [BarWorkspaceItem], isFocusedMonitor: Bool, allWorkspaceNames: [BarWorkspaceRef], availableLayouts: [String]) {
         self.monitorID = monitorID
         self.barFrame = barFrame
         self.workspaces = workspaces
@@ -183,7 +195,7 @@ public final class BarController {
 
 private struct BarView: View {
     let workspaces: [BarWorkspaceItem]
-    let allWorkspaceNames: [String]
+    let allWorkspaceNames: [BarWorkspaceRef]
     let availableLayouts: [String]
     let isFocused: Bool
     let theme: BarTheme
@@ -235,7 +247,7 @@ private struct BarView: View {
 
 private struct WorkspaceCell: View {
     let workspace: BarWorkspaceItem
-    let allWorkspaceNames: [String]
+    let allWorkspaceNames: [BarWorkspaceRef]
     let availableLayouts: [String]
     let isFocusedMonitor: Bool
     let accent: Color
@@ -293,8 +305,8 @@ private struct WorkspaceCell: View {
                         .contextMenu {
                             Button("Fokusovat okno") { onFocusWindow(window.windowID) }
                             Menu("Přesunout do") {
-                                ForEach(allWorkspaceNames.filter { $0 != workspace.name }, id: \.self) { target in
-                                    Button("workspace \(target)") { onMoveWindow(window.windowID, target) }
+                                ForEach(allWorkspaceNames.filter { $0.name != workspace.name }, id: \.name) { target in
+                                    Button(target.title) { onMoveWindow(window.windowID, target.name) }
                                 }
                             }
                         }

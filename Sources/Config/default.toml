@@ -76,6 +76,13 @@ offset-y = 0
 # background-color = "#1e1e2eCC"
 # accent-color = "#89b4fa"
 
+# Keybind cheatsheet: hold hyper past delay-ms to show a translucent overlay
+# with all keybindings; released hyper hides it.
+# [help]
+# enabled = true
+# delay-ms = 2000
+# opacity = 0.85
+
 # Shared colors ("#RRGGBB" / "#RRGGBBAA"); absent = system accent/material.
 # [theme]
 # accent = "#89b4fa"

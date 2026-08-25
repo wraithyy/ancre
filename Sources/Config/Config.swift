@@ -128,6 +128,26 @@ public struct AppConfig: Codable {
         }
     }
 
+    /// Keybind cheatsheet overlay, shown while the hyper key is held.
+    public struct Help: Codable {
+        public var enabled: Bool
+        /// How long hyper must be held before the overlay appears (ms).
+        public var delayMs: Double
+        public var opacity: Double
+
+        enum CodingKeys: String, CodingKey {
+            case enabled, opacity
+            case delayMs = "delay-ms"
+        }
+
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
+            delayMs = (try? c.decode(Double.self, forKey: .delayMs)) ?? Double((try? c.decode(Int.self, forKey: .delayMs)) ?? 2000)
+            opacity = (try? c.decode(Double.self, forKey: .opacity)) ?? 0.85
+        }
+    }
+
     /// Per-workspace appearance in the bar. All fields optional: `name` is a
     /// custom label, `icon` a short string (emoji) shown before it,
     /// `show-number` toggles the workspace number (default on).
@@ -178,9 +198,11 @@ public struct AppConfig: Codable {
     /// `[custom-layouts]`: layout name -> template spec, e.g.
     /// "h(0.6, *, v(0.5, *, *))".
     public var customLayouts: [String: String]?
+    /// `[help]`: hold-hyper keybind cheatsheet; absent = enabled, 2 s delay.
+    public var help: Help?
 
     enum CodingKeys: String, CodingKey {
-        case general, hyper, keybindings, bar, workspaces, theme, border
+        case general, hyper, keybindings, bar, workspaces, theme, border, help
         case workspaceLabels = "workspace-labels"
         case appWorkspaces = "app-workspaces"
         case customLayouts = "custom-layouts"
@@ -214,6 +236,9 @@ public enum ConfigLoader {
 
         do {
             var config = try decode(userTOML)
+            // Bundled keybindings are always active; the user config overrides
+            // key by key (an empty string value unbinds a default).
+            config.keybindings = defaults.keybindings.merging(config.keybindings) { _, user in user }
             warnings.append(contentsOf: validate(&config, defaults: defaults))
             return (config, warnings)
         } catch {
@@ -228,6 +253,7 @@ public enum ConfigLoader {
         var bindings: [String: Command] = [:]
         var warnings: [String] = []
         for (combo, commandString) in config.keybindings {
+            if commandString.isEmpty { continue } // explicit unbind of a default
             if let command = Command.parse(commandString) {
                 bindings[combo] = command
             } else {
