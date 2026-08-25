@@ -141,6 +141,30 @@ final class AutoFloatRetryTests: XCTestCase {
     }
 }
 
+final class SetFloatingTests: XCTestCase {
+    // Regression: toggle-floating used the stale discovery frame (often
+    // outside the monitor) — the float got parked and "disappeared".
+    func testFloatKeepsCurrentLayoutFrame() {
+        var (state, ids) = makeState(windowCount: 4)
+        let tileFrame = WM.allFrames(for: state.monitors[0].activeWorkspace, monitor: state.monitors[0], state: state)[ids[2]]!
+
+        _ = WM.setFloating(ids[2], floating: true, state: &state)
+
+        let floatFrame = state.monitors[0].activeWorkspace.floatingFrames[ids[2]]
+        XCTAssertEqual(floatFrame, tileFrame, "float must stay where the tile was")
+        XCTAssertTrue(floatFrame!.intersects(state.monitors[0].frame), "must not end up off-monitor (parked)")
+    }
+
+    func testUnfloatReinsertsIntoLayout() {
+        var (state, ids) = makeState(windowCount: 2)
+        _ = WM.setFloating(ids[0], floating: true, state: &state)
+        _ = WM.setFloating(ids[0], floating: false, state: &state)
+        XCTAssertEqual(state.windows[ids[0]]?.isFloating, false)
+        XCTAssertTrue(state.monitors[0].activeWorkspace.tiledWindows.contains(ids[0]))
+        XCTAssertTrue(state.monitors[0].activeWorkspace.floatingFrames.isEmpty)
+    }
+}
+
 final class MoveWindowTests: XCTestCase {
     // Bar drag&drop moves arbitrary windows, not just the focused one.
     func testMoveUnfocusedWindowToOtherWorkspaceKeepsSourceFocus() {

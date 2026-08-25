@@ -5,12 +5,17 @@ import AppKit
 import SwiftUI
 
 final class HelpOverlay {
+    struct Style {
+        var opacity = 0.85
+        var fontSize = 11.0
+        var columns = 3
+        var cornerRadius = 12.0
+    }
+
     private let window: NSWindow
-    private let opacity: Double
 
     /// `bindings` = raw config keybindings (combo -> command string).
-    init(bindings: [String: String], hyperKeyName: String, opacity: Double) {
-        self.opacity = opacity
+    init(bindings: [String: String], hyperKeyName: String, style: Style) {
         window = NSWindow(contentRect: .zero, styleMask: .borderless, backing: .buffered, defer: true)
         window.isOpaque = false
         window.backgroundColor = .clear
@@ -19,7 +24,7 @@ final class HelpOverlay {
         window.level = .statusBar
         window.collectionBehavior = [.transient, .ignoresCycle]
         window.contentView = NSHostingView(
-            rootView: HelpView(rows: Self.rows(from: bindings), hyperKeyName: hyperKeyName, opacity: opacity)
+            rootView: HelpView(rows: Self.rows(from: bindings), hyperKeyName: hyperKeyName, style: style)
         )
     }
 
@@ -53,28 +58,29 @@ final class HelpOverlay {
 private struct HelpView: View {
     let rows: [(combo: String, command: String)]
     let hyperKeyName: String
-    let opacity: Double
+    let style: HelpOverlay.Style
 
     private var columns: [[(combo: String, command: String)]] {
-        let perColumn = max(1, Int((Double(rows.count) / 3.0).rounded(.up)))
+        let count = max(1, style.columns)
+        let perColumn = max(1, Int((Double(rows.count) / Double(count)).rounded(.up)))
         return stride(from: 0, to: rows.count, by: perColumn).map { Array(rows[$0..<min($0 + perColumn, rows.count)]) }
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("applland — hyper = \(hyperKeyName)")
-                .font(.system(size: 13, weight: .bold))
+                .font(.system(size: style.fontSize + 2, weight: .bold))
             HStack(alignment: .top, spacing: 24) {
                 ForEach(Array(columns.enumerated()), id: \.offset) { _, column in
                     VStack(alignment: .leading, spacing: 3) {
                         ForEach(column, id: \.combo) { row in
                             HStack(spacing: 8) {
                                 Text(row.combo)
-                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                                    .frame(width: 90, alignment: .trailing)
+                                    .font(.system(size: style.fontSize, weight: .semibold, design: .monospaced))
+                                    .frame(width: style.fontSize * 8.5, alignment: .trailing)
                                     .foregroundStyle(Color.accentColor)
                                 Text(row.command)
-                                    .font(.system(size: 11, design: .monospaced))
+                                    .font(.system(size: style.fontSize, design: .monospaced))
                                     .foregroundStyle(.primary)
                             }
                         }
@@ -83,7 +89,7 @@ private struct HelpView: View {
             }
         }
         .padding(20)
-        .background(RoundedRectangle(cornerRadius: 12).fill(.ultraThinMaterial).opacity(opacity))
+        .background(RoundedRectangle(cornerRadius: style.cornerRadius).fill(.ultraThinMaterial).opacity(style.opacity))
         .fixedSize()
     }
 }

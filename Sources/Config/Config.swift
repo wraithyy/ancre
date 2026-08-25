@@ -18,6 +18,8 @@ public struct AppConfig: Codable {
         public var defaultLayout: String
         /// Bundle ids that always place instantly (apps that animate badly).
         public var animationsExclude: [String]
+        /// UI language for bar menus/tooltips ("en", "cs"); default "en".
+        public var language: String
 
         enum CodingKeys: String, CodingKey {
             case gapsInner = "gaps-inner"
@@ -26,6 +28,7 @@ public struct AppConfig: Codable {
             case animationDurationMs = "animation-duration-ms"
             case defaultLayout = "default-layout"
             case animationsExclude = "animations-exclude"
+            case language
         }
 
         public init(from decoder: Decoder) throws {
@@ -38,6 +41,7 @@ public struct AppConfig: Codable {
             animationDurationMs = try c.decode(Int.self, forKey: .animationDurationMs)
             defaultLayout = try c.decode(String.self, forKey: .defaultLayout)
             animationsExclude = try c.decodeIfPresent([String].self, forKey: .animationsExclude) ?? []
+            language = try c.decodeIfPresent(String.self, forKey: .language) ?? "en"
         }
 
         private static func lenientDouble(
@@ -67,16 +71,55 @@ public struct AppConfig: Codable {
         public var backgroundColor: String?
         /// Accent (active workspace, rings) "#RRGGBB"; nil = system accent.
         public var accentColor: String?
+        /// Dashed ring marking floating windows; nil = white.
+        public var floatColor: String?
+        /// Notification badge background; nil = system red.
+        public var badgeColor: String?
         /// App icon size in the bar, points.
         public var iconSize: Double
+        /// Base font size (workspace number; label is 1pt smaller).
+        public var fontSize: Double
+        /// Font family name; nil = system font (numbers monospaced).
+        public var fontFamily: String?
+        /// Gap between workspace cells.
+        public var spacing: Double
+        /// Gap between elements inside a cell (number, label, icons).
+        public var cellSpacing: Double
+        public var cellRadius: Double
+        public var cellPaddingX: Double
+        public var cellPaddingY: Double
+        public var pillPaddingX: Double
+        public var pillPaddingY: Double
+        /// Active-workspace highlight opacity (focused monitor).
+        public var activeOpacity: Double
+        /// Opacity of icons of unfocused windows.
+        public var inactiveIconOpacity: Double
+        /// Focus/float ring line width.
+        public var ringWidth: Double
+        /// Max app icons shown per workspace.
+        public var maxIcons: Int
 
         enum CodingKeys: String, CodingKey {
-            case enabled, position, opacity, height, align
+            case enabled, position, opacity, height, align, spacing
             case offsetX = "offset-x"
             case offsetY = "offset-y"
             case backgroundColor = "background-color"
             case accentColor = "accent-color"
+            case floatColor = "float-color"
+            case badgeColor = "badge-color"
             case iconSize = "icon-size"
+            case fontSize = "font-size"
+            case fontFamily = "font-family"
+            case cellSpacing = "cell-spacing"
+            case cellRadius = "cell-radius"
+            case cellPaddingX = "cell-padding-x"
+            case cellPaddingY = "cell-padding-y"
+            case pillPaddingX = "pill-padding-x"
+            case pillPaddingY = "pill-padding-y"
+            case activeOpacity = "active-opacity"
+            case inactiveIconOpacity = "inactive-icon-opacity"
+            case ringWidth = "ring-width"
+            case maxIcons = "max-icons"
         }
 
         // Newer keys are optional with defaults so configs copied before they
@@ -92,7 +135,22 @@ public struct AppConfig: Codable {
             offsetY = try Self.lenientDouble(c, .offsetY) ?? 0
             backgroundColor = try c.decodeIfPresent(String.self, forKey: .backgroundColor)
             accentColor = try c.decodeIfPresent(String.self, forKey: .accentColor)
+            floatColor = try c.decodeIfPresent(String.self, forKey: .floatColor)
+            badgeColor = try c.decodeIfPresent(String.self, forKey: .badgeColor)
             iconSize = try Self.lenientDouble(c, .iconSize) ?? 17
+            fontSize = try Self.lenientDouble(c, .fontSize) ?? 13
+            fontFamily = try c.decodeIfPresent(String.self, forKey: .fontFamily)
+            spacing = try Self.lenientDouble(c, .spacing) ?? 6
+            cellSpacing = try Self.lenientDouble(c, .cellSpacing) ?? 4
+            cellRadius = try Self.lenientDouble(c, .cellRadius) ?? 7
+            cellPaddingX = try Self.lenientDouble(c, .cellPaddingX) ?? 8
+            cellPaddingY = try Self.lenientDouble(c, .cellPaddingY) ?? 3
+            pillPaddingX = try Self.lenientDouble(c, .pillPaddingX) ?? 10
+            pillPaddingY = try Self.lenientDouble(c, .pillPaddingY) ?? 3
+            activeOpacity = try Self.lenientDouble(c, .activeOpacity) ?? 0.55
+            inactiveIconOpacity = try Self.lenientDouble(c, .inactiveIconOpacity) ?? 0.75
+            ringWidth = try Self.lenientDouble(c, .ringWidth) ?? 1.5
+            maxIcons = try c.decodeIfPresent(Int.self, forKey: .maxIcons) ?? 6
         }
 
         private static func lenientDouble(
@@ -140,15 +198,24 @@ public struct AppConfig: Codable {
         public var opacity: Double
 
         enum CodingKeys: String, CodingKey {
-            case enabled, opacity
+            case enabled, opacity, columns
             case delayMs = "delay-ms"
+            case fontSize = "font-size"
+            case cornerRadius = "corner-radius"
         }
+
+        public var fontSize: Double
+        public var columns: Int
+        public var cornerRadius: Double
 
         public init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
             delayMs = (try? c.decode(Double.self, forKey: .delayMs)) ?? Double((try? c.decode(Int.self, forKey: .delayMs)) ?? 2000)
             opacity = (try? c.decode(Double.self, forKey: .opacity)) ?? 0.85
+            fontSize = (try? c.decode(Double.self, forKey: .fontSize)) ?? Double((try? c.decode(Int.self, forKey: .fontSize)) ?? 11)
+            columns = try c.decodeIfPresent(Int.self, forKey: .columns) ?? 3
+            cornerRadius = (try? c.decode(Double.self, forKey: .cornerRadius)) ?? Double((try? c.decode(Int.self, forKey: .cornerRadius)) ?? 12)
         }
     }
 

@@ -18,8 +18,12 @@ final class WindowManagerController: WindowTrackerDelegate {
     private let tracker = WindowTracker()
     private let input = InputSystem()
     private let displays = DisplayManager()
-    private let config: AppConfig
+    /// Mutable for hot-reload; owned by the axQueue after start().
+    private var config: AppConfig
+    /// Guarded by bindingsLock — the event tap thread reads while hot-reload
+    /// replaces the whole dictionary.
     private var bindings: [String: Command] = [:]
+    private let bindingsLock = NSLock()
     private let workspaceNames = (1...9).map(String.init)
 
     private var state: WMState
@@ -41,9 +45,10 @@ final class WindowManagerController: WindowTrackerDelegate {
     /// reconfiguration macOS "rescues" offscreen windows onto a remaining
     /// display; tracking membership lets enforceTiling send them back.
     private var parkedWindows: Set<AXWindowID> = []
-    /// Created in init, which runs on the main thread (NSWindow requirement);
-    /// afterwards touched only via DispatchQueue.main. Nil when disabled.
-    private let focusBorder: FocusBorder?
+    /// Created on the main thread (NSWindow requirement); the reference is
+    /// owned by the axQueue, window operations happen via DispatchQueue.main.
+    /// Nil when disabled.
+    private var focusBorder: FocusBorder?
     /// Created in start() (main thread); nil when disabled in config.
     private var bar: BarController?
     /// Dock notification badges by pid (axQueue). ponytail: polled — macOS
@@ -56,8 +61,15 @@ final class WindowManagerController: WindowTrackerDelegate {
     /// Keybind cheatsheet (main thread only). Nil when disabled in config.
     private var helpOverlay: HelpOverlay?
     private var helpTimer: Timer?
+    /// Main thread; read by the hyper-hold handler.
+    private var helpDelaySeconds: Double = 2
     /// Eases frame changes (axQueue). Slow apps auto-fall back to instant.
-    private let animator: Animator
+    private var animator: Animator
+    /// Pause = drop all placement effects and enforcement; state keeps
+    /// updating, resume re-places everything from state. (axQueue)
+    private var tilingPaused = false
+    /// Fires on main whenever the pause state flips (menu checkbox sync).
+    var onTilingPausedChanged: ((Bool) -> Void)?
 
     init(config: AppConfig) {
         self.config = config
@@ -88,20 +100,188 @@ final class WindowManagerController: WindowTrackerDelegate {
     }
 
     func start() {
+        L10n.language = config.general.language
         let resolved = ConfigLoader.resolveBindings(config)
         resolved.warnings.forEach { NSLog("applland: %@", $0) }
-        bindings = resolved.bindings
+        setBindings(resolved.bindings)
 
-        if config.bar.enabled {
-            let theme = BarTheme(
-                opacity: config.bar.opacity,
-                align: config.bar.align,
-                offsetX: config.bar.offsetX,
-                iconSize: config.bar.iconSize,
-                background: (config.bar.backgroundColor ?? config.theme?.background).flatMap { NSColor(hex: $0) },
-                accent: (config.bar.accentColor ?? config.theme?.accent).flatMap { NSColor(hex: $0) }
-            )
-            bar = BarController(
+        bar = makeBarController()
+        rebuildHelpOverlay()
+
+        // Displays first: window discovery needs monitors to place windows on.
+        displays.start { [weak self] infos in
+            self?.applyDisplays(infos)
+        }
+
+        // Dock badge polling; Timer fires on main, work hops to axQueue.
+        // Runs even with the bar disabled (a reload may enable it) — the
+        // tick is a no-op without a bar.
+        badgeTimer = Timer.scheduledTimer(withTimeInterval: 2.5, repeats: true) { [weak self] _ in
+            self?.tracker.perform {
+                guard let self, self.bar != nil else { return }
+                let fresh = DockBadges.current()
+                if fresh != self.dockBadges {
+                    self.dockBadges = fresh
+                    self.updateBar()
+                }
+            }
+        }
+
+        tracker.delegate = self
+        tracker.start()
+
+        start_inputOnly()
+    }
+
+    /// Re-reads the user config and applies what can change live: bindings,
+    /// gaps, workspace assignments, bar, focus border, help overlay, animator,
+    /// language. Existing workspace layouts are left alone. Safe from any
+    /// thread (marshals itself).
+    func reloadConfig() {
+        tracker.perform { [self] in
+            let (newConfig, warnings) = ConfigLoader.load()
+            warnings.forEach { NSLog("applland: %@", $0) }
+            let oldHyperKey = config.hyper.key
+            config = newConfig
+            NSLog("applland: config reloaded")
+
+            DispatchQueue.main.async { L10n.language = newConfig.general.language }
+            setBindings(ConfigLoader.resolveBindings(newConfig).bindings)
+            animator = Animator(settings: .init(
+                enabled: newConfig.general.animations,
+                duration: min(max(Double(newConfig.general.animationDurationMs) / 1000, 0.05), 0.5),
+                excluded: Set(newConfig.general.animationsExclude)
+            ))
+            state.innerGap = newConfig.general.gapsInner
+            state.outerGap = newConfig.general.gapsOuter
+            state.workspaceAssignments = newConfig.workspaces ?? [:]
+
+            rebuildFocusBorder()
+            let oldBar = bar
+            bar = makeBarController()
+            DispatchQueue.main.async { oldBar?.close() }
+            rebuildHelpOverlay()
+
+            if oldHyperKey != newConfig.hyper.key {
+                // Hyper key changed — restart the remap + tap. Rare enough to
+                // accept the momentary gap.
+                NSLog("applland: hyper key changed, restarting input")
+                input.stop()
+                start_inputOnly()
+            }
+
+            // Re-place everything with the new gaps/assignments; workspace
+            // contents and layouts are preserved by reconcile.
+            applyDisplays(DisplayManager.current())
+        }
+    }
+
+    /// Restart just the input stack after a hyper key change (reuses the same
+    /// closures as start()).
+    private func start_inputOnly() {
+        input.start(
+            hyperKeyName: config.hyper.key,
+            handler: { [weak self] combo in
+                guard let self, let command = self.binding(for: combo) else { return false }
+                self.tracker.perform { self.run(command) }
+                return true
+            },
+            onHyperStateChange: { [weak self] down in
+                DispatchQueue.main.async {
+                    guard let self, let helpOverlay = self.helpOverlay else { return }
+                    self.helpTimer?.invalidate()
+                    if down {
+                        self.helpTimer = Timer.scheduledTimer(withTimeInterval: self.helpDelaySeconds, repeats: false) { _ in
+                            helpOverlay.show()
+                        }
+                    } else {
+                        self.helpTimer = nil
+                        helpOverlay.hide()
+                    }
+                }
+            }
+        )
+    }
+
+    private func binding(for combo: String) -> Command? {
+        bindingsLock.lock()
+        defer { bindingsLock.unlock() }
+        return bindings[combo]
+    }
+
+    private func setBindings(_ new: [String: Command]) {
+        bindingsLock.lock()
+        bindings = new
+        bindingsLock.unlock()
+    }
+
+    /// Recreates the focus border from config. axQueue; window work on main.
+    private func rebuildFocusBorder() {
+        let old = focusBorder
+        focusBorder = nil
+        DispatchQueue.main.async { old?.hide() }
+        guard config.border?.enabled ?? true else { return }
+        let borderConfig = config.border
+        let accent = config.theme?.accent
+        DispatchQueue.main.async { [weak self] in
+            let color = (borderConfig?.color ?? accent).flatMap { NSColor(hex: $0) } ?? .controlAccentColor
+            let border = FocusBorder(color: color, width: borderConfig?.width ?? 2, radius: borderConfig?.radius ?? 6)
+            self?.tracker.perform {
+                guard let self else { return }
+                self.focusBorder = border
+                self.updateFocusBorder()
+            }
+        }
+    }
+
+    /// (Re)creates the help overlay from config. Any thread; work on main.
+    private func rebuildHelpOverlay() {
+        let cfg = config
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.helpTimer?.invalidate()
+            self.helpTimer = nil
+            self.helpOverlay?.hide()
+            self.helpDelaySeconds = (cfg.help?.delayMs ?? 2000) / 1000
+            var style = HelpOverlay.Style()
+            if let help = cfg.help {
+                style.opacity = help.opacity
+                style.fontSize = help.fontSize
+                style.columns = help.columns
+                style.cornerRadius = help.cornerRadius
+            }
+            self.helpOverlay = (cfg.help?.enabled ?? true)
+                ? HelpOverlay(bindings: cfg.keybindings, hyperKeyName: cfg.hyper.key, style: style)
+                : nil
+        }
+    }
+
+    private func makeBarController() -> BarController? {
+        guard config.bar.enabled else { return nil }
+        let barConfig = config.bar
+        var theme = BarTheme()
+        theme.opacity = barConfig.opacity
+        theme.align = barConfig.align
+        theme.offsetX = barConfig.offsetX
+        theme.iconSize = barConfig.iconSize
+        theme.background = (barConfig.backgroundColor ?? config.theme?.background).flatMap { NSColor(hex: $0) }
+        theme.accent = (barConfig.accentColor ?? config.theme?.accent).flatMap { NSColor(hex: $0) }
+        theme.floatColor = barConfig.floatColor.flatMap { NSColor(hex: $0) }
+        theme.badgeColor = barConfig.badgeColor.flatMap { NSColor(hex: $0) }
+        theme.fontSize = barConfig.fontSize
+        theme.fontFamily = barConfig.fontFamily
+        theme.spacing = barConfig.spacing
+        theme.cellSpacing = barConfig.cellSpacing
+        theme.cellRadius = barConfig.cellRadius
+        theme.cellPaddingX = barConfig.cellPaddingX
+        theme.cellPaddingY = barConfig.cellPaddingY
+        theme.pillPaddingX = barConfig.pillPaddingX
+        theme.pillPaddingY = barConfig.pillPaddingY
+        theme.activeOpacity = barConfig.activeOpacity
+        theme.inactiveIconOpacity = barConfig.inactiveIconOpacity
+        theme.ringWidth = barConfig.ringWidth
+        theme.maxIcons = barConfig.maxIcons
+        return BarController(
                 theme: theme,
                 onSelect: { [weak self] name in
                     guard let self else { return }
@@ -132,65 +312,24 @@ final class WindowManagerController: WindowTrackerDelegate {
                 onSetLayout: { [weak self] workspaceName, layoutName in
                     guard let self else { return }
                     self.tracker.perform { self.applyLayout(named: layoutName, toWorkspace: workspaceName) }
-                }
-            )
-        }
-
-        // Displays first: window discovery needs monitors to place windows on.
-        displays.start { [weak self] infos in
-            self?.applyDisplays(infos)
-        }
-
-        if bar != nil {
-            // Dock badge polling; Timer fires on main, work hops to axQueue.
-            badgeTimer = Timer.scheduledTimer(withTimeInterval: 2.5, repeats: true) { [weak self] _ in
-                self?.tracker.perform {
+                },
+                onToggleFloat: { [weak self] windowID in
                     guard let self else { return }
-                    let fresh = DockBadges.current()
-                    if fresh != self.dockBadges {
-                        self.dockBadges = fresh
-                        self.updateBar()
+                    self.tracker.perform {
+                        let wid = WindowID(windowID)
+                        let floating = self.state.windows[wid]?.isFloating ?? false
+                        self.execute(WM.setFloating(wid, floating: !floating, state: &self.state))
+                    }
+                },
+                onToggleFullscreen: { [weak self] windowID in
+                    guard let self else { return }
+                    self.tracker.perform {
+                        // Fullscreen works on the focused window — focus it first.
+                        self.execute(WM.focusChangedExternally(WindowID(windowID), state: &self.state))
+                        self.execute([.focusWindow(WindowID(windowID))])
+                        self.run(.toggleFullscreen)
                     }
                 }
-            }
-        }
-
-        tracker.delegate = self
-        tracker.start()
-
-        if config.help?.enabled ?? true {
-            helpOverlay = HelpOverlay(
-                bindings: config.keybindings,
-                hyperKeyName: config.hyper.key,
-                opacity: config.help?.opacity ?? 0.85
-            )
-        }
-        let helpDelay = (config.help?.delayMs ?? 2000) / 1000
-
-        // `bindings` is immutable after this point, so reading it from the
-        // event tap thread without marshaling is safe.
-        input.start(
-            hyperKeyName: config.hyper.key,
-            handler: { [weak self] combo in
-                guard let self, let command = self.bindings[combo] else { return false }
-                self.tracker.perform { self.run(command) }
-                return true
-            },
-            onHyperStateChange: { [weak self] down in
-                // Tap thread — only dispatch. Held past the delay -> show help.
-                DispatchQueue.main.async {
-                    guard let self, let helpOverlay = self.helpOverlay else { return }
-                    self.helpTimer?.invalidate()
-                    if down {
-                        self.helpTimer = Timer.scheduledTimer(withTimeInterval: helpDelay, repeats: false) { _ in
-                            helpOverlay.show()
-                        }
-                    } else {
-                        self.helpTimer = nil
-                        helpOverlay.hide()
-                    }
-                }
-            }
         )
     }
 
@@ -262,7 +401,13 @@ final class WindowManagerController: WindowTrackerDelegate {
                 }
                 let windows = (workspace.tiledWindows + Array(workspace.floatingFrames.keys)).compactMap { wid -> BarWindowItem? in
                     guard let pid = state.windows[wid]?.pid else { return nil }
-                    return BarWindowItem(windowID: wid.rawValue, pid: pid, isFocused: wid == globallyFocused, badge: dockBadges[pid])
+                    return BarWindowItem(
+                        windowID: wid.rawValue,
+                        pid: pid,
+                        isFocused: wid == globallyFocused,
+                        badge: dockBadges[pid],
+                        isFloating: state.windows[wid]?.isFloating ?? false
+                    )
                 }
                 let label = config.workspaceLabels?[workspace.name]
                 return BarWorkspaceItem(
@@ -295,13 +440,48 @@ final class WindowManagerController: WindowTrackerDelegate {
     // MARK: - Command / effect pipeline (axQueue)
 
     private func run(_ command: Command) {
-        if command == .adoptWindow { adoptFrontmostWindow(); return }
-        if case .setLayout(let name) = command {
+        switch command {
+        case .adoptWindow:
+            adoptFrontmostWindow()
+            return
+        case .setLayout(let name):
             guard state.monitors.indices.contains(state.focusedMonitorIndex) else { return }
             applyLayout(named: name, toWorkspace: state.monitors[state.focusedMonitorIndex].activeWorkspace.name)
             return
+        case .pauseTiling:
+            setTilingPausedOnQueue(!tilingPaused)
+            return
+        case .retile:
+            applyDisplays(DisplayManager.current())
+            return
+        case .openConfig:
+            DispatchQueue.main.async { NSWorkspace.shared.open(ConfigLoader.userConfigURL) }
+            return
+        default:
+            break
         }
         execute(WM.dispatch(command, state: &state))
+    }
+
+    // MARK: - Menu-facing API (safe from any thread)
+
+    func toggleTilingPause() {
+        tracker.perform { self.setTilingPausedOnQueue(!self.tilingPaused) }
+    }
+
+    func retile() {
+        tracker.perform { self.applyDisplays(DisplayManager.current()) }
+    }
+
+    private func setTilingPausedOnQueue(_ paused: Bool) {
+        guard paused != tilingPaused else { return }
+        tilingPaused = paused
+        NSLog("applland: tiling %@", paused ? "paused" : "resumed")
+        DispatchQueue.main.async { self.onTilingPausedChanged?(paused) }
+        if !paused {
+            // State kept evolving while effects were dropped — re-place all.
+            applyDisplays(DisplayManager.current())
+        }
     }
 
     private func applyLayout(named name: String, toWorkspace workspaceName: String) {
@@ -361,6 +541,12 @@ final class WindowManagerController: WindowTrackerDelegate {
             if executeDepth == 0 { adoptAttempts.removeAll() }
         }
         for effect in effects {
+            if tilingPaused {
+                switch effect {
+                case .setFrame, .hideWorkspace, .showWorkspace: continue
+                case .focusWindow: break
+                }
+            }
             switch effect {
             case .setFrame(let wid, let rect):
                 assign(frame: AXFrame(origin: rect.origin, size: rect.size), to: wid)
@@ -598,7 +784,7 @@ final class WindowManagerController: WindowTrackerDelegate {
     }
 
     private func enforceTiling(id: AXWindowID, newFrame: AXFrame) {
-        guard let ax = axWindows[id] else { return }
+        guard let ax = axWindows[id], !tilingPaused else { return }
         // Mid-animation geometry events are our own setFrames, not the app's.
         guard !animator.animatingWindows.contains(id) else { return }
         if parkedWindows.contains(id) {

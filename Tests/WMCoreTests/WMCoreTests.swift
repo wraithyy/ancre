@@ -17,6 +17,7 @@ final class CommandParsingTests: XCTestCase {
         "move-to-workspace 7", "move-to-workspace 8", "move-to-workspace 9",
         "toggle-floating", "toggle-fullscreen", "adopt-window",
         "layout scroll", "layout dwindle",
+        "pause-tiling", "retile", "open-config",
         "focus-monitor previous", "focus-monitor next",
     ]
 

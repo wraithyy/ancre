@@ -8,6 +8,8 @@ animation-duration-ms = 180
 # Apps that always place instantly (animate badly):
 # animations-exclude = ["com.microsoft.teams2"]
 default-layout = "dwindle"   # dwindle | scroll
+# UI language for bar menus/tooltips: "en" (default) | "cs"
+# language = "en"
 
 [hyper]
 # Physical key remapped to act as the hyper modifier.
@@ -49,6 +51,8 @@ key = "caps_lock"
 "hyper-a" = "adopt-window"
 "hyper-t" = "layout scroll"
 "hyper-shift-t" = "layout dwindle"
+"hyper-p" = "pause-tiling"
+"hyper-r" = "retile"
 "hyper-comma" = "focus-monitor previous"
 "hyper-period" = "focus-monitor next"
 
@@ -77,6 +81,23 @@ offset-y = 0
 # Overrides of [theme] just for the bar:
 # background-color = "#1e1e2eCC"
 # accent-color = "#89b4fa"
+# Dashed ring marking floating windows (default white):
+# float-color = "#FFFFFF"
+# badge-color = "#FF3B30"
+# Typography & metrics (defaults shown):
+# font-size = 13        # workspace number; label 1pt smaller, badge ~half
+# font-family = ""      # font name; unset = system (numbers monospaced)
+# spacing = 6           # between workspace cells
+# cell-spacing = 4      # inside a cell (number, label, icons)
+# cell-radius = 7
+# cell-padding-x = 8
+# cell-padding-y = 3
+# pill-padding-x = 10
+# pill-padding-y = 3
+# active-opacity = 0.55
+# inactive-icon-opacity = 0.75
+# ring-width = 1.5
+# max-icons = 6
 
 # Keybind cheatsheet: hold hyper past delay-ms to show a translucent overlay
 # with all keybindings; released hyper hides it.
@@ -84,6 +105,9 @@ offset-y = 0
 # enabled = true
 # delay-ms = 2000
 # opacity = 0.85
+# font-size = 11
+# columns = 3
+# corner-radius = 12
 
 # Shared colors ("#RRGGBB" / "#RRGGBBAA"); absent = system accent/material.
 # [theme]

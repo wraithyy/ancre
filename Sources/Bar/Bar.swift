@@ -15,12 +15,15 @@ public struct BarWindowItem: Equatable {
     public let isFocused: Bool
     /// Dock notification badge of the owning app ("3", "•"), nil when none.
     public let badge: String?
+    /// Floating windows get a dashed ring and a "return to tiling" menu item.
+    public let isFloating: Bool
 
-    public init(windowID: UInt32, pid: pid_t, isFocused: Bool, badge: String?) {
+    public init(windowID: UInt32, pid: pid_t, isFocused: Bool, badge: String?, isFloating: Bool) {
         self.windowID = windowID
         self.pid = pid
         self.isFocused = isFocused
         self.badge = badge
+        self.isFloating = isFloating
     }
 }
 
@@ -101,24 +104,41 @@ public extension NSColor {
     }
 }
 
-/// Visual knobs resolved from config ([theme] + [bar] overrides).
+/// Visual knobs resolved from config ([theme] + [bar] overrides). Defaults
+/// here mirror the config defaults; the controller overwrites everything.
 public struct BarTheme {
-    public let opacity: Double
-    public let align: String
-    public let offsetX: Double
-    public let iconSize: CGFloat
+    public var opacity = 0.35
+    public var align = "center"
+    public var offsetX = 0.0
+    public var iconSize: CGFloat = 17
     /// nil = system material.
-    public let background: NSColor?
+    public var background: NSColor?
     /// nil = system accent.
-    public let accent: NSColor?
+    public var accent: NSColor?
+    /// Dashed float-indicator ring; nil = white.
+    public var floatColor: NSColor?
+    /// Notification badge background; nil = system red.
+    public var badgeColor: NSColor?
+    public var fontSize = 13.0
+    /// nil = system font (workspace numbers monospaced).
+    public var fontFamily: String?
+    public var spacing = 6.0
+    public var cellSpacing = 4.0
+    public var cellRadius = 7.0
+    public var cellPaddingX = 8.0
+    public var cellPaddingY = 3.0
+    public var pillPaddingX = 10.0
+    public var pillPaddingY = 3.0
+    public var activeOpacity = 0.55
+    public var inactiveIconOpacity = 0.75
+    public var ringWidth = 1.5
+    public var maxIcons = 6
 
-    public init(opacity: Double, align: String, offsetX: Double, iconSize: CGFloat, background: NSColor?, accent: NSColor?) {
-        self.opacity = opacity
-        self.align = align
-        self.offsetX = offsetX
-        self.iconSize = iconSize
-        self.background = background
-        self.accent = accent
+    public init() {}
+
+    func font(size: Double, weight: Font.Weight, monospaced: Bool = false) -> Font {
+        if let fontFamily { return .custom(fontFamily, size: size).weight(weight) }
+        return .system(size: size, weight: weight, design: monospaced ? .monospaced : .default)
     }
 }
 
@@ -129,6 +149,8 @@ public final class BarController {
     private let onMoveFocusedWindow: (String) -> Void
     private let onFocusWindow: (UInt32) -> Void
     private let onSetLayout: (String, String) -> Void
+    private let onToggleFloat: (UInt32) -> Void
+    private let onToggleFullscreen: (UInt32) -> Void
     private var windows: [String: NSWindow] = [:]
     private var lastSnapshots: [String: BarMonitorSnapshot] = [:]
 
@@ -138,7 +160,9 @@ public final class BarController {
         onMoveWindow: @escaping (UInt32, String) -> Void,
         onMoveFocusedWindow: @escaping (String) -> Void,
         onFocusWindow: @escaping (UInt32) -> Void,
-        onSetLayout: @escaping (_ workspace: String, _ layout: String) -> Void
+        onSetLayout: @escaping (_ workspace: String, _ layout: String) -> Void,
+        onToggleFloat: @escaping (UInt32) -> Void,
+        onToggleFullscreen: @escaping (UInt32) -> Void
     ) {
         self.theme = theme
         self.onSelect = onSelect
@@ -146,6 +170,8 @@ public final class BarController {
         self.onMoveFocusedWindow = onMoveFocusedWindow
         self.onFocusWindow = onFocusWindow
         self.onSetLayout = onSetLayout
+        self.onToggleFloat = onToggleFloat
+        self.onToggleFullscreen = onToggleFullscreen
     }
 
     /// Replaces all bars with the given per-monitor snapshots. Bars for
@@ -170,7 +196,9 @@ public final class BarController {
                     onMoveWindow: onMoveWindow,
                     onMoveFocusedWindow: onMoveFocusedWindow,
                     onFocusWindow: onFocusWindow,
-                    onSetLayout: onSetLayout
+                    onSetLayout: onSetLayout,
+                    onToggleFloat: onToggleFloat,
+                    onToggleFullscreen: onToggleFullscreen
                 )
             )
             window.orderFrontRegardless()
@@ -180,6 +208,13 @@ public final class BarController {
             windows.removeValue(forKey: id)
             lastSnapshots.removeValue(forKey: id)
         }
+    }
+
+    /// Closes all bar windows (hot-reload replaces the controller). Main thread.
+    public func close() {
+        for window in windows.values { window.orderOut(nil) }
+        windows.removeAll()
+        lastSnapshots.removeAll()
     }
 
     private func makeWindow() -> NSWindow {
@@ -204,29 +239,32 @@ private struct BarView: View {
     let onMoveFocusedWindow: (String) -> Void
     let onFocusWindow: (UInt32) -> Void
     let onSetLayout: (String, String) -> Void
+    let onToggleFloat: (UInt32) -> Void
+    let onToggleFullscreen: (UInt32) -> Void
 
     var body: some View {
         HStack {
             if theme.align != "left" { Spacer(minLength: 0) }
-            HStack(spacing: 6) {
+            HStack(spacing: theme.spacing) {
                 ForEach(workspaces, id: \.name) { workspace in
                     WorkspaceCell(
                         workspace: workspace,
                         allWorkspaceNames: allWorkspaceNames,
                         availableLayouts: availableLayouts,
                         isFocusedMonitor: isFocused,
-                        accent: theme.accent.map(Color.init) ?? Color.accentColor,
-                        iconSize: theme.iconSize,
+                        theme: theme,
                         onSelect: onSelect,
                         onMoveWindow: onMoveWindow,
                         onMoveFocusedWindow: onMoveFocusedWindow,
                         onFocusWindow: onFocusWindow,
-                        onSetLayout: onSetLayout
+                        onSetLayout: onSetLayout,
+                        onToggleFloat: onToggleFloat,
+                        onToggleFullscreen: onToggleFullscreen
                     )
                 }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 3)
+            .padding(.horizontal, theme.pillPaddingX)
+            .padding(.vertical, theme.pillPaddingY)
             .background(pillBackground)
             .offset(x: theme.align == "center" ? theme.offsetX : 0)
             if theme.align != "right" { Spacer(minLength: 0) }
@@ -250,50 +288,60 @@ private struct WorkspaceCell: View {
     let allWorkspaceNames: [BarWorkspaceRef]
     let availableLayouts: [String]
     let isFocusedMonitor: Bool
-    let accent: Color
-    let iconSize: CGFloat
+    let theme: BarTheme
     let onSelect: (String) -> Void
     let onMoveWindow: (UInt32, String) -> Void
     let onMoveFocusedWindow: (String) -> Void
     let onFocusWindow: (UInt32) -> Void
     let onSetLayout: (String, String) -> Void
+    let onToggleFloat: (UInt32) -> Void
+    let onToggleFullscreen: (UInt32) -> Void
 
     /// A drag hovers over this cell — highlight it as the drop target.
     @State private var isDropTarget = false
 
+    private var accent: Color { theme.accent.map(Color.init) ?? Color.accentColor }
+    private var floatColor: Color { theme.floatColor.map(Color.init) ?? Color.white }
+    private var badgeColor: Color { theme.badgeColor.map(Color.init) ?? Color.red }
+    private var iconSize: CGFloat { theme.iconSize }
+
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: theme.cellSpacing) {
             if let icon = workspace.icon {
-                Text(icon).font(.system(size: 13))
+                Text(icon).font(.system(size: theme.fontSize))
             }
             if workspace.showNumber {
                 Text(workspace.name)
-                    .font(.system(size: 13, weight: workspace.isActive ? .bold : .regular, design: .monospaced))
+                    .font(theme.font(size: theme.fontSize, weight: workspace.isActive ? .bold : .regular, monospaced: true))
                     .foregroundStyle(workspace.isActive ? Color.primary : Color.secondary)
             }
             if let displayName = workspace.displayName {
                 Text(displayName)
-                    .font(.system(size: 12, weight: workspace.isActive ? .semibold : .regular))
+                    .font(theme.font(size: theme.fontSize - 1, weight: workspace.isActive ? .semibold : .regular))
                     .foregroundStyle(workspace.isActive ? Color.primary : Color.secondary)
             }
-            ForEach(Array(workspace.windows.prefix(6).enumerated()), id: \.element.windowID) { _, window in
+            ForEach(Array(workspace.windows.prefix(theme.maxIcons).enumerated()), id: \.element.windowID) { _, window in
                 if let icon = NSRunningApplication(processIdentifier: window.pid)?.icon {
                     Image(nsImage: icon)
                         .resizable()
                         .frame(width: iconSize, height: iconSize)
-                        .opacity(window.isFocused ? 1 : 0.75)
+                        .opacity(window.isFocused ? 1 : theme.inactiveIconOpacity)
                         .overlay(
+                            // Solid accent ring = focused, dashed = floating.
                             RoundedRectangle(cornerRadius: 4)
-                                .stroke(accent, lineWidth: window.isFocused ? 1.5 : 0)
+                                .stroke(
+                                    window.isFocused ? accent : floatColor,
+                                    style: StrokeStyle(lineWidth: window.isFocused || window.isFloating ? theme.ringWidth : 0, dash: window.isFloating && !window.isFocused ? [2.5] : [])
+                                )
                         )
                         .overlay(alignment: .topTrailing) {
                             if let badge = window.badge {
                                 Text(badge.count > 2 ? "9+" : badge)
-                                    .font(.system(size: 7, weight: .bold))
+                                    .font(.system(size: max(6, theme.fontSize / 2), weight: .bold))
                                     .foregroundStyle(.white)
                                     .padding(.horizontal, 2.5)
                                     .padding(.vertical, 0.5)
-                                    .background(Capsule().fill(.red))
+                                    .background(Capsule().fill(badgeColor))
                                     .offset(x: 4, y: -4)
                             }
                         }
@@ -303,8 +351,10 @@ private struct WorkspaceCell: View {
                         }
                         .onTapGesture { onFocusWindow(window.windowID) }
                         .contextMenu {
-                            Button("Fokusovat okno") { onFocusWindow(window.windowID) }
-                            Menu("Přesunout do") {
+                            Button(L10n.focusWindow) { onFocusWindow(window.windowID) }
+                            Button(window.isFloating ? L10n.tileWindow : L10n.floatWindow) { onToggleFloat(window.windowID) }
+                            Button(L10n.toggleFullscreen) { onToggleFullscreen(window.windowID) }
+                            Menu(L10n.moveTo) {
                                 ForEach(allWorkspaceNames.filter { $0.name != workspace.name }, id: \.name) { target in
                                     Button(target.title) { onMoveWindow(window.windowID, target.name) }
                                 }
@@ -315,28 +365,28 @@ private struct WorkspaceCell: View {
             if isDropTarget {
                 // Placeholder slot where the dragged window's icon will land.
                 RoundedRectangle(cornerRadius: 4)
-                    .stroke(accent, style: StrokeStyle(lineWidth: 1.5, dash: [3]))
+                    .stroke(accent, style: StrokeStyle(lineWidth: theme.ringWidth, dash: [3]))
                     .frame(width: iconSize, height: iconSize)
             }
         }
-        .padding(.vertical, 3)
-        .padding(.horizontal, 8)
+        .padding(.vertical, theme.cellPaddingY)
+        .padding(.horizontal, theme.cellPaddingX)
         .background(
-            RoundedRectangle(cornerRadius: 7)
+            RoundedRectangle(cornerRadius: theme.cellRadius)
                 .fill(backgroundColor)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 7)
-                .stroke(accent, style: StrokeStyle(lineWidth: 1.5, dash: [4]))
+            RoundedRectangle(cornerRadius: theme.cellRadius)
+                .stroke(accent, style: StrokeStyle(lineWidth: theme.ringWidth, dash: [4]))
                 .opacity(isDropTarget ? 1 : 0)
         )
-        .contentShape(RoundedRectangle(cornerRadius: 7))
+        .contentShape(RoundedRectangle(cornerRadius: theme.cellRadius))
         .onTapGesture { onSelect(workspace.name) }
-        .help("workspace \(workspace.name)\(workspace.displayName.map { " · \($0)" } ?? "") — layout: \(workspace.layoutName), oken: \(workspace.windows.count)")
+        .help(L10n.workspaceTooltip(name: workspace.name, displayName: workspace.displayName, layout: workspace.layoutName, windowCount: workspace.windows.count))
         .contextMenu {
-            Button("Přepnout na workspace \(workspace.name)") { onSelect(workspace.name) }
-            Button("Přesunout fokusované okno sem") { onMoveFocusedWindow(workspace.name) }
-            Menu("Layout: \(workspace.layoutName)") {
+            Button(L10n.switchToWorkspace(workspace.name)) { onSelect(workspace.name) }
+            Button(L10n.moveFocusedHere) { onMoveFocusedWindow(workspace.name) }
+            Menu(L10n.layoutMenu(workspace.layoutName)) {
                 ForEach(availableLayouts, id: \.self) { layout in
                     Button {
                         onSetLayout(workspace.name, layout)
@@ -363,6 +413,6 @@ private struct WorkspaceCell: View {
 
     private var backgroundColor: Color {
         if isDropTarget { return accent.opacity(0.25) }
-        return workspace.isActive ? accent.opacity(isFocusedMonitor ? 0.55 : 0.3) : Color.clear
+        return workspace.isActive ? accent.opacity(isFocusedMonitor ? theme.activeOpacity : theme.activeOpacity * 0.55) : Color.clear
     }
 }

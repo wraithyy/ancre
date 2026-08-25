@@ -194,6 +194,18 @@ prázdné stuby. LaunchAgent plist ještě nevznikl.
 ### Milestone 5 — niri layout + custom layouty
 
 ## Task 5.1: ScrollColumns layout + per-workspace přepínání — HOTOVO (kód; + TemplateLayout pro custom layouty z configu; edit mode custom layoutů = budoucí task)
+
+**Budoucí rozšíření — pravý niri scroll (nekonečný pás):** columns layout dnes
+vždy škáluje šířky, aby se všechna okna vešla na monitor. Varianta s viewportem
+(např. 20 oken, viditelná 4, fixní šířky sloupců) je proveditelná: sloupce mimo
+viewport parkovat (infrastruktura existuje — splitVisible parkuje off-monitor
+frames, fokus je odparkuje), anchor mechanika byla v první iteraci
+ScrollColumnsLayout (git historie, commit 072ed40^). Tehdy to působilo jako
+„mizení oken" — chybělo plynulé posouvání. S Animatorem (M4) by scroll vypadal
+přirozeně: při změně anchoru animovat posun všech viditelných sloupců a parkovat
+až po dojezdu. Pozor na: hranu k sousednímu monitoru (sloupce nesmí přetéct —
+řešeno clampem „celý ven"), nearestNeighbor přes zaparkované sloupce (nechat
+jim přirozené souřadnice za hranou) a bar (ukazovat i zaparkovaná okna).
 - **Agent**: claude
 - **Files**: Sources/LayoutEngine/ScrollColumns.swift, Config rozšíření
 - **Depends on**: 1.R
@@ -202,12 +214,20 @@ prázdné stuby. LaunchAgent plist ještě nevznikl.
 
 ### Milestone 6 — Polish
 
-## Task 6.1: App→workspace pravidla + config hot-reload
+## Task 6.1: App→workspace pravidla + config reload — HOTOVO (runtime ověřeno; [app-workspaces] pravidla + explicitní „Reload config" v menubar menu místo FSEvents watch — vědomé rozhodnutí, viz odchylky)
 - **Agent**: claude
 - **Files**: Sources/Config/, Sources/WMCore/Rules.swift
 - **Depends on**: 2.1
 - **Acceptance**: appka z TOML pravidla se otevře ve svém workspace; editace TOML se projeví bez restartu
 - **Prompt seed**: [[rules]] (bundle-id/title regex → workspace, float), FSEvents watch, diff-aware reload (nepřerovnávat existující okna).
+
+**Odchylky od seedu:**
+- Pravidla: `[app-workspaces]` (bundle → workspace) místo `[[rules]]`; title
+  regex a float pravidla odložena (YAGNI, doplnit až budou potřeba).
+- Reload: explicitní menu položka místo FSEvents watch (rozhodnutí uživatele —
+  předvídatelnost > magie). Reload aplikuje: keybinds (s lockem proti tap
+  threadu), gaps, workspace assignments, bar, border, help overlay, animator,
+  jazyk, hyper klíč (restart inputu). Layouty existujících workspaces nechává.
 
 ## Task 6.2: Myší módy — hyper+drag move/resize + release mód
 - **Agent**: claude
@@ -216,7 +236,13 @@ prázdné stuby. LaunchAgent plist ještě nevznikl.
 - **Acceptance**: hyper+left-drag plynule přesouvá (okno floatne), hyper+right-drag resizuje, toggle release mód vyjme okno z mřížky a vrátí zpět
 - **Prompt seed**: CGEventTap mouse eventy při hyper, drag → přímé setFrame (bez animace), drop na tiled workspace → volba insert do mřížky vs zůstat floating.
 
-## Task 6.3: Finální review + security check
+## Task 6.3: Multilang UI — HOTOVO
+- **Files**: Sources/Bar/L10n.swift, Config schema
+- **Acceptance**: `[general] language = "cs"` přepne menu/tooltipy baru do
+  češtiny; default angličtina; neznámý jazyk = fallback EN. Další jazyk =
+  přidat slovník do L10n.tables.
+
+## Task 6.4: Finální review + security check
 - **Agent**: code-reviewer
 - **Files**: celý projekt
 - **Depends on**: vše

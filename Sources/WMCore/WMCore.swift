@@ -236,6 +236,10 @@ public enum Command: Equatable {
     /// "layout <name>": switch the focused workspace's layout. Resolved by the
     /// controller (layout construction lives in LayoutEngine); dispatch() no-op.
     case setLayout(String)
+    /// Controller-side commands (need AX/AppKit); dispatch() no-ops.
+    case pauseTiling
+    case retile
+    case openConfig
 
     /// Parses the command grammar used by `Sources/Config/default.toml`'s
     /// `[keybindings]` values. Keep this in sync with that file.
@@ -270,6 +274,15 @@ public enum Command: Equatable {
         case "layout":
             guard parts.count == 2 else { return nil }
             return .setLayout(parts[1])
+        case "pause-tiling":
+            guard parts.count == 1 else { return nil }
+            return .pauseTiling
+        case "retile":
+            guard parts.count == 1 else { return nil }
+            return .retile
+        case "open-config":
+            guard parts.count == 1 else { return nil }
+            return .openConfig
         case "focus-monitor":
             guard parts.count == 2, let target = MonitorTarget(rawValue: parts[1]) else { return nil }
             return .focusMonitor(target)
@@ -315,6 +328,8 @@ public enum WM {
             return [] // AX-side, handled by the controller before dispatch
         case .setLayout:
             return [] // resolved by the controller (needs LayoutEngine)
+        case .pauseTiling, .retile, .openConfig:
+            return [] // controller-side
         }
     }
 
@@ -597,31 +612,44 @@ public enum WM {
     }
 
     private static func toggleFloating(state: inout WMState) -> [Effect] {
-        let monitorIdx = state.focusedMonitorIndex
-        var monitor = state.monitors[monitorIdx]
-        var workspace = monitor.activeWorkspace
-        guard let window = workspace.focusedWindow, var node = state.windows[window] else { return [] }
+        guard state.monitors.indices.contains(state.focusedMonitorIndex),
+              let window = state.monitors[state.focusedMonitorIndex].activeWorkspace.focusedWindow,
+              let node = state.windows[window] else { return [] }
+        return setFloating(window, floating: !node.isFloating, state: &state)
+    }
 
-        node.isFloating.toggle()
-        state.windows[window] = node
+    /// Floats/tiles any window (hyper-v on the focused one, the bar's context
+    /// menu on arbitrary ones). Floating keeps the window at its CURRENT
+    /// layout frame — node.frame is the stale discovery frame and may lie
+    /// outside the monitor, which used to get the float instantly parked.
+    public static func setFloating(_ window: WindowID, floating: Bool, state: inout WMState) -> [Effect] {
+        guard var node = state.windows[window], node.isFloating != floating,
+              let location = state.windowLocation[window],
+              let wsIdx = state.workspaceIndex(location) else { return [] }
+        let monitorIdx = location.monitorIndex
+        var monitor = state.monitors[monitorIdx]
+        var workspace = monitor.workspaces[wsIdx]
+
         // Explicit user choice — stop second-guessing it on reconfigurations.
         state.autoFloated.remove(window)
+        node.isFloating = floating
 
-        if node.isFloating {
+        if floating {
+            let current = allFrames(for: workspace, monitor: monitor, state: state)[window] ?? node.frame
+            node.frame = current
             workspace.layout.remove(window)
-            workspace.floatingFrames[window] = node.frame
-            workspace.focusedWindow = workspace.tiledWindows.first ?? window
-            monitor.activeWorkspace = workspace
-            state.monitors[monitorIdx] = monitor
-            return frameEffects(for: workspace, monitor: monitor, state: state) + [.setFrame(window, node.frame)]
+            workspace.floatingFrames[window] = current
         } else {
             workspace.floatingFrames.removeValue(forKey: window)
             workspace.layout.insert(window, after: workspace.tiledWindows.last, container: monitor.visibleFrame, innerGap: state.innerGap, outerGap: state.outerGap)
-            workspace.focusedWindow = window
-            monitor.activeWorkspace = workspace
-            state.monitors[monitorIdx] = monitor
-            return frameEffects(for: workspace, monitor: monitor, state: state)
         }
+        state.windows[window] = node
+        workspace.focusedWindow = window
+        monitor.workspaces[wsIdx] = workspace
+        state.monitors[monitorIdx] = monitor
+
+        guard wsIdx == monitor.activeWorkspaceIndex else { return [] }
+        return frameEffects(for: workspace, monitor: monitor, state: state)
     }
 
     private static func toggleFullscreen(state: inout WMState) -> [Effect] {
