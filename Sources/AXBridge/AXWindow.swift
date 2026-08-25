@@ -17,17 +17,14 @@ private let axUIElementGetWindowImpl: AXUIElementGetWindowFn? = {
     return unsafeBitCast(sym, to: AXUIElementGetWindowFn.self)
 }()
 
-func resolveWindowID(_ element: AXUIElement) -> AXWindowID {
-    if let fn = axUIElementGetWindowImpl {
-        var windowID: UInt32 = 0
-        if fn(element, &windowID) == .success, windowID != 0 {
-            return windowID
-        }
-    }
-    // ponytail: hash fallback isn't a stable CGWindowID, only stable per-process identity.
-    // Loud on purpose: a hash collision would silently merge two windows' state.
-    NSLog("applland: _AXUIElementGetWindow unavailable, falling back to hashValue window id")
-    return AXWindowID(truncatingIfNeeded: element.hashValue)
+/// Nil when the ID can't be resolved (transient/dying element, or the private
+/// symbol is missing). Callers must skip such windows — a hash fallback would
+/// mix hash IDs with real CGWindowIDs for the same window and corrupt state.
+func resolveWindowID(_ element: AXUIElement) -> AXWindowID? {
+    guard let fn = axUIElementGetWindowImpl else { return nil }
+    var windowID: UInt32 = 0
+    guard fn(element, &windowID) == .success, windowID != 0 else { return nil }
+    return windowID
 }
 
 public struct AXFrame: Equatable, Sendable {
@@ -59,10 +56,11 @@ public final class AXWindow {
     public let pid: pid_t
     let element: AXUIElement
 
-    init(element: AXUIElement, pid: pid_t) {
+    init?(element: AXUIElement, pid: pid_t) {
+        guard let id = resolveWindowID(element) else { return nil }
         self.element = element
         self.pid = pid
-        self.id = resolveWindowID(element)
+        self.id = id
     }
 
     private func copyAttribute(_ attribute: String) -> AnyObject? {

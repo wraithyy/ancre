@@ -84,7 +84,13 @@ public func nearestNeighbor(from: CGRect, direction: Direction, candidates: [Win
         case .down: inDirection = dy > 1
         }
         guard inDirection else { continue }
-        let dist = (dx * dx + dy * dy).squareRoot()
+        // Weight the perpendicular axis heavily so "down" picks the window
+        // straight below, not a nearer diagonal one.
+        let dist: Double
+        switch direction {
+        case .left, .right: dist = abs(dx) + 3 * abs(dy)
+        case .up, .down: dist = abs(dy) + 3 * abs(dx)
+        }
         if best == nil || dist < best!.1 { best = (id, dist) }
     }
     return best?.0
@@ -436,6 +442,62 @@ public enum WM {
             effects.append(.hideWorkspace([window]))
         }
         return effects
+    }
+
+    /// User finished a native mouse drag-resize: adopt the new size into the
+    /// layout by adjusting split ratios (position changes are not adopted —
+    /// re-placement snaps the window back into its tile). Floating windows
+    /// just remember their new frame.
+    public static func windowResizedByUser(_ id: WindowID, to frame: CGRect, state: inout WMState) -> [Effect] {
+        guard let location = state.windowLocation[id],
+              let wsIdx = state.workspaceIndex(location) else { return [] }
+        var monitor = state.monitors[location.monitorIndex]
+        var workspace = monitor.workspaces[wsIdx]
+
+        if state.windows[id]?.isFloating == true {
+            workspace.floatingFrames[id] = frame
+            state.windows[id]?.frame = frame
+            monitor.workspaces[wsIdx] = workspace
+            state.monitors[location.monitorIndex] = monitor
+            return []
+        }
+
+        let current = allFrames(for: workspace, monitor: monitor, state: state)[id] ?? frame
+        let dw = frame.width - current.width
+        let dh = frame.height - current.height
+        if abs(dw) > 1 {
+            workspace.layout.resize(id, dimension: .width, delta: dw, container: monitor.visibleFrame, innerGap: state.innerGap, outerGap: state.outerGap)
+        }
+        if abs(dh) > 1 {
+            workspace.layout.resize(id, dimension: .height, delta: dh, container: monitor.visibleFrame, innerGap: state.innerGap, outerGap: state.outerGap)
+        }
+        monitor.workspaces[wsIdx] = workspace
+        state.monitors[location.monitorIndex] = monitor
+        guard wsIdx == monitor.activeWorkspaceIndex else { return [] }
+        return frameEffects(for: workspace, monitor: monitor, state: state)
+    }
+
+    /// Auto-float: takes a window that refuses its tile frame (min-size clamp
+    /// bigger than the tile) out of the layout at its actual frame, so the
+    /// remaining tiles reflow instead of overlapping it. No-op if the window
+    /// is already floating or unknown.
+    public static func floatWindow(_ id: WindowID, frame: CGRect, state: inout WMState) -> [Effect] {
+        guard var node = state.windows[id], !node.isFloating,
+              let location = state.windowLocation[id],
+              let wsIdx = state.workspaceIndex(location) else { return [] }
+        node.isFloating = true
+        node.frame = frame
+        state.windows[id] = node
+
+        var monitor = state.monitors[location.monitorIndex]
+        var workspace = monitor.workspaces[wsIdx]
+        workspace.layout.remove(id)
+        workspace.floatingFrames[id] = frame
+        monitor.workspaces[wsIdx] = workspace
+        state.monitors[location.monitorIndex] = monitor
+
+        guard wsIdx == monitor.activeWorkspaceIndex else { return [] }
+        return frameEffects(for: workspace, monitor: monitor, state: state)
     }
 
     private static func toggleFloating(state: inout WMState) -> [Effect] {

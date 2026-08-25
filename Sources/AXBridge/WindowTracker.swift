@@ -61,7 +61,15 @@ public final class WindowTracker {
             forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: nil
         ) { [weak self] note in
             guard let pid = (note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?.processIdentifier else { return }
-            self?.axAsync { self?.apps[pid]?.startObserving() }
+            self?.axAsync {
+                guard let self else { return }
+                self.apps[pid]?.startObserving()
+                // kAXFocusedWindowChanged only fires for in-app focus moves;
+                // switching apps must sync focus from the activated app here.
+                if let focused = self.apps[pid]?.focusedWindow(), self.windowCache[focused.id] != nil {
+                    self.delegate?.windowFocused(id: focused.id)
+                }
+            }
         }
     }
 
@@ -88,6 +96,10 @@ public final class WindowTracker {
 
     private func attach(pid: pid_t) {
         guard apps[pid] == nil else { return }
+        // Manage only real (dock) apps. Background services like
+        // CursorUIViewService own invisible standard-looking windows that
+        // would otherwise get tiled and steal focus.
+        guard NSRunningApplication(processIdentifier: pid)?.activationPolicy == .regular else { return }
         let app = AXApplication(pid: pid, tracker: self)
         apps[pid] = app
         app.startObserving()
@@ -125,7 +137,12 @@ public final class WindowTracker {
     }
 
     func handleWindowDestroyed(elementForID element: AXUIElement) {
-        let id = resolveWindowID(element)
+        // A dying element may no longer resolve its CGWindowID — fall back to
+        // finding the cached window whose element matches.
+        // ponytail: linear scan, fine for tens of windows.
+        guard let id = resolveWindowID(element)
+            ?? windowCache.first(where: { CFEqual($0.value.element, element) })?.key
+        else { return }
         guard windowCache.removeValue(forKey: id) != nil else { return }
         frameCache.removeValue(forKey: id)
         windowOwner.removeValue(forKey: id)
@@ -133,14 +150,12 @@ public final class WindowTracker {
     }
 
     func handleWindowFocused(element: AXUIElement) {
-        let id = resolveWindowID(element)
-        guard windowCache[id] != nil else { return }
+        guard let id = resolveWindowID(element), windowCache[id] != nil else { return }
         delegate?.windowFocused(id: id)
     }
 
     func handleWindowGeometryChanged(element: AXUIElement, moved: Bool) {
-        let id = resolveWindowID(element)
-        guard let window = windowCache[id] else { return }
+        guard let id = resolveWindowID(element), let window = windowCache[id] else { return }
         let newFrame = window.frame
         // Skip redundant delegate calls when nothing actually changed vs cache.
         guard frameCache[id] == nil || frameCache[id]!.diverges(from: newFrame, tolerance: 0.5) else { return }
@@ -153,8 +168,7 @@ public final class WindowTracker {
     }
 
     func handleWindowMiniaturized(element: AXUIElement, miniaturized: Bool) {
-        let id = resolveWindowID(element)
-        guard windowCache[id] != nil else { return }
+        guard let id = resolveWindowID(element), windowCache[id] != nil else { return }
         if miniaturized {
             delegate?.windowMiniaturized(id: id)
         } else {

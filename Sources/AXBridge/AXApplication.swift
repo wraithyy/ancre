@@ -26,12 +26,20 @@ final class AXApplication {
         self.tracker = tracker
     }
 
+    /// The app's currently focused window, if it resolves to a real window.
+    func focusedWindow() -> AXWindow? {
+        var value: AnyObject?
+        guard AXUIElementCopyAttributeValue(element, kAXFocusedWindowAttribute as CFString, &value) == .success,
+              let el = value, CFGetTypeID(el) == AXUIElementGetTypeID() else { return nil }
+        return AXWindow(element: el as! AXUIElement, pid: pid)
+    }
+
     /// Enumerates current windows via kAXWindowsAttribute.
     func currentWindows() -> [AXWindow] {
         var value: AnyObject?
         let err = AXUIElementCopyAttributeValue(element, kAXWindowsAttribute as CFString, &value)
         guard err == .success, let windows = value as? [AXUIElement] else { return [] }
-        return windows.map { AXWindow(element: $0, pid: pid) }
+        return windows.compactMap { AXWindow(element: $0, pid: pid) }
     }
 
     /// Registers the AXObserver, retrying with short backoff since some apps
@@ -93,8 +101,7 @@ final class AXApplication {
         switch notification {
         case kAXCreatedNotification:
             // Filter to windows: role check before treating as a window creation.
-            let window = AXWindow(element: element, pid: pid)
-            guard window.isStandardWindow else { return }
+            guard let window = AXWindow(element: element, pid: pid), window.isStandardWindow else { return }
             tracker.handleWindowDiscovered(window, pid: pid)
         case kAXUIElementDestroyedNotification:
             tracker.handleWindowDestroyed(elementForID: element)

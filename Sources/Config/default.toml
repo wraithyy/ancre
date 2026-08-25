@@ -60,3 +60,6 @@ key = "caps_lock"
 [bar]
 enabled = true
 position = "top"
+# Pill background opacity 0..1 and bar strip height in points.
+opacity = 0.35
+height = 28

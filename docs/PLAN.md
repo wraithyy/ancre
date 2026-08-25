@@ -168,7 +168,7 @@ prázdné stuby. LaunchAgent plist ještě nevznikl.
 
 ### Milestone 3 — Workspace bar
 
-## Task 3.1: SwiftUI bar per monitor (zobrazení + click-to-switch)
+## Task 3.1: SwiftUI bar per monitor (zobrazení + click-to-switch) — HOTOVO (kód, runtime ověření uživatelem probíhá)
 - **Agent**: claude
 - **Files**: Sources/Bar/
 - **Depends on**: 2.1

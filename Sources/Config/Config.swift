@@ -51,6 +51,30 @@ public struct AppConfig: Codable {
     public struct Bar: Codable {
         public var enabled: Bool
         public var position: String
+        public var opacity: Double
+        public var height: Double
+
+        enum CodingKeys: String, CodingKey {
+            case enabled, position, opacity, height
+        }
+
+        // Newer keys are optional with defaults so configs copied before they
+        // existed keep decoding instead of falling back to bundled defaults.
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            enabled = try c.decode(Bool.self, forKey: .enabled)
+            position = try c.decode(String.self, forKey: .position)
+            opacity = try Self.lenientDouble(c, .opacity) ?? 0.35
+            height = try Self.lenientDouble(c, .height) ?? 28
+        }
+
+        private static func lenientDouble(
+            _ c: KeyedDecodingContainer<CodingKeys>, _ key: CodingKeys
+        ) throws -> Double? {
+            if let d = try? c.decode(Double.self, forKey: key) { return d }
+            if let i = try? c.decode(Int.self, forKey: key) { return Double(i) }
+            return nil
+        }
     }
 
     public var general: General

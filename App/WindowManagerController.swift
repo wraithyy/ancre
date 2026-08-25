@@ -7,6 +7,7 @@
 
 import AppKit
 import AXBridge
+import Bar
 import Config
 import InputSystem
 import LayoutEngine
@@ -42,6 +43,8 @@ final class WindowManagerController: WindowTrackerDelegate {
     /// Created in init, which runs on the main thread (NSWindow requirement);
     /// afterwards touched only via DispatchQueue.main.
     private let focusBorder = FocusBorder()
+    /// Created in start() (main thread); nil when disabled in config.
+    private var bar: BarController?
 
     init(config: AppConfig) {
         self.config = config
@@ -59,6 +62,13 @@ final class WindowManagerController: WindowTrackerDelegate {
         let resolved = ConfigLoader.resolveBindings(config)
         resolved.warnings.forEach { NSLog("applland: %@", $0) }
         bindings = resolved.bindings
+
+        if config.bar.enabled {
+            bar = BarController(opacity: config.bar.opacity) { [weak self] workspaceName in
+                guard let self else { return }
+                self.tracker.perform { self.run(.workspace(workspaceName)) }
+            }
+        }
 
         // Displays first: window discovery needs monitors to place windows on.
         displays.start { [weak self] infos in
@@ -91,7 +101,7 @@ final class WindowManagerController: WindowTrackerDelegate {
               infos.map { "\($0.name) [\($0.id)]" }.joined(separator: ", "))
         parkingBounds = infos.dropFirst().reduce(infos[0].frame) { $0.union($1.frame) }
         let monitors = infos.map {
-            MonitorInfo(id: $0.id, name: $0.name, frame: $0.frame, visibleFrame: $0.visibleFrame)
+            MonitorInfo(id: $0.id, name: $0.name, frame: $0.frame, visibleFrame: reserveBarStrip(in: $0.visibleFrame))
         }
         execute(WM.reconcileMonitors(
             monitors,
@@ -101,13 +111,85 @@ final class WindowManagerController: WindowTrackerDelegate {
         ))
     }
 
+    /// Carves the bar strip out of a monitor's usable area so tiles don't
+    /// render under it. CG coordinates: top of the screen is minY.
+    private func reserveBarStrip(in visibleFrame: CGRect) -> CGRect {
+        guard config.bar.enabled else { return visibleFrame }
+        var frame = visibleFrame
+        frame.size.height -= config.bar.height
+        if config.bar.position != "bottom" { frame.origin.y += config.bar.height }
+        return frame
+    }
+
+    /// Snapshot of workspaces per monitor for the bar, marshaled to main.
+    private func updateBar() {
+        guard let bar else { return }
+        let snapshots = state.monitors.enumerated().map { index, monitor -> (String, CGRect, [BarWorkspaceItem], Bool) in
+            let strip = CGRect(
+                x: monitor.visibleFrame.minX,
+                y: config.bar.position == "bottom" ? monitor.visibleFrame.maxY : monitor.visibleFrame.minY - config.bar.height,
+                width: monitor.visibleFrame.width,
+                height: config.bar.height
+            )
+            let items = monitor.workspaces.enumerated().map { wsIndex, workspace -> BarWorkspaceItem in
+                var pids: [pid_t] = []
+                for wid in workspace.tiledWindows + Array(workspace.floatingFrames.keys) {
+                    if let pid = state.windows[wid]?.pid, !pids.contains(pid) { pids.append(pid) }
+                }
+                return BarWorkspaceItem(
+                    name: workspace.name,
+                    isActive: wsIndex == monitor.activeWorkspaceIndex,
+                    appPids: pids
+                )
+            }
+            return (monitor.id, strip, items, index == state.focusedMonitorIndex)
+        }
+        DispatchQueue.main.async {
+            let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
+            bar.update(snapshots.map { id, strip, items, focused in
+                BarMonitorSnapshot(
+                    monitorID: id,
+                    barFrame: DisplayManager.nsScreenRect(fromCGRect: strip, primaryHeight: primaryHeight),
+                    workspaces: items,
+                    isFocusedMonitor: focused
+                )
+            })
+        }
+    }
+
     // MARK: - Command / effect pipeline (axQueue)
 
     private func run(_ command: Command) {
         execute(WM.dispatch(command, state: &state))
     }
 
+    /// Windows whose setFrame result diverged substantially from their tile —
+    /// collected during execute()'s effect loop, resolved after it (calling
+    /// WM mid-loop would mutate state the remaining effects were computed from).
+    /// First tries adopting the actual size into the layout so neighbors make
+    /// room; floats only a window that keeps refusing after adoption.
+    private var pendingAdoptions: [(WindowID, CGRect)] = []
+    private var pendingAutoFloats: [(WindowID, CGRect)] = []
+    /// Consecutive adoption rounds per window; above snapBackLimit the window
+    /// can't be satisfied by re-ratioing (container too small for the minimum
+    /// sizes involved) and gets floated instead of ping-ponging forever.
+    private var adoptAttempts: [AXWindowID: Int] = [:]
+    /// Windows currently being resized by a native mouse drag — left alone
+    /// until the button is released, then adopted into the layout.
+    private var dragResizing: Set<AXWindowID> = []
+
+    /// Nesting depth of execute() — adoption/float drains recurse into it.
+    private var executeDepth = 0
+
     private func execute(_ effects: [Effect]) {
+        executeDepth += 1
+        // Adoption counters live for one cascade: clearing them mid-cascade
+        // (on a transient success) re-arms the ping-pong between two windows
+        // whose minimum sizes can't coexist and recursion never terminates.
+        defer {
+            executeDepth -= 1
+            if executeDepth == 0 { adoptAttempts.removeAll() }
+        }
         for effect in effects {
             switch effect {
             case .setFrame(let wid, let rect):
@@ -122,7 +204,17 @@ final class WindowManagerController: WindowTrackerDelegate {
                 }
             }
         }
+        // Recursion is bounded: adoptions by adoptAttempts, floats by the
+        // floatWindow no-op on already-floating windows.
+        while let (wid, frame) = pendingAdoptions.popLast() {
+            execute(WM.windowResizedByUser(wid, to: frame, state: &state))
+        }
+        while let (wid, frame) = pendingAutoFloats.popLast() {
+            NSLog("applland: window %u can't fit its tile, floating it", wid.rawValue)
+            execute(WM.floatWindow(wid, frame: frame, state: &state))
+        }
         updateFocusBorder()
+        updateBar()
     }
 
     /// Outlines the focused window; hides the border when nothing is focused.
@@ -135,6 +227,14 @@ final class WindowManagerController: WindowTrackerDelegate {
             return
         }
         let frame = (expectedFrames[wid.rawValue] ?? ax.frame).cgRect
+        // Some windows briefly report a zero/degenerate frame (seen as a tiny
+        // border stuck in a screen corner) — hide instead of drawing garbage.
+        guard frame.width > 40, frame.height > 40 else {
+            NSLog("applland: focus border skipped, window %u reports frame %@",
+                  wid.rawValue, String(describing: frame))
+            DispatchQueue.main.async { [focusBorder] in focusBorder.hide() }
+            return
+        }
         DispatchQueue.main.async { [focusBorder] in
             let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
             focusBorder.show(frame: DisplayManager.nsScreenRect(fromCGRect: frame, primaryHeight: primaryHeight))
@@ -153,8 +253,19 @@ final class WindowManagerController: WindowTrackerDelegate {
         // Track what the app actually settled at, not what we asked for —
         // enforcing an unreachable frame against a min-size clamp would loop.
         expectedFrames[wid.rawValue] = actual
-        if actual.diverges(from: target, tolerance: 2) {
-            // ponytail: log only; Milestone-later auto-floats windows that refuse frames.
+        // Small refusals (a menu bar app clamping a few px) stay tiled at the
+        // clamped frame. A substantial refusal (min-size bigger than the tile)
+        // first adopts the actual size into the layout — neighbors make room —
+        // and floats only if adoption keeps failing.
+        if actual.diverges(from: target, tolerance: 50) {
+            let attempts = (adoptAttempts[wid.rawValue] ?? 0) + 1
+            adoptAttempts[wid.rawValue] = attempts
+            if attempts > snapBackLimit {
+                pendingAutoFloats.append((wid, actual.cgRect))
+            } else {
+                pendingAdoptions.append((wid, actual.cgRect))
+            }
+        } else if actual.diverges(from: target, tolerance: 2) {
             NSLog("applland: window %u refused frame (wanted %@, got %@)",
                   wid.rawValue, String(describing: target), String(describing: actual))
         }
@@ -251,6 +362,7 @@ final class WindowManagerController: WindowTrackerDelegate {
         windowPids.removeValue(forKey: id)
         expectedFrames.removeValue(forKey: id)
         snapBackAttempts.removeValue(forKey: id)
+        adoptAttempts.removeValue(forKey: id)
         parkedWindows.remove(id)
         execute(WM.windowRemoved(WindowID(id), state: &state))
     }
@@ -272,17 +384,38 @@ final class WindowManagerController: WindowTrackerDelegate {
             ax.setFrame(OffscreenParking.parkFrame(size: newFrame.size, bounds: parkingBounds))
             return
         }
+        // Floating windows: no enforcement, but remember where the user put
+        // them so focus navigation and layout state stay accurate.
+        if state.windows[WindowID(id)]?.isFloating == true {
+            execute(WM.windowResizedByUser(WindowID(id), to: newFrame.cgRect, state: &state))
+            return
+        }
         guard let expected = expectedFrames[id] else { return }
         guard expected.diverges(from: newFrame, tolerance: 2) else {
             snapBackAttempts.removeValue(forKey: id) // converged
             return
         }
+        // Native mouse drag: don't fight the user mid-drag; when the button is
+        // released, adopt the final size into the layout (splits re-ratio).
+        // ponytail: if no event fires after mouse-up, the next divergence for
+        // this window adopts instead of snapping — acceptable, it matches the
+        // old "accept the app's frame" behavior.
+        if CGEventSource.buttonState(.combinedSessionState, button: .left) {
+            dragResizing.insert(id)
+            return
+        }
+        if dragResizing.remove(id) != nil {
+            execute(WM.windowResizedByUser(WindowID(id), to: newFrame.cgRect, state: &state))
+            return
+        }
         let attempts = (snapBackAttempts[id] ?? 0) + 1
         if attempts > snapBackLimit {
-            // App insists on its own frame — accept it rather than fighting.
-            NSLog("applland: window %u keeps resizing itself, accepting its frame", id)
-            expectedFrames[id] = newFrame
+            // App insists on its own frame — float it so the layout reflows
+            // around it instead of leaving a mis-sized tile overlapping others.
+            NSLog("applland: window %u keeps resizing itself, floating it", id)
+            expectedFrames.removeValue(forKey: id)
             snapBackAttempts.removeValue(forKey: id)
+            execute(WM.floatWindow(WindowID(id), frame: newFrame.cgRect, state: &state))
             return
         }
         snapBackAttempts[id] = attempts
