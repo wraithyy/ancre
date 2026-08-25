@@ -587,6 +587,42 @@ public enum WM {
         return frameEffects(for: workspace, monitor: monitor, state: state)
     }
 
+    /// Drops a (floating) window into the grid right after `target` — the
+    /// hyper+drag drop. Works across workspaces/monitors.
+    public static func tileWindow(_ id: WindowID, after target: WindowID, state: inout WMState) -> [Effect] {
+        guard id != target,
+              var node = state.windows[id],
+              let targetLocation = state.windowLocation[target],
+              let targetWsIdx = state.workspaceIndex(targetLocation) else { return [] }
+
+        if let sourceLocation = state.windowLocation[id], let sourceWsIdx = state.workspaceIndex(sourceLocation) {
+            var source = state.monitors[sourceLocation.monitorIndex].workspaces[sourceWsIdx]
+            source.floatingFrames.removeValue(forKey: id)
+            source.layout.remove(id)
+            if source.focusedWindow == id {
+                source.focusedWindow = source.tiledWindows.first ?? source.floatingFrames.keys.first
+            }
+            state.monitors[sourceLocation.monitorIndex].workspaces[sourceWsIdx] = source
+        }
+
+        node.isFloating = false
+        state.windows[id] = node
+        state.autoFloated.remove(id)
+
+        var monitor = state.monitors[targetLocation.monitorIndex]
+        var workspace = monitor.workspaces[targetWsIdx]
+        workspace.layout.insert(id, after: target, container: monitor.visibleFrame, innerGap: state.innerGap, outerGap: state.outerGap)
+        workspace.focusedWindow = id
+        workspace.layout.focusChanged(id)
+        monitor.workspaces[targetWsIdx] = workspace
+        state.monitors[targetLocation.monitorIndex] = monitor
+        state.windowLocation[id] = WindowLocation(monitorIndex: targetLocation.monitorIndex, workspaceName: workspace.name)
+        state.focusedMonitorIndex = targetLocation.monitorIndex
+
+        guard targetWsIdx == monitor.activeWorkspaceIndex else { return [.hideWorkspace([id])] }
+        return frameEffects(for: workspace, monitor: monitor, state: state) + [.focusWindow(id)]
+    }
+
     /// Auto-float: takes a window that refuses its tile frame (min-size clamp
     /// bigger than the tile) out of the layout at its actual frame, so the
     /// remaining tiles reflow instead of overlapping it. No-op if the window
@@ -669,7 +705,7 @@ public enum WM {
 
     // MARK: Helpers
 
-    static func allFrames(for workspace: Workspace, monitor: Monitor, state: WMState) -> [WindowID: CGRect] {
+    public static func allFrames(for workspace: Workspace, monitor: Monitor, state: WMState) -> [WindowID: CGRect] {
         var frames = workspace.layout.frames(container: monitor.visibleFrame, innerGap: state.innerGap, outerGap: state.outerGap)
         for (id, rect) in workspace.floatingFrames { frames[id] = rect }
         return frames

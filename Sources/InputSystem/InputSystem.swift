@@ -16,7 +16,12 @@ public final class InputSystem {
     /// config value ("caps_lock", "f13".."f20", "right_cmd", "right_option").
     /// `onHyperStateChange` fires on the tap thread when the hyper key goes
     /// down/up — receivers must only dispatch async.
-    public func start(hyperKeyName: String, handler: @escaping Handler, onHyperStateChange: ((Bool) -> Void)? = nil) {
+    public func start(
+        hyperKeyName: String,
+        handler: @escaping Handler,
+        onHyperMouse: ((HyperMouseButton, HyperMousePhase, CGPoint) -> Void)? = nil,
+        onHyperStateChange: ((Bool) -> Void)? = nil
+    ) {
         let remap = HidutilRemap(srcName: hyperKeyName, dstName: "f18")
         remap.apply()
         self.remap = remap
@@ -25,6 +30,7 @@ public final class InputSystem {
 
         let tapManager = EventTapManager(handler: handler)
         tapManager.onHyperStateChange = onHyperStateChange
+        tapManager.onHyperMouse = onHyperMouse
         tapManager.start()
         self.tapManager = tapManager
     }

@@ -163,6 +163,26 @@ public final class WindowTracker {
         delegate?.windowFocused(id: id)
     }
 
+    /// axQueue only. The tracked window under the given point (CG top-left
+    /// global coordinates), via the system-wide AX hit test — respects
+    /// z-order, unlike a frame scan. For hyper+drag mouse modes.
+    public func windowID(at point: CGPoint) -> AXWindowID? {
+        let systemWide = AXUIElementCreateSystemWide()
+        var elementRef: AXUIElement?
+        guard AXUIElementCopyElementAtPosition(systemWide, Float(point.x), Float(point.y), &elementRef) == .success,
+              let element = elementRef else { return nil }
+        var windowRef: AnyObject?
+        let windowElement: AXUIElement
+        if AXUIElementCopyAttributeValue(element, kAXWindowAttribute as CFString, &windowRef) == .success,
+           let ref = windowRef, CFGetTypeID(ref) == AXUIElementGetTypeID() {
+            windowElement = ref as! AXUIElement
+        } else {
+            windowElement = element // the hit may be the window itself
+        }
+        guard let id = resolveWindowID(windowElement), windowCache[id] != nil else { return nil }
+        return id
+    }
+
     /// axQueue only. The frontmost app's focused standard window, registering
     /// it (and the app) if discovery missed them. For the adopt-window command.
     public func frontmostFocusedWindowID() -> AXWindowID? {

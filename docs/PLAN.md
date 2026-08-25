@@ -229,7 +229,7 @@ jim přirozené souřadnice za hranou) a bar (ukazovat i zaparkovaná okna).
   threadu), gaps, workspace assignments, bar, border, help overlay, animator,
   jazyk, hyper klíč (restart inputu). Layouty existujících workspaces nechává.
 
-## Task 6.2: Myší módy — hyper+drag move/resize + release mód
+## Task 6.2: Myší módy — hyper+drag move/resize + release mód — HOTOVO (kód; drop = zůstává floating, insert-do-mřížky při dropu odloženo — vrácení přes hyper+v / bar menu; release mód = toggle-floating)
 - **Agent**: claude
 - **Files**: Sources/InputSystem/MouseModes.swift
 - **Depends on**: 4.1

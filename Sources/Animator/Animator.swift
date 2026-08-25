@@ -54,11 +54,12 @@ public final class Animator {
         _ window: AXWindow,
         bundleID: String,
         to target: AXFrame,
+        animated: Bool = true,
         completion: @escaping (AXFrame) -> Void
     ) {
         let from = window.frame
         let farEnough = from.diverges(from: target, tolerance: 8)
-        guard settings.enabled, farEnough, !settings.excluded.contains(bundleID),
+        guard settings.enabled, animated, farEnough, !settings.excluded.contains(bundleID),
               latency[bundleID, default: 0] <= instantThreshold else {
             animations.removeValue(forKey: window.id)
             completion(measuredSetFrame(window, bundleID: bundleID, target))
