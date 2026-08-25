@@ -45,6 +45,8 @@ key = "caps_lock"
 "hyper-v" = "toggle-floating"
 "hyper-f" = "toggle-fullscreen"
 "hyper-a" = "adopt-window"
+"hyper-t" = "layout scroll"
+"hyper-shift-t" = "layout dwindle"
 "hyper-comma" = "focus-monitor previous"
 "hyper-period" = "focus-monitor next"
 
@@ -64,11 +66,38 @@ position = "top"
 # Pill background opacity 0..1 and bar strip height in points.
 opacity = 0.35
 height = 28
+# Pill placement: align = "center" | "left" | "right"; offset-x shifts the
+# pill along that edge, offset-y pushes the strip away from the screen edge.
+align = "center"
+offset-x = 0
+offset-y = 0
+# icon-size = 17
+# Overrides of [theme] just for the bar:
+# background-color = "#1e1e2eCC"
+# accent-color = "#89b4fa"
 
-# Per-workspace bar appearance. All keys optional.
+# Shared colors ("#RRGGBB" / "#RRGGBBAA"); absent = system accent/material.
+# [theme]
+# accent = "#89b4fa"
+# background = "#1e1e2eCC"
+
+# Focus border around the focused window.
+# [border]
+# enabled = true
+# color = "#89b4fa"   # default: theme accent
+# width = 2
+# radius = 6
+
+# Per-workspace bar appearance + layout. All keys optional.
+# layout: "dwindle" | "scroll" | a [custom-layouts] name.
 # [workspace-labels]
-# "1" = { icon = "🌐", name = "web", show-number = false }
-# "2" = { name = "code" }
+# "1" = { icon = "🌐", name = "web", show-number = false, layout = "scroll" }
+# "2" = { name = "code", hide-when-empty = true }
+
+# Custom layouts: h(...) = side by side, v(...) = stacked, * = window slot.
+# Windows fill slots in order; extras stack into the last slot.
+# [custom-layouts]
+# "master" = "h(0.6, *, v(0.5, *, *))"
 
 # New windows of an app go straight to a workspace (bundle id -> workspace).
 # [app-workspaces]

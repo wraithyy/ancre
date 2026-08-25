@@ -175,6 +175,30 @@ extension WM {
             state.monitors.firstIndex { monitor in monitor.workspaces.contains { $0.name == name } }
         } ?? 0
 
+        // Auto-floated windows (squeezed out of a too-small tile) get another
+        // chance as tiles in the new geometry; if they still don't fit, the
+        // controller's refusal handling re-floats them.
+        for monitorIndex in state.monitors.indices {
+            for wsIdx in state.monitors[monitorIndex].workspaces.indices {
+                var workspace = state.monitors[monitorIndex].workspaces[wsIdx]
+                let retry = workspace.floatingFrames.keys.filter { state.autoFloated.contains($0) }
+                guard !retry.isEmpty else { continue }
+                for window in retry {
+                    workspace.floatingFrames.removeValue(forKey: window)
+                    workspace.layout.insert(
+                        window,
+                        after: workspace.tiledWindows.last,
+                        container: state.monitors[monitorIndex].visibleFrame,
+                        innerGap: state.innerGap,
+                        outerGap: state.outerGap
+                    )
+                    state.windows[window]?.isFloating = false
+                    state.autoFloated.remove(window)
+                }
+                state.monitors[monitorIndex].workspaces[wsIdx] = workspace
+            }
+        }
+
         state.windowLocation = [:]
         for (monitorIndex, monitor) in state.monitors.enumerated() {
             for workspace in monitor.workspaces {
@@ -188,7 +212,9 @@ extension WM {
         for monitor in state.monitors {
             for (index, workspace) in monitor.workspaces.enumerated() {
                 if index == monitor.activeWorkspaceIndex {
-                    effects.append(.showWorkspace(allFrames(for: workspace, monitor: monitor, state: state)))
+                    let (visible, offViewport) = WM.splitVisible(allFrames(for: workspace, monitor: monitor, state: state), monitor: monitor)
+                    effects.append(.showWorkspace(visible))
+                    if !offViewport.isEmpty { effects.append(.hideWorkspace(offViewport)) }
                 } else if !workspace.allWindows.isEmpty {
                     effects.append(.hideWorkspace(Array(workspace.allWindows)))
                 }

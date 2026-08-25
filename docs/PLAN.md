@@ -193,7 +193,7 @@ prázdné stuby. LaunchAgent plist ještě nevznikl.
 
 ### Milestone 5 — niri layout + custom layouty
 
-## Task 5.1: ScrollColumns layout + per-workspace přepínání
+## Task 5.1: ScrollColumns layout + per-workspace přepínání — HOTOVO (kód; + TemplateLayout pro custom layouty z configu; edit mode custom layoutů = budoucí task)
 - **Agent**: claude
 - **Files**: Sources/LayoutEngine/ScrollColumns.swift, Config rozšíření
 - **Depends on**: 1.R

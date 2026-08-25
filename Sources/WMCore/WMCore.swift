@@ -59,6 +59,14 @@ public protocol Layout {
 
     /// Adjust the split ratio that governs `window`'s size along `dimension` by `delta` points.
     mutating func resize(_ window: WindowID, dimension: WMCore.Dimension, delta: Double, container: CGRect, innerGap: Double, outerGap: Double)
+
+    /// Focus moved to `window`. Viewport layouts (scroll) re-anchor here so
+    /// the focused window stays visible; tree layouts ignore it.
+    mutating func focusChanged(_ window: WindowID)
+}
+
+public extension Layout {
+    mutating func focusChanged(_ window: WindowID) {}
 }
 
 public enum LayoutKind: String {
@@ -179,6 +187,10 @@ public struct WMState {
     /// display name). Consulted on every display reconfiguration, not just at
     /// startup, so a monitor plugged in later still claims its workspaces.
     public var workspaceAssignments: [String: String]
+    /// Windows floated automatically (couldn't fit their tile), as opposed to
+    /// a user's toggle-floating. Retried as tiles on display reconfiguration —
+    /// a window squeezed out on a small screen re-tiles on a big one.
+    public var autoFloated: Set<WindowID> = []
 
     public init(monitors: [Monitor], focusedMonitorIndex: Int = 0, windows: [WindowID: WindowNode] = [:], windowLocation: [WindowID: WindowLocation] = [:], innerGap: Double = 8, outerGap: Double = 8, workspaceAssignments: [String: String] = [:]) {
         self.monitors = monitors
@@ -221,6 +233,9 @@ public enum Command: Equatable {
     /// Handled by the controller (needs AX to find the frontmost window);
     /// dispatch() treats it as a no-op.
     case adoptWindow
+    /// "layout <name>": switch the focused workspace's layout. Resolved by the
+    /// controller (layout construction lives in LayoutEngine); dispatch() no-op.
+    case setLayout(String)
 
     /// Parses the command grammar used by `Sources/Config/default.toml`'s
     /// `[keybindings]` values. Keep this in sync with that file.
@@ -252,6 +267,9 @@ public enum Command: Equatable {
         case "adopt-window":
             guard parts.count == 1 else { return nil }
             return .adoptWindow
+        case "layout":
+            guard parts.count == 2 else { return nil }
+            return .setLayout(parts[1])
         case "focus-monitor":
             guard parts.count == 2, let target = MonitorTarget(rawValue: parts[1]) else { return nil }
             return .focusMonitor(target)
@@ -295,7 +313,38 @@ public enum WM {
             return focusMonitor(target, state: &state)
         case .adoptWindow:
             return [] // AX-side, handled by the controller before dispatch
+        case .setLayout:
+            return [] // resolved by the controller (needs LayoutEngine)
         }
+    }
+
+    /// Replaces the named workspace's layout, re-inserting its tiled windows
+    /// in order. Re-places only when that workspace is currently visible —
+    /// a hidden one gets fresh frames on its next show anyway.
+    public static func setLayout(_ newLayout: any Layout, workspaceNamed name: String, state: inout WMState) -> [Effect] {
+        guard let (monitorIdx, wsIdx) = state.locate(workspace: name) else { return [] }
+        var monitor = state.monitors[monitorIdx]
+        var workspace = monitor.workspaces[wsIdx]
+        // A fresh layout is an explicit "rearrange this": auto-floated windows
+        // (squeezed out earlier) get another chance as tiles. User floats stay.
+        let retryFloats = workspace.floatingFrames.keys.filter { state.autoFloated.contains($0) }
+        for window in retryFloats {
+            workspace.floatingFrames.removeValue(forKey: window)
+            state.windows[window]?.isFloating = false
+            state.autoFloated.remove(window)
+        }
+        var layout = newLayout
+        for window in workspace.tiledWindows + retryFloats.sorted(by: { $0.rawValue < $1.rawValue }) {
+            layout.insert(window, after: layout.orderedWindows.last, container: monitor.visibleFrame, innerGap: state.innerGap, outerGap: state.outerGap)
+        }
+        workspace.layout = layout
+        if let focused = workspace.focusedWindow {
+            workspace.layout.focusChanged(focused)
+        }
+        monitor.workspaces[wsIdx] = workspace
+        state.monitors[monitorIdx] = monitor
+        guard wsIdx == monitor.activeWorkspaceIndex else { return [] }
+        return frameEffects(for: workspace, monitor: monitor, state: state)
     }
 
     // MARK: External events
@@ -317,6 +366,7 @@ public enum WM {
 
         workspace.layout.insert(node.id, after: workspace.focusedWindow, container: monitor.visibleFrame, innerGap: state.innerGap, outerGap: state.outerGap)
         workspace.focusedWindow = node.id
+        workspace.layout.focusChanged(node.id)
         monitor.workspaces[wsIdx] = workspace
         state.monitors[monitorIndex] = monitor
 
@@ -353,7 +403,7 @@ public enum WM {
         guard let location = state.windowLocation[id], let wsIdx = state.workspaceIndex(location) else { return [] }
         state.focusedMonitorIndex = location.monitorIndex
         state.monitors[location.monitorIndex].workspaces[wsIdx].focusedWindow = id
-        return []
+        return reanchor(id, state: &state)
     }
 
     // MARK: Command implementations
@@ -368,7 +418,24 @@ public enum WM {
         others.removeValue(forKey: focused)
         guard let target = nearestNeighbor(from: myFrame, direction: direction, candidates: others) else { return [] }
         state.monitors[state.focusedMonitorIndex].activeWorkspace.focusedWindow = target
-        return [.focusWindow(target)]
+        return [.focusWindow(target)] + reanchor(target, state: &state)
+    }
+
+    /// Tells the active workspace's layout about a focus move and re-places
+    /// the workspace when that shifted the viewport (scroll layouts).
+    static func reanchor(_ window: WindowID, state: inout WMState) -> [Effect] {
+        guard let location = state.windowLocation[window],
+              let wsIdx = state.workspaceIndex(location),
+              wsIdx == state.monitors[location.monitorIndex].activeWorkspaceIndex else { return [] }
+        var monitor = state.monitors[location.monitorIndex]
+        var workspace = monitor.workspaces[wsIdx]
+        let before = allFrames(for: workspace, monitor: monitor, state: state)
+        workspace.layout.focusChanged(window)
+        let after = allFrames(for: workspace, monitor: monitor, state: state)
+        monitor.workspaces[wsIdx] = workspace
+        state.monitors[location.monitorIndex] = monitor
+        guard before != after else { return [] }
+        return frameEffects(for: workspace, monitor: monitor, state: state)
     }
 
     private static func move(_ direction: Direction, state: inout WMState) -> [Effect] {
@@ -406,7 +473,9 @@ public enum WM {
             state.monitors[monitorIdx].activeWorkspaceIndex = wsIdx
             let monitor = state.monitors[monitorIdx]
             effects.append(.hideWorkspace(hidden))
-            effects.append(.showWorkspace(allFrames(for: monitor.workspaces[wsIdx], monitor: monitor, state: state)))
+            let (visible, offViewport) = splitVisible(allFrames(for: monitor.workspaces[wsIdx], monitor: monitor, state: state), monitor: monitor)
+            effects.append(.showWorkspace(visible))
+            if !offViewport.isEmpty { effects.append(.hideWorkspace(offViewport)) }
         } else if monitorIdx == state.focusedMonitorIndex {
             return []
         }
@@ -455,6 +524,7 @@ public enum WM {
             target.layout.insert(window, after: target.focusedWindow, container: targetMonitor.visibleFrame, innerGap: state.innerGap, outerGap: state.outerGap)
         }
         target.focusedWindow = window
+        target.layout.focusChanged(window)
         state.monitors[targetMonitorIdx].workspaces[targetWsIdx] = target
         state.windowLocation[window] = WindowLocation(monitorIndex: targetMonitorIdx, workspaceName: name)
 
@@ -513,6 +583,7 @@ public enum WM {
         node.isFloating = true
         node.frame = frame
         state.windows[id] = node
+        state.autoFloated.insert(id)
 
         var monitor = state.monitors[location.monitorIndex]
         var workspace = monitor.workspaces[wsIdx]
@@ -533,6 +604,8 @@ public enum WM {
 
         node.isFloating.toggle()
         state.windows[window] = node
+        // Explicit user choice — stop second-guessing it on reconfigurations.
+        state.autoFloated.remove(window)
 
         if node.isFloating {
             workspace.layout.remove(window)
@@ -575,6 +648,21 @@ public enum WM {
     }
 
     static func frameEffects(for workspace: Workspace, monitor: Monitor, state: WMState) -> [Effect] {
-        allFrames(for: workspace, monitor: monitor, state: state).map { .setFrame($0.key, $0.value) }
+        let (visible, hidden) = splitVisible(allFrames(for: workspace, monitor: monitor, state: state), monitor: monitor)
+        var effects: [Effect] = visible.map { .setFrame($0.key, $0.value) }
+        if !hidden.isEmpty { effects.append(.hideWorkspace(hidden)) }
+        return effects
+    }
+
+    /// Scroll layouts position off-viewport columns outside the monitor;
+    /// applying such frames would drop the window onto a neighbouring display,
+    /// so they get parked instead (and re-placed when scrolled back in).
+    static func splitVisible(_ frames: [WindowID: CGRect], monitor: Monitor) -> (visible: [WindowID: CGRect], hidden: [WindowID]) {
+        var visible: [WindowID: CGRect] = [:]
+        var hidden: [WindowID] = []
+        for (id, rect) in frames {
+            if rect.intersects(monitor.frame) { visible[id] = rect } else { hidden.append(id) }
+        }
+        return (visible, hidden)
     }
 }

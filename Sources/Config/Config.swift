@@ -53,9 +53,26 @@ public struct AppConfig: Codable {
         public var position: String
         public var opacity: Double
         public var height: Double
+        /// Horizontal placement of the pill: "center" | "left" | "right".
+        public var align: String
+        /// Shift of the pill along the alignment edge (points).
+        public var offsetX: Double
+        /// Shift of the strip away from the screen edge (points).
+        public var offsetY: Double
+        /// Pill background "#RRGGBB"/"#RRGGBBAA"; nil = system material.
+        public var backgroundColor: String?
+        /// Accent (active workspace, rings) "#RRGGBB"; nil = system accent.
+        public var accentColor: String?
+        /// App icon size in the bar, points.
+        public var iconSize: Double
 
         enum CodingKeys: String, CodingKey {
-            case enabled, position, opacity, height
+            case enabled, position, opacity, height, align
+            case offsetX = "offset-x"
+            case offsetY = "offset-y"
+            case backgroundColor = "background-color"
+            case accentColor = "accent-color"
+            case iconSize = "icon-size"
         }
 
         // Newer keys are optional with defaults so configs copied before they
@@ -66,6 +83,12 @@ public struct AppConfig: Codable {
             position = try c.decode(String.self, forKey: .position)
             opacity = try Self.lenientDouble(c, .opacity) ?? 0.35
             height = try Self.lenientDouble(c, .height) ?? 28
+            align = try c.decodeIfPresent(String.self, forKey: .align) ?? "center"
+            offsetX = try Self.lenientDouble(c, .offsetX) ?? 0
+            offsetY = try Self.lenientDouble(c, .offsetY) ?? 0
+            backgroundColor = try c.decodeIfPresent(String.self, forKey: .backgroundColor)
+            accentColor = try c.decodeIfPresent(String.self, forKey: .accentColor)
+            iconSize = try Self.lenientDouble(c, .iconSize) ?? 17
         }
 
         private static func lenientDouble(
@@ -77,6 +100,34 @@ public struct AppConfig: Codable {
         }
     }
 
+    /// Shared colors every surface inherits unless it overrides them.
+    /// Colors are "#RRGGBB" or "#RRGGBBAA" strings.
+    public struct Theme: Codable {
+        /// Highlights: active workspace, focus rings/border. nil = system accent.
+        public var accent: String?
+        /// Surface backgrounds (bar pill). nil = system material.
+        public var background: String?
+    }
+
+    /// Focus border around the focused window.
+    public struct Border: Codable {
+        public var enabled: Bool
+        /// nil = theme accent.
+        public var color: String?
+        public var width: Double
+        public var radius: Double
+
+        enum CodingKeys: String, CodingKey { case enabled, color, width, radius }
+
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
+            color = try c.decodeIfPresent(String.self, forKey: .color)
+            width = (try? c.decode(Double.self, forKey: .width)) ?? Double((try? c.decode(Int.self, forKey: .width)) ?? 2)
+            radius = (try? c.decode(Double.self, forKey: .radius)) ?? Double((try? c.decode(Int.self, forKey: .radius)) ?? 6)
+        }
+    }
+
     /// Per-workspace appearance in the bar. All fields optional: `name` is a
     /// custom label, `icon` a short string (emoji) shown before it,
     /// `show-number` toggles the workspace number (default on).
@@ -84,10 +135,17 @@ public struct AppConfig: Codable {
         public var name: String?
         public var icon: String?
         public var showNumber: Bool
+        /// Hide the workspace in the bar while it has no windows (the active
+        /// workspace is always shown).
+        public var hideWhenEmpty: Bool
+        /// Layout name: "dwindle" | "scroll" | a [custom-layouts] key.
+        /// nil = general.default-layout.
+        public var layout: String?
 
         enum CodingKeys: String, CodingKey {
-            case name, icon
+            case name, icon, layout
             case showNumber = "show-number"
+            case hideWhenEmpty = "hide-when-empty"
         }
 
         public init(from decoder: Decoder) throws {
@@ -95,6 +153,8 @@ public struct AppConfig: Codable {
             name = try c.decodeIfPresent(String.self, forKey: .name)
             icon = try c.decodeIfPresent(String.self, forKey: .icon)
             showNumber = try c.decodeIfPresent(Bool.self, forKey: .showNumber) ?? true
+            hideWhenEmpty = try c.decodeIfPresent(Bool.self, forKey: .hideWhenEmpty) ?? false
+            layout = try c.decodeIfPresent(String.self, forKey: .layout)
         }
     }
 
@@ -111,11 +171,19 @@ public struct AppConfig: Codable {
     /// `[app-workspaces]`: bundle id -> workspace name new windows of that
     /// app are placed on.
     public var appWorkspaces: [String: String]?
+    /// `[theme]`: shared colors; absent = system look.
+    public var theme: Theme?
+    /// `[border]`: focus border; absent = defaults (enabled, accent, 2pt).
+    public var border: Border?
+    /// `[custom-layouts]`: layout name -> template spec, e.g.
+    /// "h(0.6, *, v(0.5, *, *))".
+    public var customLayouts: [String: String]?
 
     enum CodingKeys: String, CodingKey {
-        case general, hyper, keybindings, bar, workspaces
+        case general, hyper, keybindings, bar, workspaces, theme, border
         case workspaceLabels = "workspace-labels"
         case appWorkspaces = "app-workspaces"
+        case customLayouts = "custom-layouts"
     }
 }
 

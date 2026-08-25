@@ -41,13 +41,31 @@ final class WindowManagerController: WindowTrackerDelegate {
     /// display; tracking membership lets enforceTiling send them back.
     private var parkedWindows: Set<AXWindowID> = []
     /// Created in init, which runs on the main thread (NSWindow requirement);
-    /// afterwards touched only via DispatchQueue.main.
-    private let focusBorder = FocusBorder()
+    /// afterwards touched only via DispatchQueue.main. Nil when disabled.
+    private let focusBorder: FocusBorder?
     /// Created in start() (main thread); nil when disabled in config.
     private var bar: BarController?
+    /// Dock notification badges by pid (axQueue). ponytail: polled — macOS
+    /// has no public event for badge changes; 2.5 s keeps it invisible in CPU.
+    private var dockBadges: [pid_t: String] = [:]
+    private var badgeTimer: Timer?
+    /// Current layout name per workspace, for the bar (Workspace itself only
+    /// stores the layout instance, not its config name).
+    private var workspaceLayoutNames: [String: String] = [:]
 
     init(config: AppConfig) {
         self.config = config
+        if config.border?.enabled ?? true {
+            let color = (config.border?.color ?? config.theme?.accent)
+                .flatMap { NSColor(hex: $0) } ?? .controlAccentColor
+            focusBorder = FocusBorder(
+                color: color,
+                width: config.border?.width ?? 2,
+                radius: config.border?.radius ?? 6
+            )
+        } else {
+            focusBorder = nil
+        }
         // Monitors (and with them the workspaces) are created by the first
         // DisplayManager callback, so startup and replug take the same path.
         self.state = WMState(
@@ -64,8 +82,16 @@ final class WindowManagerController: WindowTrackerDelegate {
         bindings = resolved.bindings
 
         if config.bar.enabled {
-            bar = BarController(
+            let theme = BarTheme(
                 opacity: config.bar.opacity,
+                align: config.bar.align,
+                offsetX: config.bar.offsetX,
+                iconSize: config.bar.iconSize,
+                background: (config.bar.backgroundColor ?? config.theme?.background).flatMap { NSColor(hex: $0) },
+                accent: (config.bar.accentColor ?? config.theme?.accent).flatMap { NSColor(hex: $0) }
+            )
+            bar = BarController(
+                theme: theme,
                 onSelect: { [weak self] name in
                     guard let self else { return }
                     self.tracker.perform { self.run(.workspace(name)) }
@@ -88,9 +114,13 @@ final class WindowManagerController: WindowTrackerDelegate {
                         // Activate its workspace first (no-op if already active),
                         // then move WM focus and raise the window.
                         self.run(.workspace(location.workspaceName))
-                        _ = WM.focusChangedExternally(wid, state: &self.state)
+                        self.execute(WM.focusChangedExternally(wid, state: &self.state))
                         self.execute([.focusWindow(wid)])
                     }
+                },
+                onSetLayout: { [weak self] workspaceName, layoutName in
+                    guard let self else { return }
+                    self.tracker.perform { self.applyLayout(named: layoutName, toWorkspace: workspaceName) }
                 }
             )
         }
@@ -98,6 +128,20 @@ final class WindowManagerController: WindowTrackerDelegate {
         // Displays first: window discovery needs monitors to place windows on.
         displays.start { [weak self] infos in
             self?.applyDisplays(infos)
+        }
+
+        if bar != nil {
+            // Dock badge polling; Timer fires on main, work hops to axQueue.
+            badgeTimer = Timer.scheduledTimer(withTimeInterval: 2.5, repeats: true) { [weak self] _ in
+                self?.tracker.perform {
+                    guard let self else { return }
+                    let fresh = DockBadges.current()
+                    if fresh != self.dockBadges {
+                        self.dockBadges = fresh
+                        self.updateBar()
+                    }
+                }
+            }
         }
 
         tracker.delegate = self
@@ -113,6 +157,7 @@ final class WindowManagerController: WindowTrackerDelegate {
     }
 
     func stop() {
+        badgeTimer?.invalidate()
         input.stop()
         displays.stop()
         tracker.stop()
@@ -131,7 +176,11 @@ final class WindowManagerController: WindowTrackerDelegate {
         execute(WM.reconcileMonitors(
             monitors,
             workspaceNames: workspaceNames,
-            makeWorkspace: { Workspace(name: $0, layout: DwindleLayout()) },
+            makeWorkspace: { [config] name in
+                let layoutName = config.workspaceLabels?[name]?.layout ?? config.general.defaultLayout
+                self.workspaceLayoutNames[name] = layoutName
+                return Workspace(name: name, layout: Self.makeLayout(named: layoutName, config: config))
+            },
             state: &state
         ))
     }
@@ -141,8 +190,9 @@ final class WindowManagerController: WindowTrackerDelegate {
     private func reserveBarStrip(in visibleFrame: CGRect) -> CGRect {
         guard config.bar.enabled else { return visibleFrame }
         var frame = visibleFrame
-        frame.size.height -= config.bar.height
-        if config.bar.position != "bottom" { frame.origin.y += config.bar.height }
+        let reserved = config.bar.height + config.bar.offsetY
+        frame.size.height -= reserved
+        if config.bar.position != "bottom" { frame.origin.y += reserved }
         return frame
     }
 
@@ -152,6 +202,8 @@ final class WindowManagerController: WindowTrackerDelegate {
         let globallyFocused: WindowID? = state.monitors.indices.contains(state.focusedMonitorIndex)
             ? state.monitors[state.focusedMonitorIndex].activeWorkspace.focusedWindow
             : nil
+        let allWorkspaceNames = state.monitors.flatMap { $0.workspaces.map(\.name) }.sorted()
+        let availableLayouts = ["dwindle", "scroll"] + (config.customLayouts?.keys.sorted() ?? [])
         let snapshots = state.monitors.enumerated().map { index, monitor -> (String, CGRect, [BarWorkspaceItem], Bool) in
             let strip = CGRect(
                 x: monitor.visibleFrame.minX,
@@ -159,10 +211,16 @@ final class WindowManagerController: WindowTrackerDelegate {
                 width: monitor.visibleFrame.width,
                 height: config.bar.height
             )
-            let items = monitor.workspaces.enumerated().map { wsIndex, workspace -> BarWorkspaceItem in
+            let items = monitor.workspaces.enumerated().compactMap { wsIndex, workspace -> BarWorkspaceItem? in
+                // hide-when-empty: skip empty workspaces, except the active one
+                // (the user must always see where they are).
+                if config.workspaceLabels?[workspace.name]?.hideWhenEmpty == true,
+                   workspace.allWindows.isEmpty, wsIndex != monitor.activeWorkspaceIndex {
+                    return nil
+                }
                 let windows = (workspace.tiledWindows + Array(workspace.floatingFrames.keys)).compactMap { wid -> BarWindowItem? in
                     guard let pid = state.windows[wid]?.pid else { return nil }
-                    return BarWindowItem(windowID: wid.rawValue, pid: pid, isFocused: wid == globallyFocused)
+                    return BarWindowItem(windowID: wid.rawValue, pid: pid, isFocused: wid == globallyFocused, badge: dockBadges[pid])
                 }
                 let label = config.workspaceLabels?[workspace.name]
                 return BarWorkspaceItem(
@@ -171,7 +229,8 @@ final class WindowManagerController: WindowTrackerDelegate {
                     icon: label?.icon,
                     showNumber: label?.showNumber ?? true,
                     isActive: wsIndex == monitor.activeWorkspaceIndex,
-                    windows: windows
+                    windows: windows,
+                    layoutName: workspaceLayoutNames[workspace.name] ?? config.general.defaultLayout
                 )
             }
             return (monitor.id, strip, items, index == state.focusedMonitorIndex)
@@ -183,7 +242,9 @@ final class WindowManagerController: WindowTrackerDelegate {
                     monitorID: id,
                     barFrame: DisplayManager.nsScreenRect(fromCGRect: strip, primaryHeight: primaryHeight),
                     workspaces: items,
-                    isFocusedMonitor: focused
+                    isFocusedMonitor: focused,
+                    allWorkspaceNames: allWorkspaceNames,
+                    availableLayouts: availableLayouts
                 )
             })
         }
@@ -193,7 +254,27 @@ final class WindowManagerController: WindowTrackerDelegate {
 
     private func run(_ command: Command) {
         if command == .adoptWindow { adoptFrontmostWindow(); return }
+        if case .setLayout(let name) = command {
+            guard state.monitors.indices.contains(state.focusedMonitorIndex) else { return }
+            applyLayout(named: name, toWorkspace: state.monitors[state.focusedMonitorIndex].activeWorkspace.name)
+            return
+        }
         execute(WM.dispatch(command, state: &state))
+    }
+
+    private func applyLayout(named name: String, toWorkspace workspaceName: String) {
+        workspaceLayoutNames[workspaceName] = name
+        execute(WM.setLayout(Self.makeLayout(named: name, config: config), workspaceNamed: workspaceName, state: &state))
+    }
+
+    /// Unknown names fall back to dwindle with a log instead of crashing —
+    /// same philosophy as config warnings.
+    private static func makeLayout(named name: String, config: AppConfig) -> any Layout {
+        if let layout = LayoutFactory.make(name, customLayouts: config.customLayouts ?? [:]) {
+            return layout
+        }
+        NSLog("applland: unknown layout \"%@\", using dwindle", name)
+        return DwindleLayout()
     }
 
     /// adopt-window: pull the frontmost app's focused window into the focused
@@ -205,7 +286,7 @@ final class WindowManagerController: WindowTrackerDelegate {
         let wid = WindowID(id)
         let target = state.monitors[state.focusedMonitorIndex].activeWorkspace.name
         execute(WM.moveWindow(wid, toWorkspace: target, state: &state))
-        _ = WM.focusChangedExternally(wid, state: &state)
+        execute(WM.focusChangedExternally(wid, state: &state))
         updateFocusBorder()
         updateBar()
     }
@@ -266,6 +347,7 @@ final class WindowManagerController: WindowTrackerDelegate {
 
     /// Outlines the focused window; hides the border when nothing is focused.
     private func updateFocusBorder() {
+        guard let focusBorder else { return }
         guard state.monitors.indices.contains(state.focusedMonitorIndex),
               let wid = state.monitors[state.focusedMonitorIndex].activeWorkspace.focusedWindow,
               let ax = axWindows[wid.rawValue]
@@ -331,14 +413,35 @@ final class WindowManagerController: WindowTrackerDelegate {
     func windowDiscovered(_ window: AXWindow, app: AXAppInfo) {
         guard axWindows[window.id] == nil, !state.monitors.isEmpty else { return }
         // Native tabs: every tab is its own AXWindow sharing the tab group's
-        // frame. A new same-pid window at an existing tracked window's exact
-        // frame is a tab, not a new tile. ponytail: if the tracked sibling
-        // closes, the remaining tab stays unmanaged until adopt-window.
+        // frame — but a genuinely new window also opens at the restored frame
+        // of its sibling. Distinguish after the window server settles: a tab
+        // group keeps only one member onscreen, two real windows stay visible.
         let newFrame = window.frame
-        if axWindows.values.contains(where: { $0.pid == app.pid && $0.id != window.id && !$0.frame.diverges(from: newFrame, tolerance: 2) }) {
-            NSLog("applland: window %u looks like a tab sibling of %@, not tiling it", window.id, app.name ?? "?")
+        if let sibling = axWindows.values.first(where: { $0.pid == app.pid && $0.id != window.id && !$0.frame.diverges(from: newFrame, tolerance: 2) }) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+                self?.tracker.perform {
+                    guard let self, self.axWindows[window.id] == nil else { return }
+                    if Self.isOnscreen(sibling.id) {
+                        self.register(window, app: app)
+                    } else {
+                        // ponytail: if the tracked sibling tab closes later, the
+                        // remaining tab stays unmanaged until focus/adopt-window.
+                        NSLog("applland: window %u is a tab sibling of %@, not tiling it", window.id, app.name ?? "?")
+                    }
+                }
+            }
             return
         }
+        register(window, app: app)
+    }
+
+    private static func isOnscreen(_ id: AXWindowID) -> Bool {
+        guard let list = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]] else { return false }
+        return list.contains { ($0[kCGWindowNumber as String] as? Int) == Int(id) }
+    }
+
+    private func register(_ window: AXWindow, app: AXAppInfo) {
+        guard axWindows[window.id] == nil, !state.monitors.isEmpty else { return }
         axWindows[window.id] = window
         windowPids[window.id] = app.pid
         let frame = window.frame.cgRect
@@ -358,7 +461,7 @@ final class WindowManagerController: WindowTrackerDelegate {
 
     func windowFocused(id: AXWindowID) {
         guard axWindows[id] != nil else { return }
-        _ = WM.focusChangedExternally(WindowID(id), state: &state)
+        execute(WM.focusChangedExternally(WindowID(id), state: &state))
         updateFocusBorder()
         updateBar()
     }

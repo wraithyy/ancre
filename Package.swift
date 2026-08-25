@@ -32,6 +32,6 @@ let package = Package(
         ),
         .testTarget(name: "WMCoreTests", dependencies: ["WMCore", "LayoutEngine"]),
         .testTarget(name: "LayoutEngineTests", dependencies: ["LayoutEngine", "WMCore"]),
-        .testTarget(name: "ConfigTests", dependencies: ["Config"]),
+        .testTarget(name: "ConfigTests", dependencies: ["Config", "TOMLKit"]),
     ]
 )

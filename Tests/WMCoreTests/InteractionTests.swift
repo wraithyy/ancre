@@ -111,6 +111,36 @@ final class WindowResizedByUserTests: XCTestCase {
     }
 }
 
+final class AutoFloatRetryTests: XCTestCase {
+    private let bigMonitor = MonitorInfo(
+        id: "main", name: "Main",
+        frame: CGRect(x: 0, y: 0, width: 3440, height: 1440),
+        visibleFrame: CGRect(x: 0, y: 0, width: 3440, height: 1440)
+    )
+
+    func testAutoFloatedWindowRetilesOnReconfiguration() {
+        var (state, ids) = makeState(windowCount: 2)
+        _ = WM.floatWindow(ids[0], frame: CGRect(x: 0, y: 0, width: 800, height: 600), state: &state)
+        XCTAssertEqual(state.windows[ids[0]]?.isFloating, true)
+
+        _ = WM.reconcileMonitors([bigMonitor], workspaceNames: ["1"], makeWorkspace: { Workspace(name: $0, layout: DwindleLayout()) }, state: &state)
+
+        XCTAssertEqual(state.windows[ids[0]]?.isFloating, false, "auto-float must retry as a tile")
+        XCTAssertTrue(state.monitors[0].workspaces[0].tiledWindows.contains(ids[0]))
+    }
+
+    func testUserFloatedWindowStaysFloatingOnReconfiguration() {
+        var (state, ids) = makeState(windowCount: 2)
+        state.monitors[0].workspaces[0].focusedWindow = ids[0]
+        _ = WM.dispatch(.toggleFloating, state: &state)
+        XCTAssertEqual(state.windows[ids[0]]?.isFloating, true)
+
+        _ = WM.reconcileMonitors([bigMonitor], workspaceNames: ["1"], makeWorkspace: { Workspace(name: $0, layout: DwindleLayout()) }, state: &state)
+
+        XCTAssertEqual(state.windows[ids[0]]?.isFloating, true, "user's explicit float must survive")
+    }
+}
+
 final class MoveWindowTests: XCTestCase {
     // Bar drag&drop moves arbitrary windows, not just the focused one.
     func testMoveUnfocusedWindowToOtherWorkspaceKeepsSourceFocus() {

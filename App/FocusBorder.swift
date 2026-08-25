@@ -6,7 +6,7 @@ import AppKit
 final class FocusBorder {
     private let window: NSWindow
 
-    init() {
+    init(color: NSColor, width: CGFloat, radius: CGFloat) {
         window = NSWindow(
             contentRect: .zero,
             styleMask: .borderless,
@@ -21,9 +21,9 @@ final class FocusBorder {
         window.collectionBehavior = [.transient, .ignoresCycle]
         let view = NSView()
         view.wantsLayer = true
-        view.layer?.borderColor = NSColor.controlAccentColor.cgColor
-        view.layer?.borderWidth = 2
-        view.layer?.cornerRadius = 6
+        view.layer?.borderColor = color.cgColor
+        view.layer?.borderWidth = width
+        view.layer?.cornerRadius = radius
         window.contentView = view
     }
 
