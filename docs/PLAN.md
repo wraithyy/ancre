@@ -310,15 +310,23 @@ jim přirozené souřadnice za hranou) a bar (ukazovat i zaparkovaná okna).
 ## Backlog (další iterace):
 - Command palette ve switcheru: prefix `>` = commandy (layout, pause,
   preset...), číslo = skok na workspace.
-- Učení pravidel: lokální log ručních přesunů oken → `suggest-rules` →
-  agent navrhne [app-workspaces].
+
 - Config hooks (on-window-open → command/shell) — zatím pokryto externě přes
   event stream.
 - hidutil re-apply po wake/výměně klávesnice (IOHIDManager notifikace).
 - Pravý niri scroll (viz poznámka u 5.1), layout edit mode.
-- Auto-stack při migraci: workspace zmigrovaný na monitor, kam se okna
-  nevejdou (počet × min šířka > šířka monitoru), dočasně přepnout na stack
-  a při návratu na původní monitor vrátit layout.
+## Task 8.7: Auto-stack při migraci — HOTOVO
+- [general] auto-stack (default on) + auto-stack-min-width (300): workspace,
+  jehož okna se na monitor nevejdou, se po reconcile přepne na stack; až se
+  vejde, vrátí se původní layout. Ruční změna layoutu auto-restore ruší.
+- Ceiling: kontrola běží jen při reconfiguraci displayů, ne při přidání okna.
+
+## Task 8.8: Move log (učení pravidel, fáze 1) — HOTOVO
+- [general] move-log (default on, vypínatelný): ruční přesuny oken (keybind,
+  bar, drag, adopt — NE automatické IPC/arrange/presety) se appendují do
+  ~/Library/Application Support/applland/move-log.jsonl
+  ({ts, bundleID, from, to, source}; bez titulů). Fáze 2 (suggest-rules /
+  agent) zůstává v backlogu.
 
 ## Out of scope
 

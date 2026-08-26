@@ -61,6 +61,9 @@ final class WindowManagerController: WindowTrackerDelegate {
     /// Effective [bar] config per monitor id ([bar] + [bar-overrides]),
     /// resolved at every display reconfiguration. (axQueue)
     private var barConfigs: [String: AppConfig.Bar] = [:]
+    /// Workspaces auto-switched to stack on a cramped monitor, with the
+    /// layout to restore once they fit again. (axQueue)
+    private var autoStackedOriginals: [String: String] = [:]
     /// Keybind cheatsheet (main thread only). Nil when disabled in config.
     private var helpOverlay: HelpOverlay?
     private var helpTimer: Timer?
@@ -506,6 +509,7 @@ final class WindowManagerController: WindowTrackerDelegate {
                 onMoveWindow: { [weak self] windowID, name in
                     guard let self else { return }
                     self.tracker.perform {
+                        self.logMove(WindowID(windowID), to: name, source: "bar")
                         self.execute(WM.moveWindow(WindowID(windowID), toWorkspace: name, state: &self.state))
                     }
                 },
@@ -579,6 +583,7 @@ final class WindowManagerController: WindowTrackerDelegate {
             },
             state: &state
         ))
+        applyAutoStack()
     }
 
     /// Carves the bar strip out of a monitor's usable area so tiles don't
@@ -693,6 +698,11 @@ final class WindowManagerController: WindowTrackerDelegate {
 
     private func run(_ command: Command) {
         switch command {
+        case .moveToWorkspace(let name):
+            if state.monitors.indices.contains(state.focusedMonitorIndex),
+               let focused = state.monitors[state.focusedMonitorIndex].activeWorkspace.focusedWindow {
+                logMove(focused, to: name, source: "keybind")
+            }
         case .adoptWindow:
             adoptFrontmostWindow()
             return
@@ -810,6 +820,9 @@ final class WindowManagerController: WindowTrackerDelegate {
             }
             switch drag.action {
             case .insert(let target, let edge):
+                if let targetWs = state.windowLocation[target]?.workspaceName {
+                    logMove(drag.window, to: targetWs, source: "drag")
+                }
                 execute(WM.tileWindow(drag.window, after: target, edge: edge, state: &state))
             case .swap(let target):
                 execute(WM.swapWindows(drag.window, target, state: &state))
@@ -1140,9 +1153,61 @@ final class WindowManagerController: WindowTrackerDelegate {
         }
     }
 
-    private func applyLayout(named name: String, toWorkspace workspaceName: String) {
+    private func applyLayout(named name: String, toWorkspace workspaceName: String, isAutoStack: Bool = false) {
+        if !isAutoStack {
+            // A manual layout choice overrides any pending auto-stack restore.
+            autoStackedOriginals.removeValue(forKey: workspaceName)
+        }
         workspaceLayoutNames[workspaceName] = name
         execute(WM.setLayout(Self.makeLayout(named: name, config: config), workspaceNamed: workspaceName, state: &state))
+    }
+
+    /// Migration crowding: workspaces whose tiled windows can't plausibly fit
+    /// their monitor switch to stack; they switch back once space returns.
+    private func applyAutoStack() {
+        guard config.general.autoStack else { return }
+        let minWidth = config.general.autoStackMinWidth
+        for monitor in state.monitors {
+            for workspace in monitor.workspaces {
+                let name = workspace.name
+                let count = workspace.tiledWindows.count
+                let fits = count <= 1 || Double(count) * minWidth <= monitor.visibleFrame.width
+                let current = workspaceLayoutNames[name] ?? config.general.defaultLayout
+                if !fits, current != "stack", autoStackedOriginals[name] == nil {
+                    NSLog("applland: workspace %@ doesn't fit %@ (%d windows), auto-stacking", name, monitor.id, count)
+                    autoStackedOriginals[name] = current
+                    applyLayout(named: "stack", toWorkspace: name, isAutoStack: true)
+                } else if fits, let original = autoStackedOriginals[name] {
+                    NSLog("applland: workspace %@ fits again, restoring layout %@", name, original)
+                    autoStackedOriginals.removeValue(forKey: name)
+                    applyLayout(named: original, toWorkspace: name, isAutoStack: true)
+                }
+            }
+        }
+    }
+
+    // MARK: - Move log (axQueue)
+
+    private static var moveLogURL: URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/applland/move-log.jsonl")
+    }
+
+    /// Appends one manual window-move record — the corpus an agent later
+    /// turns into [app-workspaces] suggestions. No window titles (privacy).
+    private func logMove(_ wid: WindowID, to target: String, source: String) {
+        guard config.general.moveLog,
+              let node = state.windows[wid], !node.appBundleID.isEmpty,
+              let from = state.windowLocation[wid]?.workspaceName, from != target else { return }
+        let line = "{\"ts\":\(Int(Date().timeIntervalSince1970)),\"bundleID\":\"\(node.appBundleID)\",\"from\":\"\(from)\",\"to\":\"\(target)\",\"source\":\"\(source)\"}\n"
+        let url = Self.moveLogURL
+        if let handle = try? FileHandle(forWritingTo: url) {
+            handle.seekToEndOfFile()
+            handle.write(Data(line.utf8))
+            try? handle.close()
+        } else {
+            try? Data(line.utf8).write(to: url)
+        }
     }
 
     /// Unknown names fall back to dwindle with a log instead of crashing —
@@ -1163,6 +1228,7 @@ final class WindowManagerController: WindowTrackerDelegate {
               state.monitors.indices.contains(state.focusedMonitorIndex) else { return }
         let wid = WindowID(id)
         let target = state.monitors[state.focusedMonitorIndex].activeWorkspace.name
+        logMove(wid, to: target, source: "adopt")
         execute(WM.moveWindow(wid, toWorkspace: target, state: &state))
         execute(WM.focusChangedExternally(wid, state: &state))
         updateFocusBorder()

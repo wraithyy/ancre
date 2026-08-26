@@ -31,6 +31,14 @@ public struct AppConfig: Codable {
         /// When macOS activates an app (URL opened in the browser...), switch
         /// to that window's workspace like stock macOS would show it.
         public var followNativeFocus: Bool
+        /// Migration crowding: a workspace whose windows can't fit its new
+        /// monitor temporarily switches to the stack layout (and back).
+        public var autoStack: Bool
+        /// Minimum sensible width per tiled window for the fit heuristic.
+        public var autoStackMinWidth: Double
+        /// Log manual window moves to Application Support/applland/move-log.jsonl
+        /// (input for agent-suggested [app-workspaces] rules).
+        public var moveLog: Bool
 
         enum CodingKeys: String, CodingKey {
             case gapsInner = "gaps-inner"
@@ -41,6 +49,9 @@ public struct AppConfig: Codable {
             case animationsExclude = "animations-exclude"
             case language
             case followNativeFocus = "follow-native-focus"
+            case autoStack = "auto-stack"
+            case autoStackMinWidth = "auto-stack-min-width"
+            case moveLog = "move-log"
         }
 
         public init(from decoder: Decoder) throws {
@@ -53,6 +64,9 @@ public struct AppConfig: Codable {
             animationsExclude = try c.decodeIfPresent([String].self, forKey: .animationsExclude) ?? []
             language = try c.decodeIfPresent(String.self, forKey: .language) ?? "en"
             followNativeFocus = try c.decodeIfPresent(Bool.self, forKey: .followNativeFocus) ?? true
+            autoStack = try c.decodeIfPresent(Bool.self, forKey: .autoStack) ?? true
+            autoStackMinWidth = lenientDouble(c, .autoStackMinWidth) ?? 300
+            moveLog = try c.decodeIfPresent(Bool.self, forKey: .moveLog) ?? true
         }
     }
 
