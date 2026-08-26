@@ -12,8 +12,9 @@ command bus, exposed on a unix socket (`~/Library/Application Support/ancre/ancr
 
 1. **CLI**: `ancrectl <request>` (built at `.build/debug/ancrectl` in
    the repo, or on PATH if installed)
-2. **MCP tools** (server `ancre`, vestavěný: `ancrectl mcp`): `ancre_state`, `ancre_command`,
-   `ancre_move_window`, `ancre_focus_window`, `ancre_set_floating`
+2. **MCP tools** (server `ancre`, built into the CLI: `ancrectl mcp`): `ancre_state`,
+   `ancre_command`, `ancre_arrange`, `ancre_move_window`, `ancre_focus_window`,
+   `ancre_set_floating`
 
 Prefer MCP tools when available; the CLI is the fallback.
 
@@ -43,6 +44,10 @@ Keybinding-grammar commands (via `ancre_command` or CLI):
 | `adopt-window` | pull frontmost window into current workspace |
 | `pause-tiling` | toggle: stop/resume all tiling |
 | `retile` | rescan windows + re-place everything (fixes any mess) |
+| `switcher` | open the Spotlight-style window switcher |
+| `scratchpad` | toggle the scratchpad window |
+| `hints` | show window hints (focus by letter) |
+| `open-config` | open the config file in the default editor |
 
 Window-targeted verbs (id from state):
 
@@ -52,10 +57,13 @@ Window-targeted verbs (id from state):
 | `focus-window <id>` | focus (switches to its workspace) |
 | `set-floating <id> true\|false` | float / return to tiling |
 | `preset-save <name>` / `preset <name>` | save/apply a named arrangement |
-| `arrange <json>` | declarative one-shot: `{"layouts":{"2":"scroll"},"apps":{"com.google.Chrome":"2"},"active":["1"]}` (or MCP tool `ancre_arrange`) |
+| `arrange <json>` | declarative one-shot — apply a whole setup in ONE call instead of many: `{"layouts":{"2":"scroll"},"apps":{"com.google.Chrome":"2"},"windows":{"4495":"3"},"active":["1"],"focus":4495}` (`windows` = id→workspace, finer than `apps`; `focus` = final focused window; or MCP tool `ancre_arrange`) |
 | `subscribe` | stream JSON events (state-changed, window-opened) until disconnect |
 
-Responses: `ok`, `error: ...` (CLI exits 1), or JSON for `state`.
+Responses: `ok`, `error: ...` (CLI exits 1; exit 2 = missing arguments), or
+JSON for `state`. `reload-config` is an IPC-only verb (works here and in the
+menubar menu, but is NOT bindable in `[keybindings]`). `subscribe` streams
+events live, one JSON object per line.
 
 ## Recipes
 

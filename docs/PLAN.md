@@ -43,8 +43,10 @@ ancre/
   Scripts/bundle.sh, Scripts/Info.plist
 ```
 
-**Stav**: M1 hotový, M2 task 2.1 hotová. Bar (M3) a Animator (M4) jsou zatím
-prázdné stuby. LaunchAgent plist ještě nevznikl.
+**Stav**: M1–M8 hotové (tiling, multi-monitor, bar, animace, layouty,
+theming, myší módy, IPC/MCP/AI). LaunchAgent plist ještě nevznikl.
+Backlog: command palette ve switcheru, config hooks, hidutil re-apply po
+wake, true infinite scroll, layout edit mode, rule-learning fáze 2.
 
 **Threading**: jedna dedikovaná serial `axQueue` vlastní veškerou AX práci (AXObserver runloop source) i mutace WMCore stavu — žádné races mezi eventy a příkazy. UI a event tap do ní marshallují async.
 

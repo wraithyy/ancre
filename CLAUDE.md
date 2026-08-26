@@ -2,8 +2,8 @@
 
 Hyprland-inspired tiling window manager pro macOS. Swift, čisté veřejné
 Accessibility API — žádné privátní CGS/SkyLight API, žádný SIP zásah.
-Plán + milestones: `docs/PLAN.md` (M1 hotový, M2 task 2.1 hotová — multi-monitor
-placement + migrace; další M3 bar). `AGENTS.md` = tytéž instrukce pro cizí
+Plán + milestones: `docs/PLAN.md` (M1–M8 hotové; zbývá backlog — command
+palette, config hooks, LaunchAgent). `AGENTS.md` = tytéž instrukce pro cizí
 agenty (OpenHands), hlavně co v Linuxovém sandboxu nejde ověřit.
 
 ## Build & test
