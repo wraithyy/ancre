@@ -20,6 +20,7 @@ public final class InputSystem {
         hyperKeyName: String,
         handler: @escaping Handler,
         onHyperMouse: ((HyperMouseButton, HyperMousePhase, CGPoint) -> Void)? = nil,
+        onObservedMouseUp: ((HyperMouseButton, CGPoint) -> Void)? = nil,
         onHyperStateChange: ((Bool) -> Void)? = nil
     ) {
         let remap = HidutilRemap(srcName: hyperKeyName, dstName: "f18")
@@ -31,6 +32,7 @@ public final class InputSystem {
         let tapManager = EventTapManager(handler: handler)
         tapManager.onHyperStateChange = onHyperStateChange
         tapManager.onHyperMouse = onHyperMouse
+        tapManager.onObservedMouseUp = onObservedMouseUp
         tapManager.start()
         self.tapManager = tapManager
     }

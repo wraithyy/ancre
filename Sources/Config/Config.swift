@@ -128,7 +128,7 @@ public struct AppConfig: Codable {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             enabled = try c.decode(Bool.self, forKey: .enabled)
             position = try c.decode(String.self, forKey: .position)
-            opacity = try Self.lenientDouble(c, .opacity) ?? 0.35
+            opacity = try Self.lenientDouble(c, .opacity) ?? 1.0
             height = try Self.lenientDouble(c, .height) ?? 28
             align = try c.decodeIfPresent(String.self, forKey: .align) ?? "center"
             offsetX = try Self.lenientDouble(c, .offsetX) ?? 0
@@ -142,7 +142,7 @@ public struct AppConfig: Codable {
             fontFamily = try c.decodeIfPresent(String.self, forKey: .fontFamily)
             spacing = try Self.lenientDouble(c, .spacing) ?? 6
             cellSpacing = try Self.lenientDouble(c, .cellSpacing) ?? 4
-            cellRadius = try Self.lenientDouble(c, .cellRadius) ?? 7
+            cellRadius = try Self.lenientDouble(c, .cellRadius) ?? 6
             cellPaddingX = try Self.lenientDouble(c, .cellPaddingX) ?? 8
             cellPaddingY = try Self.lenientDouble(c, .cellPaddingY) ?? 3
             pillPaddingX = try Self.lenientDouble(c, .pillPaddingX) ?? 10
@@ -186,7 +186,24 @@ public struct AppConfig: Codable {
             enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
             color = try c.decodeIfPresent(String.self, forKey: .color)
             width = (try? c.decode(Double.self, forKey: .width)) ?? Double((try? c.decode(Int.self, forKey: .width)) ?? 2)
-            radius = (try? c.decode(Double.self, forKey: .radius)) ?? Double((try? c.decode(Int.self, forKey: .radius)) ?? 6)
+            // 10 ≈ the system window corner radius, so the border hugs frames.
+            radius = (try? c.decode(Double.self, forKey: .radius)) ?? Double((try? c.decode(Int.self, forKey: .radius)) ?? 10)
+        }
+    }
+
+    /// Drag&drop layout preview overlay.
+    public struct Preview: Codable {
+        /// nil = theme accent.
+        public var color: String?
+        /// Fill opacity of the dragged window's future slot.
+        public var opacity: Double
+
+        enum CodingKeys: String, CodingKey { case color, opacity }
+
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            color = try c.decodeIfPresent(String.self, forKey: .color)
+            opacity = (try? c.decode(Double.self, forKey: .opacity)) ?? 0.3
         }
     }
 
@@ -271,9 +288,11 @@ public struct AppConfig: Codable {
     public var customLayouts: [String: String]?
     /// `[help]`: hold-hyper keybind cheatsheet; absent = enabled, 2 s delay.
     public var help: Help?
+    /// `[preview]`: drag&drop layout preview; absent = accent, 0.3 fill.
+    public var preview: Preview?
 
     enum CodingKeys: String, CodingKey {
-        case general, hyper, keybindings, bar, workspaces, theme, border, help
+        case general, hyper, keybindings, bar, workspaces, theme, border, help, preview
         case workspaceLabels = "workspace-labels"
         case appWorkspaces = "app-workspaces"
         case customLayouts = "custom-layouts"

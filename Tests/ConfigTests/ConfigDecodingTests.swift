@@ -20,7 +20,7 @@ final class ConfigDecodingTests: XCTestCase {
         position = "top"
         """
         let config = try TOMLDecoder().decode(AppConfig.self, from: toml)
-        XCTAssertEqual(config.bar.opacity, 0.35)
+        XCTAssertEqual(config.bar.opacity, 1.0, "native .bar material default")
         XCTAssertEqual(config.bar.height, 28)
         XCTAssertEqual(config.bar.align, "center")
         XCTAssertEqual(config.bar.iconSize, 17)
@@ -69,7 +69,7 @@ final class ConfigDecodingTests: XCTestCase {
         XCTAssertEqual(config.theme?.accent, "#89b4fa")
         XCTAssertEqual(config.border?.enabled, false)
         XCTAssertEqual(config.border?.width, 3)
-        XCTAssertEqual(config.border?.radius, 6, "missing key gets default")
+        XCTAssertEqual(config.border?.radius, 10, "missing key gets default (system corner radius)")
         let label = try XCTUnwrap(config.workspaceLabels?["1"])
         XCTAssertEqual(label.name, "web")
         XCTAssertFalse(label.showNumber)

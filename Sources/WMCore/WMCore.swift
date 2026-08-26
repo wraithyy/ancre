@@ -63,10 +63,22 @@ public protocol Layout {
     /// Focus moved to `window`. Viewport layouts (scroll) re-anchor here so
     /// the focused window stays visible; tree layouts ignore it.
     mutating func focusChanged(_ window: WindowID)
+
+    /// Insert `window` on a specific side of `target` (drag&drop edge zones).
+    mutating func insert(_ window: WindowID, near target: WindowID, edge: Direction, container: CGRect, innerGap: Double, outerGap: Double)
+
+    /// Exchange the positions of two managed windows (drag&drop center zone).
+    mutating func swapPositions(_ a: WindowID, _ b: WindowID)
 }
 
 public extension Layout {
     mutating func focusChanged(_ window: WindowID) {}
+
+    mutating func insert(_ window: WindowID, near target: WindowID, edge: Direction, container: CGRect, innerGap: Double, outerGap: Double) {
+        insert(window, after: target, container: container, innerGap: innerGap, outerGap: outerGap)
+    }
+
+    mutating func swapPositions(_ a: WindowID, _ b: WindowID) {}
 }
 
 public enum LayoutKind: String {
@@ -409,6 +421,9 @@ public enum WM {
         state.monitors[location.monitorIndex] = monitor
         state.windows.removeValue(forKey: id)
         state.windowLocation.removeValue(forKey: id)
+        // CGWindowIDs get reused over long uptimes — a stale entry here would
+        // mislabel a future user-floated window as auto-floated.
+        state.autoFloated.remove(id)
 
         guard location.monitorIndex == state.focusedMonitorIndex, wsIdx == monitor.activeWorkspaceIndex else { return [] }
         return frameEffects(for: workspace, monitor: monitor, state: state)
@@ -587,9 +602,10 @@ public enum WM {
         return frameEffects(for: workspace, monitor: monitor, state: state)
     }
 
-    /// Drops a (floating) window into the grid right after `target` — the
-    /// hyper+drag drop. Works across workspaces/monitors.
-    public static func tileWindow(_ id: WindowID, after target: WindowID, state: inout WMState) -> [Effect] {
+    /// Drops a window into the grid next to `target` — the hyper+drag drop.
+    /// `edge` picks the side (nil = layout's default insert). Works for
+    /// floating and tiled sources, across workspaces/monitors.
+    public static func tileWindow(_ id: WindowID, after target: WindowID, edge: Direction? = nil, state: inout WMState) -> [Effect] {
         guard id != target,
               var node = state.windows[id],
               let targetLocation = state.windowLocation[target],
@@ -611,7 +627,11 @@ public enum WM {
 
         var monitor = state.monitors[targetLocation.monitorIndex]
         var workspace = monitor.workspaces[targetWsIdx]
-        workspace.layout.insert(id, after: target, container: monitor.visibleFrame, innerGap: state.innerGap, outerGap: state.outerGap)
+        if let edge {
+            workspace.layout.insert(id, near: target, edge: edge, container: monitor.visibleFrame, innerGap: state.innerGap, outerGap: state.outerGap)
+        } else {
+            workspace.layout.insert(id, after: target, container: monitor.visibleFrame, innerGap: state.innerGap, outerGap: state.outerGap)
+        }
         workspace.focusedWindow = id
         workspace.layout.focusChanged(id)
         monitor.workspaces[targetWsIdx] = workspace
@@ -621,6 +641,25 @@ public enum WM {
 
         guard targetWsIdx == monitor.activeWorkspaceIndex else { return [.hideWorkspace([id])] }
         return frameEffects(for: workspace, monitor: monitor, state: state) + [.focusWindow(id)]
+    }
+
+    /// Exchanges the positions of two tiled windows in the same workspace —
+    /// the drag&drop center zone.
+    public static func swapWindows(_ a: WindowID, _ b: WindowID, state: inout WMState) -> [Effect] {
+        guard a != b,
+              let locationA = state.windowLocation[a],
+              locationA == state.windowLocation[b],
+              let wsIdx = state.workspaceIndex(locationA) else { return [] }
+        var monitor = state.monitors[locationA.monitorIndex]
+        var workspace = monitor.workspaces[wsIdx]
+        guard workspace.tiledWindows.contains(a), workspace.tiledWindows.contains(b) else { return [] }
+        workspace.layout.swapPositions(a, b)
+        workspace.focusedWindow = a
+        workspace.layout.focusChanged(a)
+        monitor.workspaces[wsIdx] = workspace
+        state.monitors[locationA.monitorIndex] = monitor
+        guard wsIdx == monitor.activeWorkspaceIndex else { return [] }
+        return frameEffects(for: workspace, monitor: monitor, state: state) + [.focusWindow(a)]
     }
 
     /// Auto-float: takes a window that refuses its tile frame (min-size clamp

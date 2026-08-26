@@ -69,8 +69,9 @@ key = "caps_lock"
 [bar]
 enabled = true
 position = "top"
-# Pill background opacity 0..1 and bar strip height in points.
-opacity = 0.35
+# Pill background opacity 0..1 (native .bar material is already translucent)
+# and bar strip height in points.
+opacity = 1.0
 height = 28
 # Pill placement: align = "center" | "left" | "right"; offset-x shifts the
 # pill along that edge, offset-y pushes the strip away from the screen edge.
@@ -89,7 +90,7 @@ offset-y = 0
 # font-family = ""      # font name; unset = system (numbers monospaced)
 # spacing = 6           # between workspace cells
 # cell-spacing = 4      # inside a cell (number, label, icons)
-# cell-radius = 7
+# cell-radius = 6
 # cell-padding-x = 8
 # cell-padding-y = 3
 # pill-padding-x = 10
@@ -119,7 +120,12 @@ offset-y = 0
 # enabled = true
 # color = "#89b4fa"   # default: theme accent
 # width = 2
-# radius = 6
+# radius = 10         # default matches the system window corner radius
+
+# Drag&drop layout preview (hyper+drag).
+# [preview]
+# color = "#89b4fa"   # default: theme accent
+# opacity = 0.3       # fill of the dragged window's future slot
 
 # Per-workspace bar appearance + layout. All keys optional.
 # layout: "dwindle" | "scroll" | a [custom-layouts] name.

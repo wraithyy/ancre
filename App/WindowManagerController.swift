@@ -68,21 +68,34 @@ final class WindowManagerController: WindowTrackerDelegate {
     /// Pause = drop all placement effects and enforcement; state keeps
     /// updating, resume re-places everything from state. (axQueue)
     private var tilingPaused = false
-    /// Active hyper+mouse drag: left = move (window floats), right = resize.
+    /// What a left-drag drop will do, decided by the cursor's position within
+    /// the target tile: edge zones insert on that side, the center swaps.
+    private enum DropAction: Equatable {
+        case insert(target: WindowID, edge: Direction)
+        case swap(target: WindowID)
+    }
+    /// Active hyper+mouse drag: left = move, right = resize. A tiled window
+    /// keeps its layout slot during the drag (only the AX window follows the
+    /// mouse) so the center zone can swap slots on drop.
     private struct MouseDragState {
         let window: WindowID
         let button: HyperMouseButton
+        let wasTiled: Bool
+        /// Native = the app moves/resizes its own window (no hyper); the WM
+        /// only tracks and applies the result — it never setFrames mid-drag.
+        let isNative: Bool
         var lastLocation: CGPoint
-        /// Tile under the cursor a left-drag would drop into.
-        var dropTarget: WindowID?
+        var action: DropAction?
     }
     private var mouseDrag: MouseDragState?
     /// Placement effects bypass animation (live mouse resize). (axQueue)
     private var instantPlacement = false
-    /// Drop-target overlay (main thread windows, axQueue reference).
-    private var dropPlaceholder: DropPlaceholder?
+    /// Future-layout drop preview (main thread windows, axQueue reference).
+    private var dropPreview: LayoutPreview?
     /// Fires on main whenever the pause state flips (menu checkbox sync).
     var onTilingPausedChanged: ((Bool) -> Void)?
+    /// IPC for appllandctl / MCP.
+    private var controlServer: ControlServer?
 
     init(config: AppConfig) {
         self.config = config
@@ -97,13 +110,13 @@ final class WindowManagerController: WindowTrackerDelegate {
             focusBorder = FocusBorder(
                 color: color,
                 width: config.border?.width ?? 2,
-                radius: config.border?.radius ?? 6
+                radius: config.border?.radius ?? 10
             )
         } else {
             focusBorder = nil
         }
-        let placeholderColor = (config.theme?.accent).flatMap { NSColor(hex: $0) } ?? .controlAccentColor
-        dropPlaceholder = DropPlaceholder(color: placeholderColor)
+        let previewColor = (config.preview?.color ?? config.theme?.accent).flatMap { NSColor(hex: $0) } ?? .controlAccentColor
+        dropPreview = LayoutPreview(color: previewColor, fillOpacity: config.preview?.opacity ?? 0.3)
         // Monitors (and with them the workspaces) are created by the first
         // DisplayManager callback, so startup and replug take the same path.
         self.state = WMState(
@@ -145,7 +158,128 @@ final class WindowManagerController: WindowTrackerDelegate {
         tracker.delegate = self
         tracker.start()
 
+        // Starting while the session is locked finds zero AX windows —
+        // rescan when the session/screen comes back.
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.sessionDidBecomeActiveNotification, object: nil, queue: nil
+        ) { [weak self] _ in self?.retile() }
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.screensDidWakeNotification, object: nil, queue: nil
+        ) { [weak self] _ in self?.retile() }
+
+        controlServer = ControlServer { [weak self] request, reply in
+            guard let self else { reply("error: shutting down"); return }
+            self.tracker.perform { reply(self.handleControl(request)) }
+        }
+
         start_inputOnly()
+    }
+
+    // MARK: - IPC (axQueue)
+
+    private func handleControl(_ request: String) -> String {
+        if request == "state" { return stateJSON() }
+        if request == "reload-config" {
+            reloadConfig()
+            return "ok"
+        }
+
+        // IPC-only verbs targeting a specific window by id (from `state`) —
+        // the Command grammar stays keybinding-oriented.
+        let parts = request.split(separator: " ").map(String.init)
+        switch parts.first {
+        case "move-window" where parts.count == 3:
+            guard let raw = UInt32(parts[1]) else { return "error: bad window id" }
+            let wid = WindowID(raw)
+            guard state.windows[wid] != nil else { return "error: unknown window \(raw)" }
+            guard state.locate(workspace: parts[2]) != nil else { return "error: unknown workspace \(parts[2])" }
+            execute(WM.moveWindow(wid, toWorkspace: parts[2], state: &state))
+            return "ok"
+        case "focus-window" where parts.count == 2:
+            guard let raw = UInt32(parts[1]), state.windows[WindowID(raw)] != nil else { return "error: unknown window" }
+            let wid = WindowID(raw)
+            if let location = state.windowLocation[wid] {
+                run(.workspace(location.workspaceName))
+            }
+            execute(WM.focusChangedExternally(wid, state: &state))
+            execute([.focusWindow(wid)])
+            return "ok"
+        case "set-floating" where parts.count == 3:
+            guard let raw = UInt32(parts[1]), state.windows[WindowID(raw)] != nil else { return "error: unknown window" }
+            guard let floating = Bool(parts[2]) else { return "error: bad bool" }
+            execute(WM.setFloating(WindowID(raw), floating: floating, state: &state))
+            return "ok"
+        default:
+            break
+        }
+
+        guard let command = Command.parse(request) else {
+            return "error: unknown command \"\(request)\""
+        }
+        run(command)
+        return "ok"
+    }
+
+    private struct StateDTO: Encodable {
+        struct Window: Encodable {
+            let id: UInt32
+            let pid: Int32
+            let bundleID: String
+            let title: String
+            let floating: Bool
+            let focused: Bool
+        }
+        struct WorkspaceDTO: Encodable {
+            let name: String
+            let layout: String
+            let active: Bool
+            let windows: [Window]
+        }
+        struct MonitorDTO: Encodable {
+            let id: String
+            let focused: Bool
+            let workspaces: [WorkspaceDTO]
+        }
+        let tilingPaused: Bool
+        let monitors: [MonitorDTO]
+    }
+
+    private func stateJSON() -> String {
+        let globallyFocused: WindowID? = state.monitors.indices.contains(state.focusedMonitorIndex)
+            ? state.monitors[state.focusedMonitorIndex].activeWorkspace.focusedWindow
+            : nil
+        let dto = StateDTO(
+            tilingPaused: tilingPaused,
+            monitors: state.monitors.enumerated().map { index, monitor in
+                StateDTO.MonitorDTO(
+                    id: monitor.id,
+                    focused: index == state.focusedMonitorIndex,
+                    workspaces: monitor.workspaces.enumerated().map { wsIndex, workspace in
+                        StateDTO.WorkspaceDTO(
+                            name: workspace.name,
+                            layout: workspaceLayoutNames[workspace.name] ?? config.general.defaultLayout,
+                            active: wsIndex == monitor.activeWorkspaceIndex,
+                            windows: (workspace.tiledWindows + Array(workspace.floatingFrames.keys)).map { wid in
+                                StateDTO.Window(
+                                    id: wid.rawValue,
+                                    pid: state.windows[wid]?.pid ?? 0,
+                                    bundleID: state.windows[wid]?.appBundleID ?? "",
+                                    title: axWindows[wid.rawValue]?.title ?? "",
+                                    floating: state.windows[wid]?.isFloating ?? false,
+                                    focused: wid == globallyFocused
+                                )
+                            }
+                        )
+                    }
+                )
+            }
+        )
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        guard let data = try? encoder.encode(dto), let json = String(data: data, encoding: .utf8) else {
+            return "error: state encoding failed"
+        }
+        return json
     }
 
     /// Re-reads the user config and applies what can change live: bindings,
@@ -172,17 +306,31 @@ final class WindowManagerController: WindowTrackerDelegate {
             state.workspaceAssignments = newConfig.workspaces ?? [:]
 
             rebuildFocusBorder()
+            let oldPreview = dropPreview
+            let previewColor = (newConfig.preview?.color ?? newConfig.theme?.accent).flatMap { NSColor(hex: $0) } ?? .controlAccentColor
+            let previewOpacity = newConfig.preview?.opacity ?? 0.3
+            DispatchQueue.main.async { [weak self] in
+                oldPreview?.hide()
+                let preview = LayoutPreview(color: previewColor, fillOpacity: previewOpacity)
+                self?.tracker.perform { self?.dropPreview = preview }
+            }
             let oldBar = bar
             bar = makeBarController()
             DispatchQueue.main.async { oldBar?.close() }
             rebuildHelpOverlay()
 
             if oldHyperKey != newConfig.hyper.key {
-                // Hyper key changed — restart the remap + tap. Rare enough to
-                // accept the momentary gap.
+                // Hyper key changed — restart the remap + tap. Must happen on
+                // the MAIN thread: EventTapManager binds its run-loop source
+                // to the current thread's run loop, and startup bound it to
+                // main; restarting from the axQueue would silently rebind the
+                // tap onto the axQueue's run loop.
                 NSLog("applland: hyper key changed, restarting input")
-                input.stop()
-                start_inputOnly()
+                DispatchQueue.main.async { [weak self] in
+                    guard let self else { return }
+                    self.input.stop()
+                    self.start_inputOnly()
+                }
             }
 
             // Re-place everything with the new gaps/assignments; workspace
@@ -204,6 +352,16 @@ final class WindowManagerController: WindowTrackerDelegate {
             onHyperMouse: { [weak self] button, phase, location in
                 guard let self else { return }
                 self.tracker.perform { self.handleHyperMouse(button: button, phase: phase, location: location) }
+            },
+            onObservedMouseUp: { [weak self] button, _ in
+                guard let self else { return }
+                self.tracker.perform {
+                    // Native drags are physically always the left button;
+                    // drag.button only encodes move vs resize semantics.
+                    guard let drag = self.mouseDrag, drag.isNative, button == .left else { return }
+                    _ = drag
+                    self.endMouseDrag()
+                }
             },
             onHyperStateChange: { [weak self] down in
                 DispatchQueue.main.async {
@@ -244,7 +402,7 @@ final class WindowManagerController: WindowTrackerDelegate {
         let accent = config.theme?.accent
         DispatchQueue.main.async { [weak self] in
             let color = (borderConfig?.color ?? accent).flatMap { NSColor(hex: $0) } ?? .controlAccentColor
-            let border = FocusBorder(color: color, width: borderConfig?.width ?? 2, radius: borderConfig?.radius ?? 6)
+            let border = FocusBorder(color: color, width: borderConfig?.width ?? 2, radius: borderConfig?.radius ?? 10)
             self?.tracker.perform {
                 guard let self else { return }
                 self.focusBorder = border
@@ -471,6 +629,7 @@ final class WindowManagerController: WindowTrackerDelegate {
             setTilingPausedOnQueue(!tilingPaused)
             return
         case .retile:
+            tracker.rescanWindows()
             applyDisplays(DisplayManager.current())
             return
         case .openConfig:
@@ -489,6 +648,7 @@ final class WindowManagerController: WindowTrackerDelegate {
     }
 
     func retile() {
+        tracker.rescanWindows()
         tracker.perform { self.applyDisplays(DisplayManager.current()) }
     }
 
@@ -502,13 +662,16 @@ final class WindowManagerController: WindowTrackerDelegate {
         case .began:
             guard let id = tracker.windowID(at: location), axWindows[id] != nil else { return }
             let wid = WindowID(id)
-            if button == .left, state.windows[wid]?.isFloating != true {
-                // Moving a tile = pull it out of the grid at its current spot.
-                execute(WM.setFloating(wid, floating: true, state: &state))
-            }
             execute(WM.focusChangedExternally(wid, state: &state))
             execute([.focusWindow(wid)])
-            mouseDrag = MouseDragState(window: wid, button: button, lastLocation: location, dropTarget: nil)
+            mouseDrag = MouseDragState(
+                window: wid,
+                button: button,
+                wasTiled: state.windows[wid]?.isFloating != true,
+                isNative: false,
+                lastLocation: location,
+                action: nil
+            )
         case .moved:
             guard var drag = mouseDrag, let ax = axWindows[drag.window.rawValue] else { return }
             let dx = location.x - drag.lastLocation.x
@@ -520,7 +683,7 @@ final class WindowManagerController: WindowTrackerDelegate {
                 frame.origin.x += dx
                 frame.origin.y += dy
                 _ = ax.setFrame(frame)
-                drag.dropTarget = updateDropTarget(for: drag.window, at: location)
+                drag.action = updateDropAction(for: drag, at: location)
             } else if state.windows[drag.window]?.isFloating == true {
                 frame.size.width = max(100, frame.size.width + dx)
                 frame.size.height = max(100, frame.size.height + dy)
@@ -535,44 +698,123 @@ final class WindowManagerController: WindowTrackerDelegate {
             }
             mouseDrag = drag
         case .ended:
+            endMouseDrag()
+        }
+    }
+
+    /// Applies the outcome of a drag (hyper or native) and clears the state.
+    private func endMouseDrag() {
+        do {
             guard let drag = mouseDrag else { return }
             mouseDrag = nil
-            DispatchQueue.main.async { self.dropPlaceholder?.hide() }
+            DispatchQueue.main.async { self.dropPreview?.hide() }
             guard let ax = axWindows[drag.window.rawValue] else { return }
-            if drag.button == .left, let target = drag.dropTarget {
-                execute(WM.tileWindow(drag.window, after: target, state: &state))
-            } else {
-                // Floats remember the final frame; a live-resized tile is a no-op.
+            guard drag.button == .left else {
+                // Right-drag: floats remember the final frame; a live-resized
+                // tile already adopted its ratios.
+                execute(WM.windowResizedByUser(drag.window, to: ax.frame.cgRect, state: &state))
+                return
+            }
+            switch drag.action {
+            case .insert(let target, let edge):
+                execute(WM.tileWindow(drag.window, after: target, edge: edge, state: &state))
+            case .swap(let target):
+                execute(WM.swapWindows(drag.window, target, state: &state))
+            case nil where drag.wasTiled:
+                // Dropped on its own slot = snap back; outside any tile = the
+                // tile becomes a float where the user left it (explicit user
+                // action, not an auto-float).
+                if let location = state.windowLocation[drag.window],
+                   state.monitors.indices.contains(location.monitorIndex) {
+                    let monitor = state.monitors[location.monitorIndex]
+                    if let own = WM.allFrames(for: monitor.activeWorkspace, monitor: monitor, state: state)[drag.window],
+                       own.contains(drag.lastLocation) {
+                        assign(frame: AXFrame(origin: own.origin, size: own.size), to: drag.window)
+                        return
+                    }
+                }
+                execute(WM.floatWindow(drag.window, frame: ax.frame.cgRect, state: &state))
+                state.autoFloated.remove(drag.window)
+            case nil:
                 execute(WM.windowResizedByUser(drag.window, to: ax.frame.cgRect, state: &state))
             }
         }
     }
 
-    /// Finds the tile under the cursor (excluding the dragged window) and
-    /// moves the drop placeholder over it. Returns the target's id.
-    private func updateDropTarget(for dragged: WindowID, at location: CGPoint) -> WindowID? {
-        var targetFrame: CGRect?
-        var target: WindowID?
+    /// Current global mouse position in CG (top-left) coordinates.
+    private static func mouseLocation() -> CGPoint? {
+        CGEvent(source: nil)?.location
+    }
+
+    /// Decides what a drop at `location` would do (edge insert / center swap),
+    /// and shows a preview of the WHOLE future layout — how tiles will sit
+    /// after the drop, with the dragged window's slot filled.
+    private func updateDropAction(for drag: MouseDragState, at location: CGPoint) -> DropAction? {
+        let dragged = drag.window
+        var action: DropAction?
+        var tiles: [LayoutPreview.Tile] = []
+        var monitorFrame: CGRect = .zero
+
         if let monitorIdx = state.monitors.firstIndex(where: { $0.frame.contains(location) }) {
             let monitor = state.monitors[monitorIdx]
-            let frames = WM.allFrames(for: monitor.activeWorkspace, monitor: monitor, state: state)
+            let workspace = monitor.activeWorkspace
+            let frames = WM.allFrames(for: workspace, monitor: monitor, state: state)
+
             for (wid, rect) in frames
-            where wid != dragged && rect.contains(location) && monitor.activeWorkspace.tiledWindows.contains(wid) {
-                target = wid
-                targetFrame = rect
+            where wid != dragged && rect.contains(location) && workspace.tiledWindows.contains(wid) {
+                // Cursor position within the tile picks the zone: the middle
+                // (inner 35 % each axis) swaps, otherwise the dominant offset
+                // from center picks the insertion side.
+                let rx = (location.x - rect.midX) / (rect.width / 2)
+                let ry = (location.y - rect.midY) / (rect.height / 2)
+                let sameWorkspace = workspace.tiledWindows.contains(dragged)
+                if max(abs(rx), abs(ry)) < 0.35, sameWorkspace {
+                    action = .swap(target: wid)
+                } else if abs(rx) >= abs(ry) {
+                    action = .insert(target: wid, edge: rx < 0 ? .left : .right)
+                } else {
+                    action = .insert(target: wid, edge: ry < 0 ? .up : .down)
+                }
                 break
             }
-        }
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            if let targetFrame {
-                let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
-                self.dropPlaceholder?.show(frame: DisplayManager.nsScreenRect(fromCGRect: targetFrame, primaryHeight: primaryHeight))
-            } else {
-                self.dropPlaceholder?.hide()
+
+            if let action {
+                // Layouts are value types — simulate the drop on a copy.
+                var future = workspace
+                switch action {
+                case .insert(let target, let edge):
+                    future.floatingFrames.removeValue(forKey: dragged)
+                    future.layout.remove(dragged)
+                    future.layout.insert(dragged, near: target, edge: edge, container: monitor.visibleFrame, innerGap: state.innerGap, outerGap: state.outerGap)
+                case .swap(let target):
+                    future.layout.swapPositions(dragged, target)
+                }
+                monitorFrame = monitor.frame
+                tiles = WM.allFrames(for: future, monitor: monitor, state: state).map { wid, rect in
+                    LayoutPreview.Tile(
+                        rect: rect.offsetBy(dx: -monitor.frame.minX, dy: -monitor.frame.minY),
+                        isDragged: wid == dragged
+                    )
+                }
             }
         }
-        return target
+
+        // Same action = same preview; skip redundant window churn.
+        if action == mouseDrag?.action { return action }
+
+        DispatchQueue.main.async { [weak self] in
+            guard let self, let dropPreview = self.dropPreview else { return }
+            if tiles.isEmpty {
+                dropPreview.hide()
+            } else {
+                let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
+                dropPreview.show(
+                    monitorFrame: DisplayManager.nsScreenRect(fromCGRect: monitorFrame, primaryHeight: primaryHeight),
+                    tiles: tiles
+                )
+            }
+        }
+        return action
     }
 
     private func setTilingPausedOnQueue(_ paused: Bool) {
@@ -580,7 +822,9 @@ final class WindowManagerController: WindowTrackerDelegate {
         tilingPaused = paused
         NSLog("applland: tiling %@", paused ? "paused" : "resumed")
         DispatchQueue.main.async { self.onTilingPausedChanged?(paused) }
-        if !paused {
+        if paused {
+            updateFocusBorder() // hides it
+        } else {
             // State kept evolving while effects were dropped — re-place all.
             applyDisplays(DisplayManager.current())
         }
@@ -628,7 +872,6 @@ final class WindowManagerController: WindowTrackerDelegate {
     private var adoptAttempts: [AXWindowID: Int] = [:]
     /// Windows currently being resized by a native mouse drag — left alone
     /// until the button is released, then adopted into the layout.
-    private var dragResizing: Set<AXWindowID> = []
 
     /// Nesting depth of execute() — adoption/float drains recurse into it.
     private var executeDepth = 0
@@ -684,6 +927,11 @@ final class WindowManagerController: WindowTrackerDelegate {
     /// Outlines the focused window; hides the border when nothing is focused.
     private func updateFocusBorder() {
         guard let focusBorder else { return }
+        // Paused tiling = no WM chrome at all.
+        guard !tilingPaused else {
+            DispatchQueue.main.async { focusBorder.hide() }
+            return
+        }
         guard state.monitors.indices.contains(state.focusedMonitorIndex),
               let wid = state.monitors[state.focusedMonitorIndex].activeWorkspace.focusedWindow,
               let ax = axWindows[wid.rawValue]
@@ -887,9 +1135,26 @@ final class WindowManagerController: WindowTrackerDelegate {
 
     private func enforceTiling(id: AXWindowID, newFrame: AXFrame) {
         guard let ax = axWindows[id], !tilingPaused else { return }
-        // Mid-animation geometry events are our own setFrames, not the app's;
-        // same for a window we're dragging with hyper+mouse.
-        guard !animator.animatingWindows.contains(id), mouseDrag?.window.rawValue != id else { return }
+        // Mid-animation geometry events are our own setFrames, not the app's.
+        guard !animator.animatingWindows.contains(id) else { return }
+        // A drag in progress for this window: hyper drags are fully ours
+        // (ignore the event); native drags keep tracking the cursor (move
+        // updates drop zones, resize re-ratios live).
+        if var drag = mouseDrag, drag.window.rawValue == id {
+            guard drag.isNative else { return }
+            if drag.button == .left {
+                if let location = Self.mouseLocation() {
+                    drag.lastLocation = location
+                    drag.action = updateDropAction(for: drag, at: location)
+                    mouseDrag = drag
+                }
+            } else {
+                instantPlacement = true
+                execute(WM.windowResizedByUser(drag.window, to: newFrame.cgRect, state: &state))
+                instantPlacement = false
+            }
+            return
+        }
         if parkedWindows.contains(id) {
             guard !parkingBounds.isEmpty,
                   !OffscreenParking.isParked(newFrame, bounds: parkingBounds) else { return }
@@ -916,17 +1181,30 @@ final class WindowManagerController: WindowTrackerDelegate {
             snapBackAttempts.removeValue(forKey: id) // converged
             return
         }
-        // Native mouse drag: don't fight the user mid-drag; when the button is
-        // released, adopt the final size into the layout (splits re-ratio).
-        // ponytail: if no event fires after mouse-up, the next divergence for
-        // this window adopts instead of snapping — acceptable, it matches the
-        // old "accept the app's frame" behavior.
+        // Native mouse manipulation of a tiled window (no hyper): route it
+        // into the same drag system as hyper+drag — a size change is a live
+        // layout resize, a pure move gets drop zones + preview. Ends on the
+        // observed mouse-up from the event tap.
         if CGEventSource.buttonState(.combinedSessionState, button: .left) {
-            dragResizing.insert(id)
-            return
-        }
-        if dragResizing.remove(id) != nil {
-            execute(WM.windowResizedByUser(WindowID(id), to: newFrame.cgRect, state: &state))
+            let isResize = abs(expected.size.width - newFrame.size.width) > 2
+                || abs(expected.size.height - newFrame.size.height) > 2
+            let location = Self.mouseLocation() ?? CGPoint(x: newFrame.origin.x, y: newFrame.origin.y)
+            var drag = MouseDragState(
+                window: WindowID(id),
+                button: isResize ? .right : .left,
+                wasTiled: true,
+                isNative: true,
+                lastLocation: location,
+                action: nil
+            )
+            if isResize {
+                instantPlacement = true
+                execute(WM.windowResizedByUser(drag.window, to: newFrame.cgRect, state: &state))
+                instantPlacement = false
+            } else {
+                drag.action = updateDropAction(for: drag, at: location)
+            }
+            mouseDrag = drag
             return
         }
         let attempts = (snapBackAttempts[id] ?? 0) + 1

@@ -25,6 +25,9 @@ final class EventTapManager {
     var onHyperStateChange: ((Bool) -> Void)?
     /// hyper + mouse drag (move/resize). Tap thread — dispatch only.
     var onHyperMouse: ((HyperMouseButton, HyperMousePhase, CGPoint) -> Void)?
+    /// Every NON-captured mouse-up, observe-only (the event passes through) —
+    /// ends native window drags the WM adopted. Tap thread — dispatch only.
+    var onObservedMouseUp: ((HyperMouseButton, CGPoint) -> Void)?
     /// Button captured by a hyper+mousedown; its drag/up events are swallowed
     /// until release even if hyper is let go mid-drag.
     private var capturedButton: HyperMouseButton?
@@ -42,6 +45,10 @@ final class EventTapManager {
         self.handler = handler
     }
 
+    /// Binds the tap's run-loop source to the CURRENT thread's run loop —
+    /// start() and stop() must always be called from the same fixed thread
+    /// (the app uses main). Restarting from another thread would silently
+    /// move tap callbacks onto that thread's run loop.
     func start() {
         let watched: [CGEventType] = [
             .keyDown, .keyUp, .flagsChanged,
@@ -111,7 +118,10 @@ final class EventTapManager {
             return nil
         case .leftMouseUp, .rightMouseUp:
             let button: HyperMouseButton = type == .leftMouseUp ? .left : .right
-            guard capturedButton == button else { return Unmanaged.passRetained(event) }
+            guard capturedButton == button else {
+                onObservedMouseUp?(button, event.location)
+                return Unmanaged.passRetained(event)
+            }
             capturedButton = nil
             onHyperMouse?(button, .ended, event.location)
             return nil

@@ -66,6 +66,34 @@ public struct DwindleLayout: Layout {
         self.root = Self.removing(window, from: root)
     }
 
+    public mutating func insert(_ window: WindowID, near target: WindowID, edge: WMCore.Direction, container: CGRect, innerGap: Double, outerGap: Double) {
+        guard let root, order.contains(target), !order.contains(window) else {
+            insert(window, after: target, container: container, innerGap: innerGap, outerGap: outerGap)
+            return
+        }
+        let axis: Axis = (edge == .left || edge == .right) ? .vertical : .horizontal
+        let newFirst = edge == .left || edge == .up
+        self.root = Self.replacing(target, in: root) { existing in
+            .split(
+                axis: axis,
+                ratio: 0.5,
+                first: newFirst ? .leaf(window) : .leaf(existing),
+                second: newFirst ? .leaf(existing) : .leaf(window)
+            )
+        }
+        if let idx = order.firstIndex(of: target) {
+            order.insert(window, at: newFirst ? idx : idx + 1)
+        } else {
+            order.append(window)
+        }
+    }
+
+    public mutating func swapPositions(_ a: WindowID, _ b: WindowID) {
+        guard let root, let ia = order.firstIndex(of: a), let ib = order.firstIndex(of: b) else { return }
+        self.root = Self.swapping(a, b, in: root)
+        order.swapAt(ia, ib)
+    }
+
     @discardableResult
     public mutating func move(_ window: WindowID, direction: Direction, container: CGRect, innerGap: Double, outerGap: Double) -> Bool {
         guard let root else { return false }

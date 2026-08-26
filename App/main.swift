@@ -113,6 +113,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let controller = WindowManagerController(config: config)
         controller.onTilingPausedChanged = { [weak self] paused in
             self?.pauseItem?.state = paused ? .on : .off
+            // Paused tiling is visible at a glance on the status item.
+            self?.statusItem.button?.title = paused ? "◱✕" : "◱"
         }
         controller.start()
         self.controller = controller

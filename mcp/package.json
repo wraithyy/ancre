@@ -1,0 +1,10 @@
+{
+  "name": "applland-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for the applland tiling window manager",
+  "type": "module",
+  "bin": { "applland-mcp": "index.js" },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  }
+}

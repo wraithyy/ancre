@@ -48,6 +48,19 @@ public struct ScrollColumnsLayout: Layout {
         desiredWidths.removeValue(forKey: window)
     }
 
+    public mutating func insert(_ window: WindowID, near target: WindowID, edge: WMCore.Direction, container: CGRect, innerGap: Double, outerGap: Double) {
+        guard let idx = order.firstIndex(of: target), !order.contains(window) else {
+            insert(window, after: target, container: container, innerGap: innerGap, outerGap: outerGap)
+            return
+        }
+        order.insert(window, at: edge == .left || edge == .up ? idx : idx + 1)
+    }
+
+    public mutating func swapPositions(_ a: WindowID, _ b: WindowID) {
+        guard let ia = order.firstIndex(of: a), let ib = order.firstIndex(of: b) else { return }
+        order.swapAt(ia, ib)
+    }
+
     @discardableResult
     public mutating func move(_ window: WindowID, direction: Direction, container: CGRect, innerGap: Double, outerGap: Double) -> Bool {
         guard let idx = order.firstIndex(of: window) else { return false }

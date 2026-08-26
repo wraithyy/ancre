@@ -163,6 +163,22 @@ public final class WindowTracker {
         delegate?.windowFocused(id: id)
     }
 
+    /// Re-enumerates every attached app and registers windows discovery
+    /// missed — e.g. after starting while the session was locked (apps report
+    /// zero AX windows then). Safe from any thread.
+    public func rescanWindows() {
+        axAsync { [self] in
+            for app in NSWorkspace.shared.runningApplications where app.activationPolicy == .regular {
+                attach(pid: app.processIdentifier) // no-op if already attached
+            }
+            for (pid, app) in apps {
+                for window in app.currentWindows() where window.isTileable && windowCache[window.id] == nil {
+                    registerDiscovered(window, pid: pid)
+                }
+            }
+        }
+    }
+
     /// axQueue only. The tracked window under the given point (CG top-left
     /// global coordinates), via the system-wide AX hit test — respects
     /// z-order, unlike a frame scan. For hyper+drag mouse modes.

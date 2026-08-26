@@ -107,7 +107,7 @@ public extension NSColor {
 /// Visual knobs resolved from config ([theme] + [bar] overrides). Defaults
 /// here mirror the config defaults; the controller overwrites everything.
 public struct BarTheme {
-    public var opacity = 0.35
+    public var opacity = 1.0
     public var align = "center"
     public var offsetX = 0.0
     public var iconSize: CGFloat = 17
@@ -124,7 +124,7 @@ public struct BarTheme {
     public var fontFamily: String?
     public var spacing = 6.0
     public var cellSpacing = 4.0
-    public var cellRadius = 7.0
+    public var cellRadius = 6.0
     public var cellPaddingX = 8.0
     public var cellPaddingY = 3.0
     public var pillPaddingX = 10.0
@@ -278,7 +278,11 @@ private struct BarView: View {
         if let background = theme.background {
             Capsule().fill(Color(background)).opacity(theme.opacity)
         } else {
-            Capsule().fill(.ultraThinMaterial).opacity(theme.opacity)
+            // Native default: the menu-bar material with a hairline edge.
+            Capsule()
+                .fill(.bar)
+                .overlay(Capsule().strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
+                .opacity(theme.opacity)
         }
     }
 }
@@ -312,12 +316,12 @@ private struct WorkspaceCell: View {
             }
             if workspace.showNumber {
                 Text(workspace.name)
-                    .font(theme.font(size: theme.fontSize, weight: workspace.isActive ? .bold : .regular, monospaced: true))
+                    .font(theme.font(size: theme.fontSize, weight: workspace.isActive ? .semibold : .regular))
                     .foregroundStyle(workspace.isActive ? Color.primary : Color.secondary)
             }
             if let displayName = workspace.displayName {
                 Text(displayName)
-                    .font(theme.font(size: theme.fontSize - 1, weight: workspace.isActive ? .semibold : .regular))
+                    .font(theme.font(size: theme.fontSize - 1, weight: workspace.isActive ? .medium : .regular))
                     .foregroundStyle(workspace.isActive ? Color.primary : Color.secondary)
             }
             ForEach(Array(workspace.windows.prefix(theme.maxIcons).enumerated()), id: \.element.windowID) { _, window in
@@ -413,6 +417,12 @@ private struct WorkspaceCell: View {
 
     private var backgroundColor: Color {
         if isDropTarget { return accent.opacity(0.25) }
-        return workspace.isActive ? accent.opacity(isFocusedMonitor ? theme.activeOpacity : theme.activeOpacity * 0.55) : Color.clear
+        guard workspace.isActive else { return Color.clear }
+        // Custom accent = colored highlight; native default = the subtle
+        // menu-bar-style primary tint that adapts to light/dark.
+        if theme.accent != nil {
+            return accent.opacity(isFocusedMonitor ? theme.activeOpacity : theme.activeOpacity * 0.55)
+        }
+        return Color.primary.opacity(isFocusedMonitor ? 0.16 : 0.09)
     }
 }

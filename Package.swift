@@ -13,6 +13,7 @@ let package = Package(
     ],
     targets: [
         .target(name: "WMCore", swiftSettings: swiftSettings),
+        .executableTarget(name: "appllandctl", swiftSettings: swiftSettings),
         .target(name: "LayoutEngine", dependencies: ["WMCore"], swiftSettings: swiftSettings),
         .target(name: "AXBridge", dependencies: ["WMCore"], swiftSettings: swiftSettings),
         .target(name: "InputSystem", dependencies: ["WMCore"], swiftSettings: swiftSettings),

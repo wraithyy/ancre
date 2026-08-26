@@ -242,12 +242,47 @@ jim přirozené souřadnice za hranou) a bar (ukazovat i zaparkovaná okna).
   češtiny; default angličtina; neznámý jazyk = fallback EN. Další jazyk =
   přidat slovník do L10n.tables.
 
-## Task 6.4: Finální review + security check
+## Task 6.4: Finální review + security check — HOTOVO
+- code-reviewer: 0 CRITICAL, 2 HIGH (opraveno: autoFloated leak při
+  windowRemoved — CGWindowID reuse; restart event tapu při hot-reloadu
+  hyper klávesy musí jít přes main thread — run-loop binding), 1 MEDIUM
+  (opraveno: SO_RCVTIMEO + čtení mimo accept queue v ControlServeru)
+- security-reviewer: 0 CRITICAL/HIGH, 2 MEDIUM (opraveno: socket přesunut
+  z /tmp do ~/Library/Application Support/applland — squatting/spoofing na
+  multi-user mašině; read timeouty server i CLI), 1 LOW akceptováno
+  (SIGKILL nechá CapsLock remap — dokumentovaný recovery hidutil příkazem).
+  Čisté: newline injection přes MCP (maxSplits: 1 + connection-per-request),
+  0600 permissions, 4KB request cap, žádné logování keystroků, fatalError
+  jen na bundled defaults.
 - **Agent**: code-reviewer
 - **Files**: celý projekt
 - **Depends on**: vše
 - **Acceptance**: žádné CRITICAL/HIGH
 - **Prompt seed**: Celkový review: memory (AX refy), CPU idle profil, permission handling, hidutil revert při crash.
+
+### Milestone 7 — AI ready (IPC, MCP, skill)
+
+## Task 7.1: IPC socket + appllandctl CLI — HOTOVO (runtime ověřeno: state/dispatch/move-window/reload-config, error paths, socket 0600)
+- **Files**: App/ControlServer.swift, Sources/appllandctl/
+- **Acceptance**: `appllandctl workspace 3` přepne workspace; `appllandctl state`
+  vrátí JSON stavu (monitory, workspaces, okna s tituly, layouty, floaty).
+  Socket ~/Library/Application Support/applland/applland.sock, práva 0600, protokol řádkový.
+- **Poznámka**: commandy jdou přes existující Command.parse — CLI je jen
+  transport. Model yabai/aerospace.
+
+## Task 7.2: MCP server — HOTOVO (mcp/index.js, plain JS bez build stepu; registrováno `claude mcp add applland --scope user`; smoke test stdio prošel)
+- **Files**: mcp/ (TypeScript balíček)
+- **Acceptance**: MCP tools applland_state / applland_dispatch /
+  applland_move_window nad socketem; agent umí přeuspořádat okna.
+
+## Task 7.3: Skill pro Claude Code — HOTOVO (.claude/skills/applland/SKILL.md — transporty, grammar tabulky, window-targeted verby, recepty)
+- **Files**: .claude/skills/applland/
+- **Acceptance**: skill dokumentuje CLI/MCP + recepty (příprava workspace,
+  úklid notifikačních appek).
+
+## Nápady dál (bez pořadí): presety/snapshoty rozložení (save/restore-session),
+event stream (subscribe focus/workspace changes pro sketchybar), config hooks
+(on-window-open → command), agentem učená app-workspaces pravidla.
 
 ## Out of scope
 
