@@ -1,0 +1,58 @@
+name: Release
+
+# Tag-driven releases: push a tag `vX.Y.Z` and this builds a universal
+# (arm64 + x86_64) ancre.app + ancrectl, zips them, and publishes a GitHub
+# Release with auto-generated notes. The job summary prints the sha256 and
+# a ready-to-paste version bump for the Homebrew cask
+# (wraithyy/homebrew-tap, Casks/ancre.rb).
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Stamp version from tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" Scripts/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" Scripts/Info.plist
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Build universal bundle
+        run: Scripts/bundle.sh universal
+
+      - name: Package
+        run: |
+          STAGE="$(mktemp -d)"
+          cp -R .build/ancre.app "$STAGE/"
+          cp .build/apple/Products/Release/ancrectl "$STAGE/"
+          (cd "$STAGE" && ditto -c -k . "$GITHUB_WORKSPACE/ancre-$VERSION-macos.zip")
+          shasum -a 256 "ancre-$VERSION-macos.zip" | tee checksum.txt
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            "ancre-$VERSION-macos.zip" \
+            --title "ancre $VERSION" \
+            --generate-notes
+
+      - name: Cask bump summary
+        run: |
+          SHA=$(cut -d' ' -f1 checksum.txt)
+          {
+            echo "## Homebrew cask bump (wraithyy/homebrew-tap → Casks/ancre.rb)"
+            echo '```ruby'
+            echo "  version \"$VERSION\""
+            echo "  sha256 \"$SHA\""
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
