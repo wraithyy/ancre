@@ -33,7 +33,7 @@ jobs:
         run: |
           STAGE="$(mktemp -d)"
           cp -R .build/ancre.app "$STAGE/"
-          cp .build/apple/Products/Release/ancrectl "$STAGE/"
+          cp .build/universal/ancrectl "$STAGE/"
           (cd "$STAGE" && ditto -c -k . "$GITHUB_WORKSPACE/ancre-$VERSION-macos.zip")
           shasum -a 256 "ancre-$VERSION-macos.zip" | tee checksum.txt
 

@@ -4,11 +4,20 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-# "universal" builds an arm64+x86_64 fat binary (used by the release CI).
+# "universal" builds arm64+x86_64 and lipos them (used by the release CI;
+# `swift build --arch a --arch b` is broken on CI toolchains).
 CONF="${1:-debug}"
 if [ "$CONF" = "universal" ]; then
-    swift build -c release --arch arm64 --arch x86_64
-    BUILT=".build/apple/Products/Release"
+    swift build -c release --triple arm64-apple-macosx
+    swift build -c release --triple x86_64-apple-macosx
+    BUILT=".build/universal"
+    mkdir -p "$BUILT"
+    for bin in ancre ancrectl; do
+        lipo -create ".build/arm64-apple-macosx/release/$bin" \
+                     ".build/x86_64-apple-macosx/release/$bin" \
+             -output "$BUILT/$bin"
+    done
+    find .build/arm64-apple-macosx/release -maxdepth 1 -name '*.bundle' -exec cp -R {} "$BUILT/" \;
 else
     swift build -c "$CONF"
     BUILT=".build/$CONF"
@@ -22,7 +31,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp Scripts/Info.plist "$APP/Contents/Info.plist"
 cp "$BIN" "$APP/Contents/MacOS/ancre"
 # SPM resource bundles (default.toml etc.)
-find ".build/$CONF" -maxdepth 1 -name '*.bundle' -exec cp -R {} "$APP/Contents/Resources/" \;
+find "$BUILT" -maxdepth 1 -name '*.bundle' -exec cp -R {} "$APP/Contents/Resources/" \;
 
 # Brand assets: app icon + menubar template image
 BRAND="docs/brand/ancre-fixed-point-brand-kit"
