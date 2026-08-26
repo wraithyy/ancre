@@ -6,8 +6,8 @@ sidebar:
 ---
 
 Config žije v `~/.config/ancre/ancre.toml` — vytvoří se z defaultů při prvním
-spuštění. Kompletní katalog klíčů s defaulty: `Sources/Config/default.toml`
-v repozitáři.
+spuštění. Kompletní katalog klíčů s typy, defaulty a povolenými hodnotami:
+[Config reference](/ancre/cs/config-reference/).
 
 Změny aplikuje **Reload config** v menubar menu (nebo `ancrectl reload-config`)
 bez restartu. Chyba v configu nikdy neshodí app — fallback na defaulty

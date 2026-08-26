@@ -42,7 +42,7 @@ export default defineConfig({
         {
           label: 'Reference',
           translations: { cs: 'Reference' },
-          items: ['architecture', 'troubleshooting'],
+          items: ['config-reference', 'architecture', 'troubleshooting'],
         },
       ],
     }),

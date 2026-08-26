@@ -6,8 +6,8 @@ sidebar:
 ---
 
 The config lives at `~/.config/ancre/ancre.toml` — created from defaults on
-first launch. The complete key catalogue with defaults:
-`Sources/Config/default.toml` in the repository.
+first launch. The complete key catalogue with types, defaults, and allowed
+values: [Config reference](/ancre/config-reference/).
 
 Changes apply via **Reload config** in the menu bar menu (or
 `ancrectl reload-config`) without a restart. A config error never crashes the
