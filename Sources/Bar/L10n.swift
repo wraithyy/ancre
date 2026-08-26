@@ -24,6 +24,25 @@ public enum L10n {
     public static var openConfig: String { t("open_config") }
     public static var reloadConfig: String { t("reload_config") }
     public static var switcherPlaceholder: String { t("switcher_placeholder") }
+    public static var onboardingSubtitle: String { t("onboarding_subtitle") }
+    public static var onboardingAccessibility: String { t("onboarding_accessibility") }
+    public static var onboardingInputMonitoring: String { t("onboarding_input") }
+    public static var onboardingRemapWarning: String { t("onboarding_remap") }
+    public static var onboardingStart: String { t("onboarding_start") }
+    public static var onboardingGrant: String { t("onboarding_grant") }
+    public static var onboardingHowTo: String { t("onboarding_howto") }
+    public static var onboardingAI: String { t("onboarding_ai") }
+    public static var onboardingTips: [(String, String)] {
+        [
+            ("hyper + 1…9", t("tip_workspaces")),
+            ("hyper + H J K L", t("tip_focus")),
+            ("hyper + ⇧ + H J K L", t("tip_move")),
+            ("hyper + mezerník", t("tip_switcher")),
+            (t("tip_drag_key"), t("tip_drag")),
+            (t("tip_resize_key"), t("tip_resize")),
+            (t("tip_hold_key"), t("tip_hold")),
+        ]
+    }
     public static func layoutMenu(_ current: String) -> String {
         String(format: t("layout_menu"), current)
     }
@@ -54,6 +73,24 @@ public enum L10n {
         "open_config": "Open config",
         "reload_config": "Reload config",
         "switcher_placeholder": "Search windows…",
+        "onboarding_subtitle": "Tiling window manager. Two permissions are needed before it can start.",
+        "onboarding_accessibility": "Moving and resizing windows of other apps.",
+        "onboarding_input": "The hyper key (CapsLock) and keyboard shortcuts.",
+        "onboarding_remap": "Starting remaps CapsLock to act as the hyper key and begins tiling your windows.",
+        "onboarding_start": "Start ancre",
+        "onboarding_grant": "Grant…",
+        "onboarding_howto": "The basics",
+        "tip_workspaces": "switch workspaces",
+        "tip_focus": "move focus between windows",
+        "tip_move": "move the focused window",
+        "tip_switcher": "search windows (Spotlight-style)",
+        "tip_drag_key": "drag a window",
+        "tip_drag": "move it — edges insert, center swaps",
+        "tip_resize_key": "drag a window edge",
+        "tip_resize": "resize — neighbors adjust",
+        "tip_hold_key": "hold hyper",
+        "tip_hold": "cheatsheet with every shortcut",
+        "onboarding_ai": "AI ready: the `ancrectl` CLI and an MCP server (mcp/) let agents inspect and arrange your windows — register with: claude mcp add ancre -- node <repo>/mcp/index.js",
     ]
 
     private static let tables: [String: [String: String]] = [
@@ -74,6 +111,24 @@ public enum L10n {
             "open_config": "Otevřít config",
             "reload_config": "Znovu načíst config",
             "switcher_placeholder": "Hledat okna…",
+            "onboarding_subtitle": "Tiling window manager. Před spuštěním potřebuje dvě oprávnění.",
+            "onboarding_accessibility": "Přesouvání a resize oken ostatních aplikací.",
+            "onboarding_input": "Hyper klávesa (CapsLock) a klávesové zkratky.",
+            "onboarding_remap": "Spuštění přemapuje CapsLock na hyper klávesu a začne skládat okna.",
+            "onboarding_start": "Spustit ancre",
+            "onboarding_grant": "Povolit…",
+            "onboarding_howto": "Základy ovládání",
+            "tip_workspaces": "přepínání workspaces",
+            "tip_focus": "fokus mezi okny",
+            "tip_move": "přesun fokusovaného okna",
+            "tip_switcher": "hledání oken (jako Spotlight)",
+            "tip_drag_key": "tažení okna",
+            "tip_drag": "přesun — kraje vloží, střed prohodí",
+            "tip_resize_key": "tažení hrany okna",
+            "tip_resize": "resize — sousedi se přizpůsobí",
+            "tip_hold_key": "podržet hyper",
+            "tip_hold": "nápověda se všemi zkratkami",
+            "onboarding_ai": "AI ready: CLI `ancrectl` a MCP server (mcp/) — agenti můžou okna číst i přeskládat. Registrace: claude mcp add ancre -- node <repo>/mcp/index.js",
         ],
     ]
 }

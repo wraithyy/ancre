@@ -1,4 +1,4 @@
-# applland default config — copied to ~/.config/applland/applland.toml on first run
+# ancre default config — copied to ~/.config/ancre/ancre.toml on first run
 
 [general]
 gaps-inner = 8
@@ -19,7 +19,7 @@ default-layout = "dwindle"   # dwindle | scroll | stack (monocle)
 # auto-stack = true
 # auto-stack-min-width = 300
 # Log manual window moves (bundle id + workspaces, no titles) to
-# ~/Library/Application Support/applland/move-log.jsonl — feed it to an agent
+# ~/Library/Application Support/ancre/move-log.jsonl — feed it to an agent
 # to suggest [app-workspaces] rules. Default on; false disables.
 # move-log = true
 

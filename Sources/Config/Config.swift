@@ -1,6 +1,6 @@
 // Config — TOML schema + loader (Task 1.7).
 //
-// User config lives at ~/.config/applland/applland.toml; on first run the
+// User config lives at ~/.config/ancre/ancre.toml; on first run the
 // bundled default.toml is copied there. Invalid config falls back to the
 // bundled defaults and reports human-readable warnings instead of crashing —
 // a WM that dies on a config typo locks the user out of their keybindings.
@@ -36,7 +36,7 @@ public struct AppConfig: Codable {
         public var autoStack: Bool
         /// Minimum sensible width per tiled window for the fit heuristic.
         public var autoStackMinWidth: Double
-        /// Log manual window moves to Application Support/applland/move-log.jsonl
+        /// Log manual window moves to Application Support/ancre/move-log.jsonl
         /// (input for agent-suggested [app-workspaces] rules).
         public var moveLog: Bool
 
@@ -447,7 +447,7 @@ extension AppConfig {
 public enum ConfigLoader {
     public static var userConfigURL: URL {
         FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".config/applland/applland.toml")
+            .appendingPathComponent(".config/ancre/ancre.toml")
     }
 
     /// Loads user config, falling back to bundled defaults on any error.
@@ -459,7 +459,7 @@ public enum ConfigLoader {
         do {
             defaults = try decode(try bundledDefaultTOML())
         } catch {
-            fatalError("applland: bundled default.toml is invalid: \(error)")
+            fatalError("ancre: bundled default.toml is invalid: \(error)")
         }
 
         copyDefaultIfMissing(warnings: &warnings)

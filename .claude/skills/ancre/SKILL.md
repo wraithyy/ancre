@@ -1,25 +1,25 @@
 ---
-name: applland
-description: Control the applland tiling window manager — inspect and rearrange macOS windows, workspaces, and layouts via appllandctl CLI or the applland MCP server. Use when the user asks to arrange windows, prepare a workspace ("připrav mi workspace na review"), move apps between workspaces, switch layouts, or query what's on screen.
+name: ancre
+description: Control the ancre tiling window manager — inspect and rearrange macOS windows, workspaces, and layouts via ancrectl CLI or the ancre MCP server. Use when the user asks to arrange windows, prepare a workspace ("připrav mi workspace na review"), move apps between workspaces, switch layouts, or query what's on screen.
 ---
 
-# Controlling applland
+# Controlling ancre
 
-applland is a Hyprland-inspired tiling WM. Everything goes through its
-command bus, exposed on a unix socket (`~/Library/Application Support/applland/applland.sock`).
+ancre is a Hyprland-inspired tiling WM. Everything goes through its
+command bus, exposed on a unix socket (`~/Library/Application Support/ancre/ancre.sock`).
 
 ## Two transports, same protocol
 
-1. **CLI**: `appllandctl <request>` (built at `.build/debug/appllandctl` in
+1. **CLI**: `ancrectl <request>` (built at `.build/debug/ancrectl` in
    the repo, or on PATH if installed)
-2. **MCP tools** (server `applland`): `applland_state`, `applland_command`,
-   `applland_move_window`, `applland_focus_window`, `applland_set_floating`
+2. **MCP tools** (server `ancre`): `ancre_state`, `ancre_command`,
+   `ancre_move_window`, `ancre_focus_window`, `ancre_set_floating`
 
 Prefer MCP tools when available; the CLI is the fallback.
 
 ## Workflow
 
-1. **Always read state first**: `applland_state` / `appllandctl state` →
+1. **Always read state first**: `ancre_state` / `ancrectl state` →
    JSON with monitors (stable ids), workspaces (name, layout, active) and
    windows (id, pid, bundleID, title, floating, focused). Window ids are the
    handles for targeted operations — find windows by `title`/`bundleID`.
@@ -28,7 +28,7 @@ Prefer MCP tools when available; the CLI is the fallback.
 
 ## Requests
 
-Keybinding-grammar commands (via `applland_command` or CLI):
+Keybinding-grammar commands (via `ancre_command` or CLI):
 
 | request | effect |
 |---|---|
@@ -52,7 +52,7 @@ Window-targeted verbs (id from state):
 | `focus-window <id>` | focus (switches to its workspace) |
 | `set-floating <id> true\|false` | float / return to tiling |
 | `preset-save <name>` / `preset <name>` | save/apply a named arrangement |
-| `arrange <json>` | declarative one-shot: `{"layouts":{"2":"scroll"},"apps":{"com.google.Chrome":"2"},"active":["1"]}` (or MCP tool `applland_arrange`) |
+| `arrange <json>` | declarative one-shot: `{"layouts":{"2":"scroll"},"apps":{"com.google.Chrome":"2"},"active":["1"]}` (or MCP tool `ancre_arrange`) |
 | `subscribe` | stream JSON events (state-changed, window-opened) until disconnect |
 
 Responses: `ok`, `error: ...` (CLI exits 1), or JSON for `state`.
@@ -64,10 +64,10 @@ Responses: `ok`, `error: ...` (CLI exits 1), or JSON for `state`.
   one workspace → `focus-window` the IDE.
 - **Clean up distractions**: state → windows with bundleID Teams/Discord/
   Mail → `move-window` each to their home workspace (see `[app-workspaces]`
-  in `~/.config/applland/applland.toml`).
+  in `~/.config/ancre/ancre.toml`).
 - **Something looks broken**: `retile`.
-- applland not responding on the socket → check it's running
-  (`pgrep applland`), start with `open .build/applland.app` from the repo.
+- ancre not responding on the socket → check it's running
+  (`pgrep ancre`), start with `open .build/ancre.app` from the repo.
 
 ## Notes
 
@@ -75,6 +75,6 @@ Responses: `ok`, `error: ...` (CLI exits 1), or JSON for `state`.
   and do not change the names.
 - `state` shows `tilingPaused` — if true, placement is suspended until
   `pause-tiling` toggles it back.
-- Config is TOML at `~/.config/applland/applland.toml`; after editing it,
+- Config is TOML at `~/.config/ancre/ancre.toml`; after editing it,
   send `reload-config` to apply it live (bindings, gaps, bar, colors, rules —
   existing workspace layouts stay put).

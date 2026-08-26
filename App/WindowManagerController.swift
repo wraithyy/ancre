@@ -104,7 +104,7 @@ final class WindowManagerController: WindowTrackerDelegate {
     private var dropPreview: LayoutPreview?
     /// Fires on main whenever the pause state flips (menu checkbox sync).
     var onTilingPausedChanged: ((Bool) -> Void)?
-    /// IPC for appllandctl / MCP.
+    /// IPC for ancrectl / MCP.
     private var controlServer: ControlServer?
     /// Spotlight-style window switcher (main thread only).
     private var switcher: SwitcherOverlay?
@@ -144,10 +144,11 @@ final class WindowManagerController: WindowTrackerDelegate {
     func start() {
         L10n.language = config.general.language
         let resolved = ConfigLoader.resolveBindings(config)
-        resolved.warnings.forEach { NSLog("applland: %@", $0) }
+        resolved.warnings.forEach { NSLog("ancre: %@", $0) }
         setBindings(resolved.bindings)
 
         bar = makeBarController()
+        bar?.onRegionsChanged = { [weak self] regions in self?.input.setPassThroughRegions(regions) }
         rebuildHelpOverlay()
 
         // Displays first: window discovery needs monitors to place windows on.
@@ -312,10 +313,10 @@ final class WindowManagerController: WindowTrackerDelegate {
     func reloadConfig() {
         tracker.perform { [self] in
             let (newConfig, warnings) = ConfigLoader.load()
-            warnings.forEach { NSLog("applland: %@", $0) }
+            warnings.forEach { NSLog("ancre: %@", $0) }
             let oldHyperKey = config.hyper.key
             config = newConfig
-            NSLog("applland: config reloaded")
+            NSLog("ancre: config reloaded")
 
             DispatchQueue.main.async { L10n.language = newConfig.general.language }
             setBindings(ConfigLoader.resolveBindings(newConfig).bindings)
@@ -339,6 +340,7 @@ final class WindowManagerController: WindowTrackerDelegate {
             }
             let oldBar = bar
             bar = makeBarController()
+            bar?.onRegionsChanged = { [weak self] regions in self?.input.setPassThroughRegions(regions) }
             DispatchQueue.main.async { oldBar?.close() }
             rebuildHelpOverlay()
 
@@ -348,7 +350,7 @@ final class WindowManagerController: WindowTrackerDelegate {
                 // to the current thread's run loop, and startup bound it to
                 // main; restarting from the axQueue would silently rebind the
                 // tap onto the axQueue's run loop.
-                NSLog("applland: hyper key changed, restarting input")
+                NSLog("ancre: hyper key changed, restarting input")
                 DispatchQueue.main.async { [weak self] in
                     guard let self else { return }
                     self.input.stop()
@@ -564,7 +566,7 @@ final class WindowManagerController: WindowTrackerDelegate {
 
     private func applyDisplays(_ infos: [DisplayInfo]) {
         guard !infos.isEmpty else { return }
-        NSLog("applland: %d display(s): %@", infos.count,
+        NSLog("ancre: %d display(s): %@", infos.count,
               infos.map { "\($0.name) [\($0.id)]" }.joined(separator: ", "))
         parkingBounds = infos.dropFirst().reduce(infos[0].frame) { $0.union($1.frame) }
         barConfigs = Dictionary(uniqueKeysWithValues: infos.map {
@@ -861,12 +863,12 @@ final class WindowManagerController: WindowTrackerDelegate {
 
     private func toggleScratchpad() {
         guard let bundleID = config.scratchpad?.app else {
-            NSLog("applland: scratchpad has no [scratchpad].app configured")
+            NSLog("ancre: scratchpad has no [scratchpad].app configured")
             return
         }
         guard let wid = state.windows.first(where: { $0.value.appBundleID == bundleID })?.key,
               axWindows[wid.rawValue] != nil else {
-            NSLog("applland: scratchpad app %@ has no window, launching it", bundleID)
+            NSLog("ancre: scratchpad app %@ has no window, launching it", bundleID)
             if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
                 DispatchQueue.main.async { NSWorkspace.shared.openApplication(at: url, configuration: .init()) }
             }
@@ -909,7 +911,7 @@ final class WindowManagerController: WindowTrackerDelegate {
 
     private static var presetsURL: URL {
         FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/applland/presets.json")
+            .appendingPathComponent("Library/Application Support/ancre/presets.json")
     }
 
     private func loadPresets() -> [String: Arrangement] {
@@ -938,7 +940,7 @@ final class WindowManagerController: WindowTrackerDelegate {
         guard let data = try? encoder.encode(presets) else { return "error: preset encoding failed" }
         do {
             try data.write(to: Self.presetsURL, options: .atomic)
-            NSLog("applland: preset \"%@\" saved", name)
+            NSLog("ancre: preset \"%@\" saved", name)
             return "ok"
         } catch {
             return "error: \(error.localizedDescription)"
@@ -967,7 +969,7 @@ final class WindowManagerController: WindowTrackerDelegate {
         guard let arrangement = loadPresets()[name] else {
             return "error: unknown preset \"\(name)\""
         }
-        NSLog("applland: applying preset \"%@\"", name)
+        NSLog("ancre: applying preset \"%@\"", name)
         return applyArrangement(arrangement)
     }
 
@@ -1143,7 +1145,7 @@ final class WindowManagerController: WindowTrackerDelegate {
     private func setTilingPausedOnQueue(_ paused: Bool) {
         guard paused != tilingPaused else { return }
         tilingPaused = paused
-        NSLog("applland: tiling %@", paused ? "paused" : "resumed")
+        NSLog("ancre: tiling %@", paused ? "paused" : "resumed")
         DispatchQueue.main.async { self.onTilingPausedChanged?(paused) }
         if paused {
             updateFocusBorder() // hides it
@@ -1174,11 +1176,11 @@ final class WindowManagerController: WindowTrackerDelegate {
                 let fits = count <= 1 || Double(count) * minWidth <= monitor.visibleFrame.width
                 let current = workspaceLayoutNames[name] ?? config.general.defaultLayout
                 if !fits, current != "stack", autoStackedOriginals[name] == nil {
-                    NSLog("applland: workspace %@ doesn't fit %@ (%d windows), auto-stacking", name, monitor.id, count)
+                    NSLog("ancre: workspace %@ doesn't fit %@ (%d windows), auto-stacking", name, monitor.id, count)
                     autoStackedOriginals[name] = current
                     applyLayout(named: "stack", toWorkspace: name, isAutoStack: true)
                 } else if fits, let original = autoStackedOriginals[name] {
-                    NSLog("applland: workspace %@ fits again, restoring layout %@", name, original)
+                    NSLog("ancre: workspace %@ fits again, restoring layout %@", name, original)
                     autoStackedOriginals.removeValue(forKey: name)
                     applyLayout(named: original, toWorkspace: name, isAutoStack: true)
                 }
@@ -1190,7 +1192,7 @@ final class WindowManagerController: WindowTrackerDelegate {
 
     private static var moveLogURL: URL {
         FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/applland/move-log.jsonl")
+            .appendingPathComponent("Library/Application Support/ancre/move-log.jsonl")
     }
 
     /// Appends one manual window-move record — the corpus an agent later
@@ -1216,7 +1218,7 @@ final class WindowManagerController: WindowTrackerDelegate {
         if let layout = LayoutFactory.make(name, customLayouts: config.customLayouts ?? [:]) {
             return layout
         }
-        NSLog("applland: unknown layout \"%@\", using dwindle", name)
+        NSLog("ancre: unknown layout \"%@\", using dwindle", name)
         return DwindleLayout()
     }
 
@@ -1296,7 +1298,7 @@ final class WindowManagerController: WindowTrackerDelegate {
             execute(WM.windowResizedByUser(wid, to: frame, state: &state))
         }
         while let (wid, frame) = pendingAutoFloats.popLast() {
-            NSLog("applland: window %u can't fit its tile, floating it", wid.rawValue)
+            NSLog("ancre: window %u can't fit its tile, floating it", wid.rawValue)
             execute(WM.floatWindow(wid, frame: frame, state: &state))
         }
     }
@@ -1320,7 +1322,7 @@ final class WindowManagerController: WindowTrackerDelegate {
         // Some windows briefly report a zero/degenerate frame (seen as a tiny
         // border stuck in a screen corner) — hide instead of drawing garbage.
         guard frame.width > 40, frame.height > 40 else {
-            NSLog("applland: focus border skipped, window %u reports frame %@",
+            NSLog("ancre: focus border skipped, window %u reports frame %@",
                   wid.rawValue, String(describing: frame))
             DispatchQueue.main.async { [focusBorder] in focusBorder.hide() }
             return
@@ -1363,7 +1365,7 @@ final class WindowManagerController: WindowTrackerDelegate {
                 pendingAdoptions.append((wid, actual.cgRect))
             }
         } else if actual.diverges(from: target, tolerance: 2) {
-            NSLog("applland: window %u refused frame (wanted %@, got %@)",
+            NSLog("ancre: window %u refused frame (wanted %@, got %@)",
                   wid.rawValue, String(describing: target), String(describing: actual))
         }
         // Animated completions arrive outside execute() — resolve refusals now.
@@ -1401,7 +1403,7 @@ final class WindowManagerController: WindowTrackerDelegate {
                     } else {
                         // ponytail: if the tracked sibling tab closes later, the
                         // remaining tab stays unmanaged until focus/adopt-window.
-                        NSLog("applland: window %u is a tab sibling of %@, not tiling it", window.id, app.name ?? "?")
+                        NSLog("ancre: window %u is a tab sibling of %@, not tiling it", window.id, app.name ?? "?")
                     }
                 }
             }
@@ -1558,7 +1560,7 @@ final class WindowManagerController: WindowTrackerDelegate {
             // snap-back so a window macOS insists on rescuing doesn't loop.
             let attempts = (snapBackAttempts[id] ?? 0) + 1
             guard attempts <= snapBackLimit else {
-                NSLog("applland: window %u keeps escaping parking, leaving it visible", id)
+                NSLog("ancre: window %u keeps escaping parking, leaving it visible", id)
                 return
             }
             snapBackAttempts[id] = attempts
@@ -1607,7 +1609,7 @@ final class WindowManagerController: WindowTrackerDelegate {
         if attempts > snapBackLimit {
             // App insists on its own frame — float it so the layout reflows
             // around it instead of leaving a mis-sized tile overlapping others.
-            NSLog("applland: window %u keeps resizing itself, floating it", id)
+            NSLog("ancre: window %u keeps resizing itself, floating it", id)
             expectedFrames.removeValue(forKey: id)
             snapBackAttempts.removeValue(forKey: id)
             execute(WM.floatWindow(WindowID(id), frame: newFrame.cgRect, state: &state))

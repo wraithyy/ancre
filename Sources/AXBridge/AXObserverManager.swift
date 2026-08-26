@@ -19,7 +19,7 @@ final class AXRunLoopThread {
     private(set) var runLoop: CFRunLoop!
 
     private init() {
-        queue = DispatchQueue(label: "com.applland.axbridge.axQueue")
+        queue = DispatchQueue(label: "com.ancre.axbridge.axQueue")
         thread = Thread { [weak self] in
             guard let self else { return }
             self.runLoop = CFRunLoopGetCurrent()
@@ -30,7 +30,7 @@ final class AXRunLoopThread {
             CFRunLoopAddTimer(self.runLoop, timer, .defaultMode)
             CFRunLoopRun()
         }
-        thread.name = "com.applland.axbridge.runloop"
+        thread.name = "com.ancre.axbridge.runloop"
         thread.start()
         runLoopReady.wait()
     }

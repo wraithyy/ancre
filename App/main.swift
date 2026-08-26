@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var controller: WindowManagerController?
     private var permissionPollTimer: Timer?
+    private var onboarding: OnboardingWindow?
     private var pauseItem: NSMenuItem?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -24,7 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Rebuilt after the controller starts so titles use the config language.
     private func buildMenu() {
         let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "applland", action: nil, keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "ancre", action: nil, keyEquivalent: ""))
         menu.addItem(.separator())
 
         if controller != nil {
@@ -90,26 +91,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller?.reloadConfig()
     }
 
-    /// Prompts for Accessibility, then polls until the user grants it —
-    /// the system offers no notification for permission changes.
+    /// Everything granted = start silently; anything missing = show the
+    /// onboarding window and start only after the user hits Start there.
     private func startWhenTrusted() {
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-        if AXIsProcessTrustedWithOptions(options) {
+        // The onboarding renders before the controller sets the language.
+        L10n.language = ConfigLoader.load().config.general.language
+        let status = PermissionsModel.check()
+        if status.accessibility && status.input {
             startWindowManager()
             return
         }
-        NSLog("applland: waiting for Accessibility permission")
-        permissionPollTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] timer in
-            guard AXIsProcessTrusted() else { return }
-            timer.invalidate()
-            self?.permissionPollTimer = nil
+        NSLog("ancre: permissions missing, showing onboarding")
+        onboarding = OnboardingWindow()
+        onboarding?.show { [weak self] in
+            self?.onboarding = nil
             self?.startWindowManager()
         }
     }
 
     private func startWindowManager() {
         let (config, warnings) = ConfigLoader.load()
-        warnings.forEach { NSLog("applland: %@", $0) }
+        warnings.forEach { NSLog("ancre: %@", $0) }
         let controller = WindowManagerController(config: config)
         controller.onTilingPausedChanged = { [weak self] paused in
             self?.pauseItem?.state = paused ? .on : .off
@@ -119,7 +121,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller.start()
         self.controller = controller
         buildMenu() // full menu, localized per config
-        NSLog("applland: window manager started")
+        NSLog("ancre: window manager started")
     }
 }
 

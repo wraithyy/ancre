@@ -62,10 +62,10 @@ final class HidutilRemap {
             if process.terminationStatus != 0 {
                 let data = errPipe.fileHandleForReading.readDataToEndOfFile()
                 let message = String(data: data, encoding: .utf8) ?? "unknown error"
-                NSLog("applland: hidutil remap failed (status \(process.terminationStatus)): \(message)")
+                NSLog("ancre: hidutil remap failed (status \(process.terminationStatus)): \(message)")
             }
         } catch {
-            NSLog("applland: failed to launch hidutil: \(error)")
+            NSLog("ancre: failed to launch hidutil: \(error)")
         }
     }
 }
@@ -75,7 +75,7 @@ final class HidutilRemap {
 final class HIDDeviceWatcher {
     private var manager: IOHIDManager?
     private let onDeviceMatched: () -> Void
-    private let queue = DispatchQueue(label: "applland.hiddevicewatcher")
+    private let queue = DispatchQueue(label: "ancre.hiddevicewatcher")
 
     init(onDeviceMatched: @escaping () -> Void) {
         self.onDeviceMatched = onDeviceMatched
@@ -101,7 +101,7 @@ final class HIDDeviceWatcher {
             IOHIDManagerScheduleWithRunLoop(manager, CFRunLoopGetCurrent(), CFRunLoopMode.defaultMode.rawValue)
             let result = IOHIDManagerOpen(manager, IOOptionBits(kIOHIDOptionsTypeNone))
             if result != kIOReturnSuccess {
-                NSLog("applland: IOHIDManagerOpen failed: \(result)")
+                NSLog("ancre: IOHIDManagerOpen failed: \(result)")
             }
             CFRunLoopRun()
         }

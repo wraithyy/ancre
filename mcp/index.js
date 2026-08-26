@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// MCP server for applland — a thin wrapper over the control socket
-// (/tmp/applland-$UID.sock). Requests are single lines; applland validates
+// MCP server for ancre — a thin wrapper over the control socket
+// (/tmp/ancre-$UID.sock). Requests are single lines; ancre validates
 // everything through its strict command grammar.
 
 import { createConnection } from "node:net";
@@ -9,7 +9,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
-const SOCKET = `${homedir()}/Library/Application Support/applland/applland.sock`;
+const SOCKET = `${homedir()}/Library/Application Support/ancre/ancre.sock`;
 
 function send(request) {
   return new Promise((resolve, reject) => {
@@ -17,37 +17,37 @@ function send(request) {
     let data = "";
     socket.setTimeout(3000, () => {
       socket.destroy();
-      reject(new Error("applland socket timeout"));
+      reject(new Error("ancre socket timeout"));
     });
     socket.on("connect", () => socket.write(request + "\n"));
     socket.on("data", (chunk) => (data += chunk));
     socket.on("end", () => resolve(data.trim()));
     socket.on("error", (err) =>
-      reject(new Error(`cannot reach applland at ${SOCKET} (${err.code}) — is it running?`))
+      reject(new Error(`cannot reach ancre at ${SOCKET} (${err.code}) — is it running?`))
     );
   });
 }
 
 const asText = (text) => ({ content: [{ type: "text", text }] });
 
-const server = new McpServer({ name: "applland", version: "0.1.0" });
+const server = new McpServer({ name: "ancre", version: "0.1.0" });
 
 server.tool(
-  "applland_state",
+  "ancre_state",
   "Current window-manager state as JSON: monitors (stable ids), their workspaces (name, layout, active), and windows (id, pid, bundleID, title, floating, focused). Window ids from here are the handles for the other tools.",
   {},
   async () => asText(await send("state"))
 );
 
 server.tool(
-  "applland_command",
+  "ancre_command",
   "Dispatch a window-manager command, same grammar as keybindings: 'workspace <name>', 'move-to-workspace <name>' (focused window), 'focus left|down|up|right', 'move left|down|up|right', 'resize width|height <delta>', 'layout dwindle|scroll|<custom>', 'toggle-floating', 'toggle-fullscreen', 'focus-monitor next|previous', 'adopt-window', 'pause-tiling', 'retile', 'open-config'. Returns 'ok' or 'error: ...'.",
   { command: z.string().describe("command string, e.g. 'workspace 3'") },
   async ({ command }) => asText(await send(command))
 );
 
 server.tool(
-  "applland_arrange",
+  "ancre_arrange",
   "Apply a whole declarative arrangement in one call: per-workspace layouts, app-to-workspace placement (all windows of a bundle id move), and which workspaces to activate. Example: {layouts: {'2': 'scroll'}, apps: {'com.google.Chrome': '2', 'dev.zed.Zed': '1'}, active: ['1']}.",
   {
     layouts: z.record(z.string()).optional().describe("workspace name -> layout (dwindle|scroll|custom)"),
@@ -59,24 +59,24 @@ server.tool(
 );
 
 server.tool(
-  "applland_move_window",
-  "Move a specific window (id from applland_state) to a workspace.",
+  "ancre_move_window",
+  "Move a specific window (id from ancre_state) to a workspace.",
   {
-    window_id: z.number().int().describe("window id from applland_state"),
+    window_id: z.number().int().describe("window id from ancre_state"),
     workspace: z.string().describe("target workspace name, e.g. '3'"),
   },
   async ({ window_id, workspace }) => asText(await send(`move-window ${window_id} ${workspace}`))
 );
 
 server.tool(
-  "applland_focus_window",
+  "ancre_focus_window",
   "Focus a specific window (switches to its workspace first).",
   { window_id: z.number().int() },
   async ({ window_id }) => asText(await send(`focus-window ${window_id}`))
 );
 
 server.tool(
-  "applland_set_floating",
+  "ancre_set_floating",
   "Float (true) or tile (false) a specific window.",
   { window_id: z.number().int(), floating: z.boolean() },
   async ({ window_id, floating }) => asText(await send(`set-floating ${window_id} ${floating}`))

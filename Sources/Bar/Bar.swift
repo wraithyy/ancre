@@ -96,7 +96,7 @@ public struct BarMonitorSnapshot: Equatable {
     }
 }
 
-private let dragPrefix = "applland-window:"
+private let dragPrefix = "ancre-window:"
 
 public extension NSColor {
     /// Parses "#RRGGBB" or "#RRGGBBAA".
@@ -182,6 +182,20 @@ public final class BarController {
     private var notchTargets: [String: (target: NSRect, safeTop: CGFloat)] = [:]
     /// Hyper held = keep notch pills out regardless of the cursor.
     private var hyperPeek = false
+    /// Fires with the CG-coordinate frames of visible bar windows whenever
+    /// they change — the event tap passes hyper+clicks through them.
+    public var onRegionsChanged: (([CGRect]) -> Void)?
+
+    private func emitRegions() {
+        let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
+        let regions = windows.values
+            .filter { $0.isVisible }
+            .map { window -> CGRect in
+                let f = window.frame
+                return CGRect(x: f.minX, y: primaryHeight - f.minY - f.height, width: f.width, height: f.height)
+            }
+        onRegionsChanged?(regions)
+    }
 
     public init(
         theme: BarTheme,
@@ -279,6 +293,7 @@ public final class BarController {
             windows.removeValue(forKey: id)
             lastSnapshots.removeValue(forKey: id)
         }
+        emitRegions()
     }
 
     /// Hyper held down = peek all notch-hidden pills; released = hide them
@@ -399,11 +414,16 @@ public final class BarController {
         window.setFrame(start, display: false)
         window.alphaValue = 0
         window.orderFrontRegardless()
-        NSAnimationContext.runAnimationGroup { context in
+        NSAnimationContext.runAnimationGroup({ context in
             context.duration = 0.18
             window.animator().setFrame(target, display: true)
             window.animator().alphaValue = 1
-        }
+        }, completionHandler: { [weak self] in
+            // Regions must reflect the LANDED frame — emitting at animation
+            // start would register the tucked-away position and hyper+clicks
+            // on the revealed pill would get captured as window drags.
+            self?.emitRegions()
+        })
         // Stay out while the cursor is near (zone, pill, or the gap between);
         // exit events alone misfire on a quick pass through the zone.
         revealWatchers[monitorID]?.invalidate()
@@ -427,9 +447,10 @@ public final class BarController {
         NSAnimationContext.runAnimationGroup({ context in
             context.duration = 0.15
             window.animator().alphaValue = 0
-        }, completionHandler: {
+        }, completionHandler: { [weak self] in
             window.orderOut(nil)
             window.alphaValue = 1
+            self?.emitRegions()
         })
     }
 
@@ -585,17 +606,19 @@ private struct WorkspaceCell: View {
             } else {
                 HStack(spacing: theme.cellSpacing) {
                     if let icon = workspace.icon {
-                        Text(icon).font(.system(size: theme.fontSize))
+                        Text(icon).font(.system(size: theme.fontSize)).fixedSize()
                     }
                     if workspace.showNumber {
                         Text(workspace.name)
                             .font(theme.font(size: theme.fontSize, weight: workspace.isActive ? .semibold : .regular))
                             .foregroundStyle(workspace.isActive ? Color.primary : Color.secondary)
+                            .fixedSize()
                     }
                     if let displayName = workspace.displayName {
                         Text(displayName)
                             .font(theme.font(size: theme.fontSize - 1, weight: workspace.isActive ? .medium : .regular))
                             .foregroundStyle(workspace.isActive ? Color.primary : Color.secondary)
+                            .fixedSize() // never compress into an ellipsis
                     }
                     windowIcons
                     dropSlot

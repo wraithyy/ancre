@@ -1,4 +1,4 @@
-# applland
+# ancre
 
 Hyprland-inspired tiling window manager pro macOS. Čisté veřejné Accessibility
 API — žádné privátní CGS/SkyLight, žádný zásah do SIP.
@@ -9,15 +9,15 @@ API — žádné privátní CGS/SkyLight, žádný zásah do SIP.
 - **Workspace bar**: ikonky oken, drag&drop, badge notifikací, context menu
 - **Hyper klávesa** (CapsLock) pro všechny zkratky + myší módy (hyper+drag)
 - **Animace** s automatickým fallbackem pro pomalé appky
-- **AI ready**: unix socket + `appllandctl` CLI + MCP server + Claude skill
+- **AI ready**: unix socket + `ancrectl` CLI + MCP server + Claude skill
 
 ## Instalace a spuštění
 
 ```sh
 swift build            # celý balíček
 swift test             # unit testy
-Scripts/bundle.sh      # sestaví .build/applland.app
-open .build/applland.app
+Scripts/bundle.sh      # sestaví .build/ancre.app
+open .build/ancre.app
 ```
 
 Při prvním spuštění si app vyžádá **Accessibility** permission (System
@@ -59,9 +59,9 @@ stabilní ID pro config), otevření/reload configu.
 
 ## Konfigurace
 
-`~/.config/applland/applland.toml` — vytvoří se z defaultů při prvním
+`~/.config/ancre/ancre.toml` — vytvoří se z defaultů při prvním
 spuštění. Kompletní katalog klíčů s defaulty: `Sources/Config/default.toml`.
-Změny aplikuje **Reload config** v menubar menu (nebo `appllandctl
+Změny aplikuje **Reload config** v menubar menu (nebo `ancrectl
 reload-config`) bez restartu. Chyba v configu nikdy neshodí app — fallback
 na defaulty s warningem v logu.
 
@@ -84,27 +84,27 @@ Přehled sekcí:
 ## Skriptování a AI (CLI · MCP · skill)
 
 Vše jde přes command bus, vystavený na unix socketu
-`~/Library/Application Support/applland/applland.sock` (práva 0600 — ovládá jen tvůj uživatel).
+`~/Library/Application Support/ancre/ancre.sock` (práva 0600 — ovládá jen tvůj uživatel).
 
-**CLI** (`.build/debug/appllandctl`):
+**CLI** (`.build/debug/ancrectl`):
 
 ```sh
-appllandctl state            # JSON: monitory, workspaces, okna (id, titul, bundle, float, fokus)
-appllandctl workspace 3      # libovolný command ze zkratek
-appllandctl layout scroll
-appllandctl move-window 4495 8   # cílené verby: move-window / focus-window / set-floating <id> ...
-appllandctl reload-config
+ancrectl state            # JSON: monitory, workspaces, okna (id, titul, bundle, float, fokus)
+ancrectl workspace 3      # libovolný command ze zkratek
+ancrectl layout scroll
+ancrectl move-window 4495 8   # cílené verby: move-window / focus-window / set-floating <id> ...
+ancrectl reload-config
 ```
 
 Odpověď `ok`, `error: ...` (exit 1), nebo JSON.
 
 **MCP server** (`mcp/index.js`, registrace
-`claude mcp add applland --scope user -- node .../mcp/index.js`): tools
-`applland_state`, `applland_command`, `applland_move_window`,
-`applland_focus_window`, `applland_set_floating`. Agent tak umí „připrav mi
+`claude mcp add ancre --scope user -- node .../mcp/index.js`): tools
+`ancre_state`, `ancre_command`, `ancre_move_window`,
+`ancre_focus_window`, `ancre_set_floating`. Agent tak umí „připrav mi
 workspace na review" — najde okna podle titulů/bundle ID a přeuspořádá je.
 
-**Claude skill**: `.claude/skills/applland/SKILL.md` — workflow a recepty.
+**Claude skill**: `.claude/skills/ancre/SKILL.md` — workflow a recepty.
 
 ## Architektura
 
@@ -125,4 +125,4 @@ Klíčový invariant: veškerý stav žije na axQueue; skryté workspaces se
   = float), pravý klik → Fokusovat.
 - **CapsLock se chová divně po pádu** → `hidutil property --set
   '{"UserKeyMapping":[]}'`.
-- Log: app loguje přes NSLog — `log stream --predicate 'process == "applland"'`.
+- Log: app loguje přes NSLog — `log stream --predicate 'process == "ancre"'`.

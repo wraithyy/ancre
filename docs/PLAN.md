@@ -1,4 +1,4 @@
-# applland — Hyprland-inspired tiling WM pro macOS
+# ancre — Hyprland-inspired tiling WM pro macOS
 
 ## Context
 
@@ -30,7 +30,7 @@ unsandboxed, permissions: Accessibility + Input Monitoring. Závislost:
 **TOMLKit** (SPM).
 
 ```
-applland/
+ancre/
   App/                    AppDelegate, menu bar, permission onboarding
   Sources/AXBridge/       AXUIElement/AXObserver, window cache, DisplayManager, OffscreenParking
   Sources/WMCore/         window tree, workspace model, focus state — čistá logika, unit-testable
@@ -79,7 +79,7 @@ prázdné stuby. LaunchAgent plist ještě nevznikl.
 - **Files**: celá kostra dle stromu výše, App/, Package.swift, Scripts/Info.plist
 - **Depends on**: none
 - **Acceptance**: `swift build` projde; app se spustí jako menu bar item; permission onboarding požádá o Accessibility
-- **Prompt seed**: Založ Xcode projekt applland (menu bar app, unsandboxed, LSUIElement), SPM lokální moduly AXBridge/WMCore/LayoutEngine/InputSystem/Config/Animator/Bar, TOMLKit dependency, Info.plist s usage descriptions, AXIsProcessTrustedWithOptions onboarding.
+- **Prompt seed**: Založ Xcode projekt ancre (menu bar app, unsandboxed, LSUIElement), SPM lokální moduly AXBridge/WMCore/LayoutEngine/InputSystem/Config/Animator/Bar, TOMLKit dependency, Info.plist s usage descriptions, AXIsProcessTrustedWithOptions onboarding.
 
 ## Task 1.2: AXBridge — discovery a tracking oken
 - **Agent**: claude
@@ -120,7 +120,7 @@ prázdné stuby. LaunchAgent plist ještě nevznikl.
 - **Agent**: claude
 - **Files**: Sources/Config/ (Schema.swift, Loader.swift), Resources/default.toml
 - **Depends on**: 1.5
-- **Acceptance**: binds z ~/.config/applland/applland.toml přepíší defaulty; nevalidní config → čitelná chyba, fallback na defaulty
+- **Acceptance**: binds z ~/.config/ancre/ancre.toml přepíší defaulty; nevalidní config → čitelná chyba, fallback na defaulty
 - **Prompt seed**: TOMLKit schema: [keybindings], [general] (gaps, animace on/off), hyper klávesa konfigurovatelná. Validace s chybovými hláškami.
 
 ## Task 1.R: Review milestone 1
@@ -248,7 +248,7 @@ jim přirozené souřadnice za hranou) a bar (ukazovat i zaparkovaná okna).
   hyper klávesy musí jít přes main thread — run-loop binding), 1 MEDIUM
   (opraveno: SO_RCVTIMEO + čtení mimo accept queue v ControlServeru)
 - security-reviewer: 0 CRITICAL/HIGH, 2 MEDIUM (opraveno: socket přesunut
-  z /tmp do ~/Library/Application Support/applland — squatting/spoofing na
+  z /tmp do ~/Library/Application Support/ancre — squatting/spoofing na
   multi-user mašině; read timeouty server i CLI), 1 LOW akceptováno
   (SIGKILL nechá CapsLock remap — dokumentovaný recovery hidutil příkazem).
   Čisté: newline injection přes MCP (maxSplits: 1 + connection-per-request),
@@ -262,21 +262,21 @@ jim přirozené souřadnice za hranou) a bar (ukazovat i zaparkovaná okna).
 
 ### Milestone 7 — AI ready (IPC, MCP, skill)
 
-## Task 7.1: IPC socket + appllandctl CLI — HOTOVO (runtime ověřeno: state/dispatch/move-window/reload-config, error paths, socket 0600)
-- **Files**: App/ControlServer.swift, Sources/appllandctl/
-- **Acceptance**: `appllandctl workspace 3` přepne workspace; `appllandctl state`
+## Task 7.1: IPC socket + ancrectl CLI — HOTOVO (runtime ověřeno: state/dispatch/move-window/reload-config, error paths, socket 0600)
+- **Files**: App/ControlServer.swift, Sources/ancrectl/
+- **Acceptance**: `ancrectl workspace 3` přepne workspace; `ancrectl state`
   vrátí JSON stavu (monitory, workspaces, okna s tituly, layouty, floaty).
-  Socket ~/Library/Application Support/applland/applland.sock, práva 0600, protokol řádkový.
+  Socket ~/Library/Application Support/ancre/ancre.sock, práva 0600, protokol řádkový.
 - **Poznámka**: commandy jdou přes existující Command.parse — CLI je jen
   transport. Model yabai/aerospace.
 
-## Task 7.2: MCP server — HOTOVO (mcp/index.js, plain JS bez build stepu; registrováno `claude mcp add applland --scope user`; smoke test stdio prošel)
+## Task 7.2: MCP server — HOTOVO (mcp/index.js, plain JS bez build stepu; registrováno `claude mcp add ancre --scope user`; smoke test stdio prošel)
 - **Files**: mcp/ (TypeScript balíček)
-- **Acceptance**: MCP tools applland_state / applland_dispatch /
-  applland_move_window nad socketem; agent umí přeuspořádat okna.
+- **Acceptance**: MCP tools ancre_state / ancre_dispatch /
+  ancre_move_window nad socketem; agent umí přeuspořádat okna.
 
-## Task 7.3: Skill pro Claude Code — HOTOVO (.claude/skills/applland/SKILL.md — transporty, grammar tabulky, window-targeted verby, recepty)
-- **Files**: .claude/skills/applland/
+## Task 7.3: Skill pro Claude Code — HOTOVO (.claude/skills/ancre/SKILL.md — transporty, grammar tabulky, window-targeted verby, recepty)
+- **Files**: .claude/skills/ancre/
 - **Acceptance**: skill dokumentuje CLI/MCP + recepty (příprava workspace,
   úklid notifikačních appek).
 
@@ -299,12 +299,12 @@ jim přirozené souřadnice za hranou) a bar (ukazovat i zaparkovaná okna).
 
 ## Task 8.5: Presety + arrange — HOTOVO
 - `preset-save <name>` / `preset <name>` (commandy → bindovatelné, IPC, MCP);
-  úložiště ~/Library/Application Support/applland/presets.json.
-- IPC verb `arrange <json>` + MCP tool applland_arrange: deklarativní
+  úložiště ~/Library/Application Support/ancre/presets.json.
+- IPC verb `arrange <json>` + MCP tool ancre_arrange: deklarativní
   {layouts, apps, active} jedním callem.
 
 ## Task 8.6: Event stream — HOTOVO
-- `appllandctl subscribe` streamuje JSON eventy (state-changed při změně
+- `ancrectl subscribe` streamuje JSON eventy (state-changed při změně
   fokusu/workspace/pauzy, window-opened). Podklad pro sketchybar/agenty.
 
 ## Backlog (další iterace):
@@ -324,7 +324,7 @@ jim přirozené souřadnice za hranou) a bar (ukazovat i zaparkovaná okna).
 ## Task 8.8: Move log (učení pravidel, fáze 1) — HOTOVO
 - [general] move-log (default on, vypínatelný): ruční přesuny oken (keybind,
   bar, drag, adopt — NE automatické IPC/arrange/presety) se appendují do
-  ~/Library/Application Support/applland/move-log.jsonl
+  ~/Library/Application Support/ancre/move-log.jsonl
   ({ts, bundleID, from, to, source}; bez titulů). Fáze 2 (suggest-rules /
   agent) zůstává v backlogu.
 

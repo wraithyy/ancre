@@ -37,6 +37,12 @@ public final class InputSystem {
         self.tapManager = tapManager
     }
 
+    /// Regions (CG top-left) where hyper+clicks pass through — the WM's own
+    /// clickable overlays (bar). Thread-safe.
+    public func setPassThroughRegions(_ regions: [CGRect]) {
+        tapManager?.setPassThroughRegions(regions)
+    }
+
     public func stop() {
         tapManager?.stop()
         tapManager = nil

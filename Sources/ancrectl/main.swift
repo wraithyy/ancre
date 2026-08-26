@@ -1,17 +1,17 @@
-// appllandctl — CLI for the applland control socket.
-// Usage: appllandctl <command...>   e.g. `appllandctl workspace 3`,
-//        `appllandctl layout scroll`, `appllandctl state`
+// ancrectl — CLI for the ancre control socket.
+// Usage: ancrectl <command...>   e.g. `ancrectl workspace 3`,
+//        `ancrectl layout scroll`, `ancrectl state`
 
 import Foundation
 
 let request = CommandLine.arguments.dropFirst().joined(separator: " ")
 guard !request.isEmpty else {
-    FileHandle.standardError.write(Data("usage: appllandctl <command...> | state\n".utf8))
+    FileHandle.standardError.write(Data("usage: ancrectl <command...> | state\n".utf8))
     exit(2)
 }
 
 let path = FileManager.default.homeDirectoryForCurrentUser
-    .appendingPathComponent("Library/Application Support/applland/applland.sock").path
+    .appendingPathComponent("Library/Application Support/ancre/ancre.sock").path
 let fd = socket(AF_UNIX, SOCK_STREAM, 0)
 guard fd >= 0 else { perror("socket"); exit(1) }
 var timeout = timeval(tv_sec: 5, tv_usec: 0)
@@ -32,7 +32,7 @@ let connected = withUnsafePointer(to: &addr) {
     }
 }
 guard connected == 0 else {
-    FileHandle.standardError.write(Data("appllandctl: cannot connect to \(path) — is applland running?\n".utf8))
+    FileHandle.standardError.write(Data("ancrectl: cannot connect to \(path) — is ancre running?\n".utf8))
     exit(1)
 }
 

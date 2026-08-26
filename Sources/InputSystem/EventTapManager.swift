@@ -31,6 +31,24 @@ final class EventTapManager {
     /// Button captured by a hyper+mousedown; its drag/up events are swallowed
     /// until release even if hyper is let go mid-drag.
     private var capturedButton: HyperMouseButton?
+    /// Screen regions (CG top-left coords) where hyper+clicks pass through to
+    /// the app under the cursor — our own bar/overlay windows must stay
+    /// clickable while hyper is held. Guarded by regionsLock (tap thread
+    /// reads, main thread writes).
+    private var passThroughRegions: [CGRect] = []
+    private let regionsLock = NSLock()
+
+    func setPassThroughRegions(_ regions: [CGRect]) {
+        regionsLock.lock()
+        passThroughRegions = regions
+        regionsLock.unlock()
+    }
+
+    private func isPassThrough(_ point: CGPoint) -> Bool {
+        regionsLock.lock()
+        defer { regionsLock.unlock() }
+        return passThroughRegions.contains { $0.contains(point) }
+    }
 
     private let hyperKeycode: Int64
     private let handler: Handler
@@ -70,7 +88,7 @@ final class EventTapManager {
             },
             userInfo: refcon
         ) else {
-            NSLog("applland: failed to create event tap — check Accessibility/Input Monitoring permissions")
+            NSLog("ancre: failed to create event tap — check Accessibility/Input Monitoring permissions")
             return
         }
 
@@ -97,7 +115,7 @@ final class EventTapManager {
     // Handler implementations are expected to dispatch async themselves.
     private func handle(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-            NSLog("applland: event tap disabled (\(type == .tapDisabledByTimeout ? "timeout" : "user input")), re-enabling")
+            NSLog("ancre: event tap disabled (\(type == .tapDisabledByTimeout ? "timeout" : "user input")), re-enabling")
             if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
             return Unmanaged.passRetained(event)
         }
@@ -108,6 +126,8 @@ final class EventTapManager {
         case .leftMouseDown, .rightMouseDown:
             let button: HyperMouseButton = type == .leftMouseDown ? .left : .right
             guard hyperActive, capturedButton == nil else { return Unmanaged.passRetained(event) }
+            // Clicks on our own bar/overlays stay clickable during hyper.
+            if isPassThrough(event.location) { return Unmanaged.passRetained(event) }
             capturedButton = button
             onHyperMouse?(button, .began, event.location)
             return nil

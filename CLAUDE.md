@@ -1,4 +1,4 @@
-# applland
+# ancre
 
 Hyprland-inspired tiling window manager pro macOS. Swift, čisté veřejné
 Accessibility API — žádné privátní CGS/SkyLight API, žádný SIP zásah.
@@ -11,8 +11,8 @@ agenty (OpenHands), hlavně co v Linuxovém sandboxu nejde ověřit.
 ```
 swift build            # celý balíček
 swift test             # unit testy (WMCore, LayoutEngine, Config)
-Scripts/bundle.sh      # sestaví .build/applland.app (ad-hoc podpis, stabilní identifier)
-open .build/applland.app
+Scripts/bundle.sh      # sestaví .build/ancre.app (ad-hoc podpis, stabilní identifier)
+open .build/ancre.app
 ```
 
 Žádný .xcodeproj — čistý SPM + bundle skript. Runtime vyžaduje Accessibility
@@ -32,7 +32,7 @@ Jedna cesta pro každou operaci, žádné obcházení.
 | `Sources/LayoutEngine` | implementace layoutů (DwindleLayout; scroll = M5). Stateless value typy |
 | `Sources/AXBridge` | AXUIElement/AXObserver, WindowTracker + delegate, DisplayManager (stabilní ID displayů + reconfigurace), OffscreenParking (parking workaround izolovaný ZDE — při rozbití macOS updatem se patchuje jen tento soubor) |
 | `Sources/InputSystem` | hidutil remap, CGEventTap. Nezávislý na WMCore — resolvuje jen binding stringy ("hyper-shift-h") přes callback |
-| `Sources/Config` | TOMLKit schema + loader, `~/.config/applland/applland.toml`, validace s warningy (nikdy crash na config typo) |
+| `Sources/Config` | TOMLKit schema + loader, `~/.config/ancre/ancre.toml`, validace s warningy (nikdy crash na config typo) |
 | `App/` | main.swift + WindowManagerController (glue AX↔WMCore↔Input) |
 
 ## Threading — nejdůležitější invariant

@@ -1,4 +1,4 @@
-# applland — instrukce pro agenty
+# ancre — instrukce pro agenty
 
 Hyprland-inspired tiling window manager pro macOS. Swift, veřejné Accessibility
 API, žádný SIP zásah. Detailní architektura a konvence: `CLAUDE.md`.
@@ -25,7 +25,7 @@ toolchain (Swift 6.0, language mode v5).
 ```
 swift build            # celý balíček
 swift test             # unit testy (WMCore, LayoutEngine, Config)
-Scripts/bundle.sh      # .build/applland.app (ad-hoc podpis)
+Scripts/bundle.sh      # .build/ancre.app (ad-hoc podpis)
 ```
 
 Žádný `.xcodeproj`, žádné CI workflow (`.github/` neexistuje) — jediná
@@ -33,7 +33,7 @@ automatická kontrola je `swift test`.
 
 ## NIKDY nespouštěj appku automatizovaně
 
-`open .build/applland.app` udělá dvě globální věci: přemapuje **CapsLock→F18**
+`open .build/ancre.app` udělá dvě globální věci: přemapuje **CapsLock→F18**
 přes `hidutil` a začne **přeskládávat všechna okna** na ploše. Vyžaduje
 Accessibility + Input Monitoring permission a živou display session.
 
@@ -65,7 +65,7 @@ sekce Verification).
 | `Sources/LayoutEngine` | layouty (`DwindleLayout`), stateless value typy |
 | `Sources/AXBridge` | AXUIElement/AXObserver, `WindowTracker`, `DisplayManager`, `OffscreenParking` |
 | `Sources/InputSystem` | hidutil remap, CGEventTap |
-| `Sources/Config` | TOMLKit schema, `~/.config/applland/applland.toml` |
+| `Sources/Config` | TOMLKit schema, `~/.config/ancre/ancre.toml` |
 | `App/` | `main.swift` + `WindowManagerController` (glue) |
 | `Sources/Bar`, `Sources/Animator` | zatím stuby (M3/M4) |
 

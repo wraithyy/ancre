@@ -68,7 +68,7 @@ private struct HelpView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("applland — hyper = \(hyperKeyName)")
+            Text("ancre — hyper = \(hyperKeyName)")
                 .font(.system(size: style.fontSize + 2, weight: .bold))
             HStack(alignment: .top, spacing: 24) {
                 ForEach(Array(columns.enumerated()), id: \.offset) { _, column in

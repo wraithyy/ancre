@@ -1,4 +1,4 @@
-// IPC for appllandctl / MCP (Task 7.1): a unix domain socket accepting one
+// IPC for ancrectl / MCP (Task 7.1): a unix domain socket accepting one
 // line-based request per connection and replying with one line.
 //
 // Security model: the socket lives in a per-UID path with 0600 permissions —
@@ -18,13 +18,13 @@ final class ControlServer {
     /// (bind DoS) or spoof the server for our clients.
     static var socketPath: String {
         let dir = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/applland")
+            .appendingPathComponent("Library/Application Support/ancre")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-        return dir.appendingPathComponent("applland.sock").path
+        return dir.appendingPathComponent("ancre.sock").path
     }
 
     private let handler: Handler
-    private let queue = DispatchQueue(label: "com.applland.control")
+    private let queue = DispatchQueue(label: "com.ancre.control")
     private var listenFD: Int32 = -1
     private var acceptSource: DispatchSourceRead?
     /// Max request size; anything longer is a misbehaving client.
@@ -59,7 +59,7 @@ final class ControlServer {
         guard bindResult == 0, listen(listenFD, 8) == 0, chmod(path, 0o600) == 0 else {
             close(listenFD)
             unlink(path)
-            NSLog("applland: control socket setup failed at %@", path)
+            NSLog("ancre: control socket setup failed at %@", path)
             return nil
         }
 
@@ -67,7 +67,7 @@ final class ControlServer {
         source.setEventHandler { [weak self] in self?.acceptConnection() }
         source.resume()
         acceptSource = source
-        NSLog("applland: control socket at %@", path)
+        NSLog("ancre: control socket at %@", path)
     }
 
     deinit {
