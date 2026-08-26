@@ -86,4 +86,27 @@ final class ConfigDecodingTests: XCTestCase {
             .appendingPathComponent("Sources/Config/default.toml")
         _ = try TOMLDecoder().decode(AppConfig.self, from: String(contentsOf: url, encoding: .utf8))
     }
+
+    /// A config missing the formerly-required structural keys must still decode
+    /// with defaults instead of throwing and discarding the whole user config.
+    func testConfigWithoutStructuralKeysDecodes() throws {
+        let toml = """
+        [general]
+        gaps-inner = 12
+        [hyper]
+        key = "caps_lock"
+        [keybindings]
+        [bar]
+        height = 32
+        """
+        let config = try TOMLDecoder().decode(AppConfig.self, from: toml)
+        XCTAssertEqual(config.general.animations, true)
+        XCTAssertEqual(config.general.animationDurationMs, 180)
+        XCTAssertEqual(config.general.defaultLayout, "dwindle")
+        XCTAssertEqual(config.bar.enabled, true)
+        XCTAssertEqual(config.bar.position, "top")
+        XCTAssertEqual(config.general.gapsInner, 12, "user values survive")
+        XCTAssertEqual(config.bar.height, 32, "user values survive")
+    }
+
 }

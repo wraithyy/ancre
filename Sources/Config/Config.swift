@@ -58,9 +58,9 @@ public struct AppConfig: Codable {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             gapsInner = lenientDouble(c, .gapsInner) ?? 8
             gapsOuter = lenientDouble(c, .gapsOuter) ?? 8
-            animations = try c.decode(Bool.self, forKey: .animations)
-            animationDurationMs = try c.decode(Int.self, forKey: .animationDurationMs)
-            defaultLayout = try c.decode(String.self, forKey: .defaultLayout)
+            animations = try c.decodeIfPresent(Bool.self, forKey: .animations) ?? true
+            animationDurationMs = try c.decodeIfPresent(Int.self, forKey: .animationDurationMs) ?? 180
+            defaultLayout = try c.decodeIfPresent(String.self, forKey: .defaultLayout) ?? "dwindle"
             animationsExclude = try c.decodeIfPresent([String].self, forKey: .animationsExclude) ?? []
             language = try c.decodeIfPresent(String.self, forKey: .language) ?? "en"
             followNativeFocus = try c.decodeIfPresent(Bool.self, forKey: .followNativeFocus) ?? true
@@ -153,8 +153,8 @@ public struct AppConfig: Codable {
         // existed keep decoding instead of falling back to bundled defaults.
         public init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
-            enabled = try c.decode(Bool.self, forKey: .enabled)
-            position = try c.decode(String.self, forKey: .position)
+            enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
+            position = try c.decodeIfPresent(String.self, forKey: .position) ?? "top"
             opacity = lenientDouble(c, .opacity) ?? 1.0
             height = lenientDouble(c, .height) ?? 28
             align = try c.decodeIfPresent(String.self, forKey: .align) ?? "center"
