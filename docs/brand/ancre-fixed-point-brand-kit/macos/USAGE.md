@@ -30,4 +30,4 @@ Image("AncreMenuTemplate")
   .renderingMode(.template)
 ```
 
-The menubar icon must stay flat black in the asset file. macOS handles light/dark rendering when it is marked as a template image.
+The menu bar icon must stay flat black in the asset file. macOS handles light/dark rendering when it is marked as a template image.

@@ -14,13 +14,13 @@ Keep a simple stack for `ancre`:
 
 Role: documentation site, headings, navigation, marketing lines with a technical tone.
 
-Why: clean, contemporary, less default than Inter, still very readable.
+Why: clean, contemporary, less generic than Inter, still very readable.
 
 Usage:
 
-- H1: 48-72 px, weight 500
-- H2: 28-36 px, weight 520 or 600
-- UI labels: 13-15 px, weight 500
+- H1: 48–72 px, weight 500
+- H2: 28–36 px, weight 520 or 600
+- UI labels: 13–15 px, weight 500
 
 Source: https://vercel.com/font
 
@@ -28,12 +28,12 @@ Source: https://vercel.com/font
 
 Role: fallback and a safe choice for product UI.
 
-Why: a robust free font at small sizes. Use it as a fallback, since it is very widespread today.
+Why: a robust free font at small sizes. Use it as a fallback, since it is widely used today.
 
 Usage:
 
-- Body: 16-18 px, line-height 1.55
-- Table/UI: 13-14 px, line-height 1.4
+- Body: 16–18 px, line-height 1.55
+- Table/UI: 13–14 px, line-height 1.4
 
 Source: https://rsms.me/inter/
 
@@ -46,8 +46,8 @@ Why: very readable in code, technical character without a retro effect.
 Usage:
 
 - Inline code: 0.94em
-- Blocks: 13-14 px, line-height 1.55
-- Shortcut chips: 12-13 px, weight 500
+- Blocks: 13–14 px, line-height 1.55
+- Shortcut chips: 12–13 px, weight 500
 
 Source: https://www.jetbrains.com/lp/mono/
 

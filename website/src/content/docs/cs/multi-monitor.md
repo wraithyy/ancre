@@ -6,7 +6,7 @@ sidebar:
 ---
 
 Workspaces 1–9 se rozprostírají napříč monitory se **stabilním přiřazením**,
-které přežije odpojení a znovupřipojení displeje.
+které přežije odpojení a znovupřipojení monitoru.
 
 ## Přiřazení workspace → monitor
 
@@ -17,16 +17,36 @@ které přežije odpojení a znovupřipojení displeje.
 ```
 
 Hodnota je buď **stabilní monitor ID** (`vendor:model:serial` — loguje se při
-startu, zkopíruješ kliknutím v menubar menu ◱), nebo **část názvu displeje**.
+startu, zkopíruješ kliknutím v menubar menu ◱), nebo **část názvu monitoru**.
+
+Může to být i pole — priority list, kde vyhrává první připojený monitor,
+takže stejný config funguje doma i v kanceláři:
+
+```toml
+[workspaces]
+"1" = ["PHL", "P34w"]   # preferuj PHL, fallback P34w
+```
+
+:::caution
+Levné panely často hlásí serial `0`. Dva identické panely se stejným
+matcherem se pak srazí — `ancre` je rozliší přidáním pozičního suffixu
+(`#1`, `#2`, ...) k druhému z nich. Přeuspořádání monitorů prohodí, který
+panel dostane který suffix, což prohodí i jejich workspaces.
+:::
 
 ## Chování
 
-- Nevyjmenované workspaces se rozprostřou po zbylých displejích.
-- Workspace, jejíž displej se odpojí, se přesune na připojený a **po replugu
+- Nevyjmenované workspaces se rozprostřou po zbylých monitorech.
+- Workspace, jejíž monitor se odpojí, se přesune na připojený a **po replugu
   se vrátí** — placement je čistá funkce (názvy workspaces, config, připojené
   monitory), žádná imperativní migrace, takže replug vždy reprodukuje totéž.
 - Monitor ID je odvozené z hardwaru, ne z `CGDirectDisplayID` (ten se mezi
   sessions mění).
+- Spánek nebo zavřené víko může hlásit nula připojených monitorů; v tu chvíli
+  `ancre` nechá aktuální uspořádání beze změny místo přeřazování workspaces,
+  takže po probuzení je vše tam, kde bylo.
+- Fokus následuje workspace podle jména: přesun fokusu na monitor fokusuje
+  ten workspace, který je na něm právě aktivní, ne pevné číslo workspace.
 
 ## Fokus mezi monitory
 

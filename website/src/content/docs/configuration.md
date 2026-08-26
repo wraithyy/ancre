@@ -6,12 +6,21 @@ sidebar:
 ---
 
 The config lives at `~/.config/ancre/ancre.toml` — created from defaults on
-first launch. The complete key catalogue with types, defaults, and allowed
+first launch. The complete key catalog with types, defaults, and allowed
 values: [Config reference](/ancre/config-reference/).
 
 Changes apply via **Reload config** in the menu bar menu (or
 `ancrectl reload-config`) without a restart. A config error never crashes the
 app — it falls back to defaults with a warning in the log.
+
+:::caution
+A *missing* key is always safe — it falls back to that key's default and the
+rest of your config is kept. A key with the *wrong type* is not: it aborts the
+whole decode, so your **entire** user config is discarded for that reload and
+everything falls back to bundled defaults. The exceptions are the numeric keys
+(`gaps-inner`, `gaps-outer`, `opacity`, `height`, …), which accept either an
+int or a float and fall back to their own default if the value is neither.
+:::
 
 ## Section overview
 
@@ -24,7 +33,7 @@ app — it falls back to defaults with a warning in the log.
 | `[workspace-labels]` | per-workspace: `name`, `icon` (emoji), `show-number`, `hide-when-empty`, `layout` |
 | `[app-workspaces]` | bundle ID → workspace for new windows |
 | `[custom-layouts]` | custom layouts from templates — see [Layouts](/ancre/layouts/) |
-| `[theme]` | shared colours (`accent`, `background`, hex `#RRGGBB[AA]`) |
+| `[theme]` | shared colors (`accent`, `background`, hex `#RRGGBB[AA]`) |
 | `[bar]` + `[bar-overrides.*]` | workspace bar — see [Bar](/ancre/bar/) |
 | `[border]` | focus border: `enabled`, `color`, `width`, `radius` |
 | `[help]` | cheatsheet: `enabled`, `delay-ms`, `opacity`, `font-size`, `columns`, `corner-radius` |
@@ -38,7 +47,7 @@ app — it falls back to defaults with a warning in the log.
 gaps-inner = 8
 gaps-outer = 8
 animations = true
-animation-duration-ms = 180
+animation-duration-ms = 180   # silently clamped to 50-500 ms
 # Apps that animate badly — place instantly:
 # animations-exclude = ["com.microsoft.teams2"]
 default-layout = "dwindle"   # dwindle | scroll | stack (monocle)

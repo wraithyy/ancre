@@ -23,6 +23,45 @@ cover them:
 - **Digging deeper**: ancre logs to the system log; view live with
   `log stream --predicate 'process == "ancre"'`.
 
+## Reset permissions
+
+ancre is ad-hoc signed (`codesign --identifier com.ancre.wm`, see
+`Scripts/bundle.sh`), and an ad-hoc signature's hash changes on every
+rebuild. macOS ties Accessibility/Input Monitoring grants to that signature,
+so after a rebuild the permission can show as "granted" in System Settings
+while the running binary is silently rejected — because it no longer
+matches the signature the grant was issued to.
+
+If ancre stops reacting to hyper or stops tiling after you rebuild it, reset
+both grants and re-approve:
+
+```sh
+tccutil reset Accessibility com.ancre.wm
+tccutil reset ListenEvent com.ancre.wm
+```
+
+Then relaunch ancre and go through the permission prompts again.
+
+## Reporting a bug
+
+Check your version first: `mdls -name kMDItemVersion .build/ancre.app`
+(source build) or `brew info --cask ancre` (Homebrew install).
+
+Attach to the report:
+
+- Recent logs: `log show --predicate 'process == "ancre"' --last 1h`
+- Your `~/.config/ancre/ancre.toml`
+- macOS version (`sw_vers`)
+- Whether you installed via Homebrew or built from source
+
+If ancre seems "stuck" and stops responding to hyper entirely, macOS may
+have auto-disabled the CGEventTap after a timeout (it does this if the
+callback doesn't return promptly). ancre's tap handler re-enables itself on
+`.tapDisabledByTimeout`/`.tapDisabledByUserInput`
+(`Sources/InputSystem/EventTapManager.swift`), logging the event — check
+`log stream --predicate 'process == "ancre"'` for a re-enable message before
+filing a bug.
+
 ## Uninstall
 
 1. Quit ancre (menu bar icon → Quit) — the CapsLock remap reverts

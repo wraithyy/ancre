@@ -8,6 +8,8 @@ sidebar:
 Bar zobrazuje workspaces s ikonkami oken, badge notifikací a podporuje
 drag&drop. Vše řídí sekce `[bar]`.
 
+![Workspace bar ancre v menu baru, tmavý motiv](../../../assets/ancre-menubar-preview-dark.png)
+
 ## Pozice
 
 ```toml
@@ -19,7 +21,7 @@ position = "top"   # top | bottom | left | right | menubar | notch
 - `top` / `bottom` / `left` / `right` — rezervují pruh na hraně obrazovky
   (left/right = vertikální bar, `height` je jeho tloušťka).
 - `menubar` — pill žije **uvnitř** systémového menu baru, žádná plocha pro
-  tiling se neztrácí. Na displeji s notchem sedí vedle notche
+  tiling se neztrácí. Na monitoru s notchem sedí vedle notche
   (`notch-side = "left" | "right"`).
 - `notch` — bar je skrytý úplně; najetí myší na notch vysune pill pod ním.
 
@@ -51,7 +53,7 @@ height = 28
 ## Per-monitor overrides
 
 `[bar-overrides.<matcher>]` přepisuje klíče `[bar]` pro konkrétní monitor.
-Matcher je stabilní ID nebo část názvu; klíč `notch` matchuje displeje
+Matcher je stabilní ID nebo část názvu; klíč `notch` matchuje monitory
 s notchem. Priorita: konkrétní matcher > `notch` > základní `[bar]`.
 
 ```toml

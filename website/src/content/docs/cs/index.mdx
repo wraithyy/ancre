@@ -3,10 +3,13 @@ title: ancre
 description: Hyprland-inspired tiling window manager pro macOS — čisté veřejné Accessibility API, žádný zásah do SIP.
 ---
 
-Hyprland-inspired tiling window manager pro macOS. Čisté veřejné Accessibility
-API — žádné privátní CGS/SkyLight, žádný zásah do SIP.
+Hyprland-inspired tiling window manager pro macOS. Žádné privátní
+CGS/SkyLight window API, žádný zásah do SIP — s jednou zdokumentovanou
+výjimkou: `_AXUIElementGetWindow` přes `dlsym`, použité k získání stabilního
+`CGWindowID` z `AXUIElement` (stejný trik používá yabai i Amethyst, protože
+pro to neexistuje veřejné API).
 
-- **Layouty** — dwindle (Hyprland), columns („scroll"), stack (monocle),
+- **Layouty** — dwindle (Hyprland), columns („scroll”), stack (monocle),
   vlastní layouty ze šablon v configu
 - **Workspaces 1–9** napříč monitory se stabilním přiřazením (přežije replug)
 - **Workspace bar** — ikonky oken, drag&drop, badge notifikací; pozice včetně
@@ -15,16 +18,18 @@ API — žádné privátní CGS/SkyLight, žádný zásah do SIP.
 - **AI ready** — unix socket + `ancrectl` CLI + vestavěný MCP server +
   Claude skill
 
-## Quick start
+## Rychlý start
 
 ```sh
 git clone https://github.com/wraithyy/ancre && cd ancre
-swift build
+swift build -c release
 Scripts/bundle.sh
 open .build/ancre.app
 ```
 
-Povol **Accessibility** a **Input Monitoring** — detaily
+Preferuješ Homebrew? Viz [Instalace](/ancre/cs/installation/).
+
+Povol **Accessibility** a **Input Monitoring**, až se zeptá — detaily
 v [Instalaci](/ancre/cs/installation/). Pak:
 
 ```sh
@@ -35,6 +40,19 @@ ancrectl state    # JSON snapshot monitorů, workspaces a oken
 ```
 
 Podržení hyperu 2 s zobrazí celý [cheatsheet zkratek](/ancre/cs/controls/).
+
+## Známá omezení
+
+- Offscreen parking (skrývání oken neaktivních workspaces) spoléhá na to,
+  jak macOS clampuje AX pozice oken u okraje obrazovky — chování, které se
+  liší podle verze macOS.
+- Animace se automaticky vypnou pro appky, jejichž AX odpovědi jsou příliš
+  pomalé na plynulou animaci.
+- Žádná distribuce přes App Store: ancre potřebuje Accessibility přístup
+  a přemapovává CapsLock přes `hidutil`, obojí mimo App Store sandbox.
+- App je ad-hoc podepsaná, ne notarizovaná — Gatekeeper je spokojený díky
+  Homebrew casku (nebo ručnímu sundání quarantine při buildu ze zdrojů), ale
+  Apple notarization ticket chybí.
 
 ## Kam dál
 

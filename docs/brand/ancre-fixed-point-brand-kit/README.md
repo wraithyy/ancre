@@ -14,7 +14,7 @@ This kit uses the fixed-point logo: two window edges around a fixed center.
 
 ## Recommended usage
 
-- Menubar: `menubar/AncreMenuTemplate.svg`, set `isTemplate = true` in AppKit
+- Menu bar: `menubar/AncreMenuTemplate.svg`, set `isTemplate = true` in AppKit
 - App icon: `macos/ancre.appiconset`
 - Web favicon: `web/favicon/favicon.svg`
 - README header: `github/ancre-readme-header.svg`
@@ -23,3 +23,7 @@ This kit uses the fixed-point logo: two window edges around a fixed center.
 ## Source logo
 
 The core mark lives in `logo/mark/ancre-mark.svg` and uses `currentColor`.
+
+## Naming
+
+In prose, the project name is always lowercase `ancre`. PascalCase forms such as `AncreMenuTemplate.svg` are asset and file names only.

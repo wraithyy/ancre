@@ -28,6 +28,25 @@ export default defineConfig({
       editLink: {
         baseUrl: 'https://github.com/wraithyy/ancre/edit/main/website/',
       },
+      lastUpdated: true,
+      head: [
+        {
+          tag: 'meta',
+          attrs: { property: 'og:image', content: 'https://wraithyy.github.io/ancre/og-image.png' },
+        },
+        {
+          tag: 'meta',
+          attrs: { property: 'og:image:width', content: '1200' },
+        },
+        {
+          tag: 'meta',
+          attrs: { property: 'og:image:height', content: '630' },
+        },
+        {
+          tag: 'meta',
+          attrs: { name: 'twitter:image', content: 'https://wraithyy.github.io/ancre/og-image.png' },
+        },
+      ],
       sidebar: [
         {
           label: 'Getting started',

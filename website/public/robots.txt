@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://wraithyy.github.io/ancre/sitemap-index.xml

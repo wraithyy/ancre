@@ -5,7 +5,7 @@ sidebar:
   order: 10
 ---
 
-Complete catalogue of every key the config loader actually parses, extracted
+Complete catalog of every key the config loader actually parses, extracted
 from `Sources/Config/Config.swift`. The config lives at
 `~/.config/ancre/ancre.toml`; changes apply via **Reload config** (menu bar
 or `ancrectl reload-config`). A config error never crashes the app — it falls
@@ -19,7 +19,7 @@ back to defaults with a warning in the log. For a guided tour see
 | `gaps-inner` | number | `8` | ≥ 0 (negative clamps to 0 with a warning) | gap between windows |
 | `gaps-outer` | number | `8` | ≥ 0 (clamped) | gap to the screen edge |
 | `animations` | bool | `true` | — | enable animations |
-| `animation-duration-ms` | int | `180` | ms | animation length |
+| `animation-duration-ms` | int | `180` | ms, silently clamped to 50-500 | animation length |
 | `default-layout` | string | `"dwindle"` | `dwindle` \| `scroll` \| `stack` \| any `[custom-layouts]` name; unknown → warning + fallback | default layout |
 | `animations-exclude` | string array | `[]` | bundle IDs | apps that always place instantly |
 | `language` | string | `"en"` | `"en"` \| `"cs"` (not validated) | bar menu/tooltip language |
@@ -145,7 +145,7 @@ alphabetical order; the first match applies.
 
 Overridable keys — **only these**: `position`, `align`, `notch-side`,
 `offset-x`, `offset-y`, `height`, `opacity`, `icon-size`, `font-size`,
-`peek`, `idle-opacity`. Colours, typography, and cell metrics cannot be
+`peek`, `idle-opacity`. Colors, typography, and cell metrics cannot be
 overridden per monitor.
 
 ```toml
@@ -189,15 +189,24 @@ icon-size = 17
 
 | Key | Type | Default | Notes |
 |---|---|---|---|
-| `color` | string | theme accent | drag&drop placeholder colour |
+| `color` | string | theme accent | drag&drop placeholder color |
 | `opacity` | number | `0.3` | fill of the dragged window's future slot |
 
 ## Validation summary
 
-- Clamped: `gaps-inner`/`gaps-outer` to ≥ 0.
+- Clamped: `gaps-inner`/`gaps-outer` to ≥ 0; `animation-duration-ms` to
+  50–500 ms.
 - Validated with fallback: `default-layout`, `hyper.key`, `bar.position`,
   `[workspaces]` matchers, `[keybindings]` command strings.
 - **Not validated** (a wrong value passes through and misbehaves at the
-  consumer): `align`, `notch-side`, `language`, colour strings.
+  consumer): `align`, `notch-side`, `language`, color strings.
 - `# [[rules]]` in `default.toml` is a placeholder for a future window-rules
   section — the loader does not read it yet.
+
+:::caution
+A missing key falls back to its own default and the rest of the config is
+kept. A key with the wrong *type* aborts decoding of the whole file, and the
+entire user config for that reload falls back to bundled defaults — not just
+the offending key. The numeric keys above are the exception: they accept an
+int or a float and fall back to their own default otherwise.
+:::

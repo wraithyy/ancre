@@ -9,9 +9,12 @@ ancre má tři vestavěné layouty a šablonový jazyk pro vlastní.
 
 ## Vestavěné
 
-- **dwindle** — binární dělení jako v Hyprlandu; každé nové okno půlí
-  největší slot. Default (`[general].default-layout`).
-- **scroll** — sloupce vedle sebe („columns"), inspirováno scroll layoutem.
+- **dwindle** — binární dělení jako v Hyprlandu; každé nové okno rozdělí
+  slot, do kterého bylo vloženo. Osa splitu se řídí aktuálním poměrem stran
+  toho slotu — širší se dělí vedle sebe, vyšší nad sebou — a nový split vždy
+  začíná na poměru 0.5; posune ho jen ruční resize. Default
+  (`[general].default-layout`).
+- **scroll** — sloupce vedle sebe („columns”), inspirováno scroll layoutem.
 - **stack** — monocle: jedno okno přes celou plochu, ostatní za ním.
 
 Přepínání: `hyper+t` (scroll), `hyper+shift+t` (dwindle), nebo obecně
@@ -41,3 +44,19 @@ Workspace zmigrovaná na monitor, kam se její okna nevejdou
 (`počet × auto-stack-min-width > šířka monitoru`), se dočasně přepne do
 stack layoutu a vrátí se zpět, jakmile je místo. Default zapnuto
 (`[general].auto-stack`).
+
+## Float a fullscreen
+
+`hyper+v` (`toggle-floating`) vyjme fokusované okno ze stromu tilingu, takže
+si drží vlastní pozici a velikost; `hyper+f` (`toggle-fullscreen`) ho
+roztáhne přes celou obrazovku. Obojí jsou obyčejné commandy, takže fungují
+i z `ancrectl` a z pravého kliku v baru.
+
+Okno může přejít do float i samo: pokud odmítá frame, který mu `ancre`
+přiřadí (třeba kvůli pevné minimální velikosti), `ancre` to zkusí až
+3×, pak to vzdá a okno přejde do float místo věčného boje — zbytek tilingu
+se kolem něj přeuspořádá, jako by nikdy tiled nebylo.
+
+Gaps a rámeček fokusu se konfigurují v `[general]` a `[border]` — viz
+[Konfigurace](/ancre/cs/configuration/) a
+[config reference](/ancre/cs/config-reference/).

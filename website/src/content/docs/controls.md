@@ -9,13 +9,25 @@ Hyper = CapsLock (change the key via `[hyper].key` in the config). Holding
 hyper for more than 2 s shows a **cheatsheet of all shortcuts** as a
 translucent overlay.
 
+Using CapsLock as hyper means ancre remaps it to F18 via `hidutil` on launch,
+and the global event tap that catches it requires the **Input Monitoring**
+permission — see [Installation](/ancre/installation/#permissions) and
+[Troubleshooting](/ancre/troubleshooting/) if it stops working after a
+rebuild.
+
+:::caution
+`right_cmd` and `right_option` are also valid `[hyper].key` values, but they
+collide with system shortcuts: `right_cmd` with Spotlight, `right_option`
+with input-language switching. CapsLock avoids both.
+:::
+
 ## Keyboard shortcuts
 
 | Shortcut | Action |
 |---|---|
 | `hyper+h/j/k/l` | focus in direction |
 | `hyper+shift+h/j/k/l` | swap window in direction |
-| `hyper+arrows` | resize (neighbours give way) |
+| `hyper+arrows` | resize (neighbors give way) |
 | `hyper+1..9` | switch workspace |
 | `hyper+shift+1..9` | move focused window to workspace |
 | `hyper+v` | float / back to tiles |
@@ -38,7 +50,7 @@ Every shortcut can be remapped in the `[keybindings]` section — see
   dropping over another tile inserts it next to it (a placeholder shows the
   future position).
 - **`hyper+right drag`** — resize. Tiled windows live-rearrange their
-  neighbours.
+  neighbors.
 
 ## Workspace bar
 

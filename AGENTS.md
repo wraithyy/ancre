@@ -28,8 +28,12 @@ swift test             # unit testy (WMCore, LayoutEngine, Config)
 Scripts/bundle.sh      # .build/ancre.app (ad-hoc podpis)
 ```
 
-Žádný `.xcodeproj`, žádné CI workflow (`.github/` neexistuje) — jediná
-automatická kontrola je `swift test`.
+Žádný `.xcodeproj`. CI (`.github/workflows/`) běží na `macos-15` runneru:
+`ci.yml` na push/PR do `main` (mimo změny jen v `website/`, `docs/`, `*.md`)
+dělá `swift build` → `swift test` → `Scripts/bundle.sh`; `release.yml` na tagu
+`vX.Y.Z` staví universal (arm64+x86_64) bundle a publikuje GitHub Release;
+`deploy-docs.yml` nasazuje `website/` na GitHub Pages (běží na
+`ubuntu-latest`, jen Astro build — nesouvisí se Swift kódem).
 
 ## NIKDY nespouštěj appku automatizovaně
 
@@ -66,8 +70,10 @@ sekce Verification).
 | `Sources/AXBridge` | AXUIElement/AXObserver, `WindowTracker`, `DisplayManager`, `OffscreenParking` |
 | `Sources/InputSystem` | hidutil remap, CGEventTap |
 | `Sources/Config` | TOMLKit schema, `~/.config/ancre/ancre.toml` |
-| `App/` | `main.swift` + `WindowManagerController` (glue) |
-| `Sources/Bar`, `Sources/Animator` | zatím stuby (M3/M4) |
+| `Sources/Animator` | animace při přeskládávání oken |
+| `Sources/Bar` | workspace bar (menu bar / notch) |
+| `App/` | executable target `ancre`: `main.swift` + `WindowManagerController` (glue) |
+| `ancrectl` | executable target, CLI klient pro socket/MCP |
 
 ## Dvě věci, kde dokumentace lže, kdybys je nečetl
 

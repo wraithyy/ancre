@@ -2,21 +2,24 @@
 
 > Nicer rendering: https://wraithyy.github.io/ancre/scripting/
 
-Every feature goes through one command bus, exposed on a unix socket at
+Every feature goes through one command bus, exposed on a Unix socket at
 `~/Library/Application Support/ancre/ancre.sock` (mode 0600 — only your
-user can drive it).
+user can drive it). If ancre isn't running, any `ancrectl` call prints
+`ancrectl: cannot connect to <path> — is ancre running?` to stderr and
+exits 1.
 
 ## CLI
 
-`ancrectl` is on PATH with the Homebrew install; from source it lands in
-`.build/release/ancrectl` (or `.build/debug/` after a plain `swift build`) —
-copy it to `/usr/local/bin` or call it by path.
+`ancrectl` is on PATH with the Homebrew install. From source, a plain
+`swift build` puts it at `.build/debug/ancrectl`; `swift build -c release`
+puts it at `.build/release/ancrectl` — copy either to `/usr/local/bin` or
+call it by path.
 
 ```sh
-ancrectl state                 # JSON: monitors, workspaces, windows (id, title, bundle, floating, focused)
+ancrectl state                 # JSON: monitors, workspaces, windows (id, pid, bundleID, title, floating, focused)
 ancrectl workspace 3           # any command from the keybinding grammar
 ancrectl layout scroll
-ancrectl move-window 4495 8    # targeted verbs: move-window / focus-window / set-floating <id>
+ancrectl move-window 4495 8    # targeted verbs: move-window / focus-window / set-floating <id> <true|false>
 ancrectl preset-save review    # save the current arrangement…
 ancrectl preset review         # …and restore it later
 ancrectl arrange '{"layouts":{"2":"scroll"},"apps":{"com.google.Chrome":"2"},"windows":{"4495":"3"},"active":["1"],"focus":4495}'
@@ -32,7 +35,10 @@ final focus.
 The full request grammar (every command and verb, plus recipes) lives in
 the Claude skill: [`.claude/skills/ancre/SKILL.md`](../.claude/skills/ancre/SKILL.md).
 
-## MCP server (built in — no Node, no repo checkout)
+## MCP server
+
+Built in — no Node install or repo checkout needed, `ancrectl mcp` runs a
+stdio MCP server directly.
 
 ```sh
 claude mcp add ancre --scope user -- ancrectl mcp

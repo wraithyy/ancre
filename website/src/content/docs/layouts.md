@@ -9,8 +9,11 @@ ancre ships three built-in layouts and a template language for custom ones.
 
 ## Built-in
 
-- **dwindle** — binary splitting like Hyprland; every new window halves the
-  largest slot. The default (`[general].default-layout`).
+- **dwindle** — binary splitting like Hyprland; every new window splits the
+  leaf it's inserted after. The split axis follows that leaf's current
+  aspect ratio — wider splits side by side, taller splits stacked — and a
+  new split always starts at a 0.5 ratio; only a manual resize moves it.
+  The default (`[general].default-layout`).
 - **scroll** — columns side by side, inspired by scrolling layouts.
 - **stack** — monocle: one window fills the screen, the rest sit behind it.
 
@@ -41,3 +44,19 @@ A workspace migrated to a monitor its windows don't fit on
 (`count × auto-stack-min-width > monitor width`) temporarily switches to the
 stack layout and back once space returns. On by default
 (`[general].auto-stack`).
+
+## Floating and fullscreen
+
+`hyper+v` (`toggle-floating`) takes the focused window out of the tiling tree
+so it keeps its own position and size; `hyper+f` (`toggle-fullscreen`) grows
+it to fill the screen. Both are ordinary commands, so they also work from
+`ancrectl` and the bar's right-click menu.
+
+A window can also float itself: if it refuses the frame `ancre` assigns it
+(a fixed minimum size, for example), `ancre` retries up to 3 times and then
+gives up and floats the window instead of fighting it forever — the rest of
+the tiling reflows around it as if it had never been tiled.
+
+Gaps and the focus border are configured in `[general]` and `[border]` —
+see [Configuration](/ancre/configuration/) and the
+[config reference](/ancre/config-reference/).

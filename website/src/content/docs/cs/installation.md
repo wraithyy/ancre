@@ -5,12 +5,36 @@ sidebar:
   order: 1
 ---
 
-ancre se sestavuje ze zdrojů — čistý Swift Package Manager, žádný `.xcodeproj`.
+:::caution
+Spuštění přemapuje CapsLock→F18 (přes `hidutil`) a začne přeskládávat okna,
+bez ohledu na to, jak byl ancre nainstalovaný. Pokud app spadne bez úklidu,
+remap vrátíš ručně:
 
 ```sh
-swift build            # celý balíček
-swift test             # unit testy
-Scripts/bundle.sh      # sestaví .build/ancre.app (ad-hoc podpis)
+hidutil property --set '{"UserKeyMapping":[]}'
+```
+:::
+
+## Homebrew (doporučeno)
+
+```sh
+brew tap wraithyy/tap
+brew trust wraithyy/tap          # tap třetí strany potřebuje jednorázový trust
+brew install --cask ancre        # nainstaluje ancre.app a dá ancrectl na PATH
+open /Applications/ancre.app
+```
+
+App je ad-hoc podepsaná (bez placeného developer certifikátu); cask za tebe
+sundá quarantine flag, takže Gatekeeper si nebude stěžovat.
+
+## Ze zdrojů
+
+Čistý Swift Package Manager, žádný `.xcodeproj`.
+
+```sh
+swift build -c release    # celý balíček
+swift test                # unit testy
+Scripts/bundle.sh         # sestaví .build/ancre.app (ad-hoc podpis)
 open .build/ancre.app
 ```
 
@@ -20,19 +44,18 @@ Při prvním spuštění si app vyžádá **Accessibility** permission
 (System Settings → Privacy & Security → Accessibility) a čeká, dokud ji
 nedostane. Event tap pro hyper klávesu vyžaduje navíc **Input Monitoring**.
 
-:::caution
-Spuštění přemapuje CapsLock→F18 (přes `hidutil`) a začne přeskládávat okna.
-Pokud app spadne bez úklidu, remap vrátíš ručně:
-
-```sh
-hidutil property --set '{"UserKeyMapping":[]}'
-```
-:::
-
 ## První spuštění
 
+- Onboarding okno vypíše chybějící permissions, odkazuje přímo do
+  příslušného panelu System Settings a spustí window manager, až jsou
+  všechny udělené a klikneš Start. Pokud jsou permissions už v pořádku,
+  přeskočí se úplně.
 - Config `~/.config/ancre/ancre.toml` se vytvoří z defaultů.
 - Okna na viditelných workspaces se srovnají do dlaždic; skryté workspaces se
-  „parkují" mimo obrazovku.
+  „parkují” mimo obrazovku.
 - V menubaru přibude ikona **◱** — pauza tilingu, přeskládání, seznam
-  monitorů, otevření/reload configu.
+  monitorů, otevření a znovunačtení configu.
+
+Pokud po rebuildu přestane fungovat permission (nový ad-hoc podpis vypadá
+pro macOS jako jiná app), viz
+[Troubleshooting](/ancre/cs/troubleshooting/#permissions-přestanou-fungovat-po-rebuildu).

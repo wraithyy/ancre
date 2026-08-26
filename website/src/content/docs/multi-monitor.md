@@ -20,7 +20,22 @@ The value is either the **stable monitor ID** (`vendor:model:serial` — logged
 at startup, copy it with a click in the ◱ menu bar menu) or **part of the
 display name**.
 
-## Behaviour
+It can also be an array — a priority list where the first connected monitor
+wins, so the same config works at home and at the office:
+
+```toml
+[workspaces]
+"1" = ["PHL", "P34w"]   # prefer PHL, fall back to P34w
+```
+
+:::caution
+Cheap panels often report serial `0`. Two identical panels with the same
+matcher then collide — `ancre` disambiguates by adding a positional suffix
+(`#1`, `#2`, ...) to the second one. Reordering the displays swaps which
+panel gets which suffix, which swaps their workspaces.
+:::
+
+## Behavior
 
 - Unlisted workspaces spread over the remaining displays.
 - A workspace whose display disconnects moves to a connected one and
@@ -29,6 +44,12 @@ display name**.
   reproduces the same result.
 - The monitor ID is hardware-derived, not `CGDirectDisplayID` (which changes
   between sessions).
+- Sleep or a closed lid can report zero connected displays; when that
+  happens `ancre` leaves the current arrangement untouched instead of
+  reassigning workspaces, so everything is back where it was on wake.
+- Focus follows the workspace by name: moving focus to a monitor focuses
+  whichever workspace is currently active on it, not a fixed workspace
+  number.
 
 ## Focus across monitors
 

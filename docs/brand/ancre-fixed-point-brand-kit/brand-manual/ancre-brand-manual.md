@@ -2,9 +2,9 @@
 
 ## Foundation
 
-ancre is a window manager for macOS power users. The brand should feel like a precise tool: quiet, sharp, native, without startup noise.
+ancre is a window manager for macOS power users. The brand should feel like a precise tool: quiet, sharp, native, without unnecessary flourish.
 
-The core motif is the **fixed point**: two windows moving around a fixed center. The brand therefore never shows an anchor or a grid literally. It must work as a menubar glyph, an app icon, and a mark in documentation.
+The core motif is the **fixed point**: two windows moving around a fixed center. The brand therefore never shows an anchor or a grid literally. It must work as a menu bar glyph, an app icon, and a mark in documentation.
 
 ## Logo
 
@@ -23,19 +23,19 @@ The clear space around the mark is at least the width of the center diamond. For
 
 ## Minimum sizes
 
-- Menubar: 18-22 px, use `menubar/AncreMenuTemplate.svg`
+- Menu bar: 18–22 px, use `menubar/AncreMenuTemplate.svg`
 - Favicon: 16 px, use the optical variant or the prepared favicon exports
 - GitHub badge: 64 px and up
 - App icon: 128 px and up; below 64 px use the simpler mark, not the full app icon
 
 ## Colors
 
-The base is dark, but not a blue surface everywhere. Blue is action, cyan is navigation/focus, violet is depth or a secondary accent only, brass is a small counterpoint.
+The base is dark, not blue, everywhere. Blue is action, cyan is navigation/focus, violet is depth or a secondary accent only, brass is a small counterpoint.
 
 | Token | Hex | Use |
 | --- | --- | --- |
 | Ink | `#0B0D12` | main background |
-| Graphite | `#151A23` | panels and menubar preview |
+| Graphite | `#151A23` | panels and menu bar preview |
 | Panel | `#1C2230` | secondary surfaces |
 | Rule | `#30394A` | lines, borders |
 | Frost | `#EDF0F5` | primary text/logo |
@@ -62,7 +62,7 @@ Use normal tracking `0`. Do not use a condensed display font for the logo. The w
 
 ## Icons
 
-The menubar icon must be a template: black, no background, no shadow. Set `isTemplate = true` in AppKit.
+The menu bar icon must be a template: black, no background, no shadow. Set `isTemplate = true` in AppKit.
 
 The app icon may have the macOS plate and subtle depth, but the mark must stay readable without effects. The app icon is a product icon, not a replacement for the logo in documentation.
 
@@ -89,6 +89,6 @@ The README header should show the brand and the project's purpose. In the repo u
 
 - do not go back to the anchor as an illustration
 - do not put the logo in a blue gradient square everywhere
-- do not add shadows to the menubar icon
+- do not add shadows to the menu bar icon
 - do not stretch the wordmark
 - do not use the mark as a pattern on every surface

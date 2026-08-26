@@ -74,58 +74,64 @@ wake, true infinite scroll, layout edit mode, rule-learning fáze 2.
 
 ## Tasks
 
+Stav "HOTOVO" u M1–M8 znamená různou míru ověření podle modulu: unit testy
+pokrývají jen WMCore/LayoutEngine/Config (`swift test`, 63 testů); AXBridge,
+InputSystem, Bar, Animator a App vyžadují Accessibility/Input Monitoring
+permissions a display session, takže jsou ověřené manuálně (viz poznámky u
+jednotlivých tasků — "runtime ověřeno" vs "kód, runtime ověření probíhá").
+
 ### Milestone 1 — MVP (single monitor, dwindle, hotkeys, workspaces)
 
-## Task 1.1: Založit SPM balíček + moduly + TOMLKit — HOTOVO
+#### Task 1.1: Založit SPM balíček + moduly + TOMLKit — HOTOVO
 - **Agent**: claude
 - **Files**: celá kostra dle stromu výše, App/, Package.swift, Scripts/Info.plist
 - **Depends on**: none
 - **Acceptance**: `swift build` projde; app se spustí jako menu bar item; permission onboarding požádá o Accessibility
 - **Prompt seed**: Založ Xcode projekt ancre (menu bar app, unsandboxed, LSUIElement), SPM lokální moduly AXBridge/WMCore/LayoutEngine/InputSystem/Config/Animator/Bar, TOMLKit dependency, Info.plist s usage descriptions, AXIsProcessTrustedWithOptions onboarding.
 
-## Task 1.2: AXBridge — discovery a tracking oken
+#### Task 1.2: AXBridge — discovery a tracking oken
 - **Agent**: claude
 - **Files**: Sources/AXBridge/ (AXObserverManager.swift, WindowCache.swift, AXWindow.swift)
 - **Depends on**: 1.1
 - **Acceptance**: debug log ukazuje živě: launch/terminate appky, created/destroyed/focused/moved/resized okna, enumerace existujících oken při startu
 - **Prompt seed**: Implementuj AX vrstvu na dedikované axQueue: NSWorkspace notifikace → AXUIElementCreateApplication → AXObserver (windowCreated, uiElementDestroyed, focusedWindowChanged, moved, resized, miniaturized), cache framů, enumerace kAXWindowsAttribute při startu.
 
-## Task 1.3: WMCore — window tree, workspace model, Command bus
+#### Task 1.3: WMCore — window tree, workspace model, Command bus
 - **Agent**: claude
 - **Files**: Sources/WMCore/ (LayoutTree.swift, Workspace.swift, Monitor.swift, Command.swift, WM.swift), Tests/WMCoreTests/
 - **Depends on**: none (čistá logika, paralelně s 1.2)
 - **Acceptance**: unit testy: dwindle strom insert/remove/swap/focus-neighbor, workspace přiřazení; `swift test` zelené
 - **Prompt seed**: Čistý stavový model bez AX závislostí: rekurzivní LayoutTree (leaf/split), Workspace s layoutem, Monitor s ordered workspaces, Command enum + dispatch. Testy na tree operace a hjkl navigaci.
 
-## Task 1.4: LayoutEngine — protokol + Dwindle
+#### Task 1.4: LayoutEngine — protokol + Dwindle
 - **Agent**: claude
 - **Files**: Sources/LayoutEngine/ (Protocol.swift, Dwindle.swift), testy
 - **Depends on**: 1.3
 - **Acceptance**: unit test: N oken → správné framy s gaps pro dané viewport rozměry
 - **Prompt seed**: LayoutEngine protokol (windows+viewport+gaps → frames, insert/remove/move/resize-hooks), Dwindle implementace (Hyprland sémantika: střídavé dělení, split ratio).
 
-## Task 1.5: InputSystem — hidutil remap + CGEventTap + default binds
+#### Task 1.5: InputSystem — hidutil remap + CGEventTap + default binds
 - **Agent**: claude
 - **Files**: Sources/InputSystem/ (EventTapManager.swift, HidutilRemap.swift, Keybinding.swift)
 - **Depends on**: 1.3
 - **Acceptance**: CapsLock funguje jako hyper; hyper+hjkl/shift+hjkl/1..9 emitují správné Command; tap přežije timeout disable (re-enable log)
 - **Prompt seed**: hidutil UserKeyMapping CapsLock→F18 (apply při startu, revert při quit, re-apply po wake/IOHID změně), CGEventTap s re-enable handlingem, mapování kombinací na Command enum.
 
-## Task 1.6: Integrace — tiling enforcement + focus + virtuální workspaces
+#### Task 1.6: Integrace — tiling enforcement + focus + virtuální workspaces
 - **Agent**: claude
 - **Files**: Sources/AXBridge/OffscreenParking.swift, Sources/WMCore/WM.swift, App/ wiring
 - **Depends on**: 1.2, 1.4, 1.5
 - **Acceptance**: manuální: 4 okna se tilují, hyper+hjkl přepíná focus, hyper+shift+hjkl prohazuje, hyper+2 skryje/obnoví workspace okamžitě, self-resize okna snapne zpět
 - **Prompt seed**: Propoj AX eventy → WMCore → layout → AX setFrame. Anti-self-resize debounce+snapback, focus set (AXFocused + NSRunningApplication.activate), OffscreenParking se startup self-testem.
 
-## Task 1.7: Config — TOML schema + načtení keybinds
+#### Task 1.7: Config — TOML schema + načtení keybinds
 - **Agent**: claude
 - **Files**: Sources/Config/ (Schema.swift, Loader.swift), Resources/default.toml
 - **Depends on**: 1.5
 - **Acceptance**: binds z ~/.config/ancre/ancre.toml přepíší defaulty; nevalidní config → čitelná chyba, fallback na defaulty
 - **Prompt seed**: TOMLKit schema: [keybindings], [general] (gaps, animace on/off), hyper klávesa konfigurovatelná. Validace s chybovými hláškami.
 
-## Task 1.R: Review milestone 1
+#### Task 1.R: Review milestone 1
 - **Agent**: code-reviewer
 - **Files**: vše z M1
 - **Depends on**: 1.6, 1.7
@@ -134,7 +140,7 @@ wake, true infinite scroll, layout edit mode, rule-learning fáze 2.
 
 ### Milestone 2 — Multi-monitor
 
-## Task 2.1: Stabilní monitor ID + workspace→monitor assignment + migrace — HOTOVO (runtime ověřeno 2026-08-25, built-in + P34w-20)
+#### Task 2.1: Stabilní monitor ID + workspace→monitor assignment + migrace — HOTOVO (runtime ověřeno 2026-08-25, built-in + P34w-20)
 - **Agent**: claude
 - **Files**: Sources/WMCore/Monitor.swift, Sources/AXBridge/DisplayManager.swift, Config schema rozšíření
 - **Depends on**: 1.R
@@ -170,14 +176,14 @@ wake, true infinite scroll, layout edit mode, rule-learning fáze 2.
 
 ### Milestone 3 — Workspace bar
 
-## Task 3.1: SwiftUI bar per monitor (zobrazení + click-to-switch) — HOTOVO (kód, runtime ověření uživatelem probíhá)
+#### Task 3.1: SwiftUI bar per monitor (zobrazení + click-to-switch) — HOTOVO (kód, runtime ověření uživatelem probíhá)
 - **Agent**: claude
 - **Files**: Sources/Bar/
 - **Depends on**: 2.1
 - **Acceptance**: bar na každém monitoru živě ukazuje workspaces + ikony appek, klik přepne
 - **Prompt seed**: NSWindow (borderless, .statusBar level, canJoinAllSpaces) per monitor, SwiftUI obsah odebírající WMCore state stream, NSRunningApplication.icon.
 
-## Task 3.2: Bar interakce — drag&drop + right-click menu — HOTOVO (kód, runtime ověření uživatelem probíhá)
+#### Task 3.2: Bar interakce — drag&drop + right-click menu — HOTOVO (kód, runtime ověření uživatelem probíhá)
 - **Agent**: claude
 - **Files**: Sources/Bar/
 - **Depends on**: 3.1
@@ -186,7 +192,7 @@ wake, true infinite scroll, layout edit mode, rule-learning fáze 2.
 
 ### Milestone 4 — Animace
 
-## Task 4.1: Animator — adaptivní interpolace — HOTOVO (kód; DispatchSourceTimer 60 Hz místo CVDisplayLink — timer běží jen během animací, idle 0 %)
+#### Task 4.1: Animator — adaptivní interpolace — HOTOVO (kód; DispatchSourceTimer 60 Hz místo CVDisplayLink — timer běží jen během animací, idle 0 %)
 - **Agent**: claude
 - **Files**: Sources/Animator/
 - **Depends on**: 1.R
@@ -195,7 +201,7 @@ wake, true infinite scroll, layout edit mode, rule-learning fáze 2.
 
 ### Milestone 5 — niri layout + custom layouty
 
-## Task 5.1: ScrollColumns layout + per-workspace přepínání — HOTOVO (kód; + TemplateLayout pro custom layouty z configu; edit mode custom layoutů = budoucí task)
+#### Task 5.1: ScrollColumns layout + per-workspace přepínání — HOTOVO (kód; + TemplateLayout pro custom layouty z configu; edit mode custom layoutů = budoucí task)
 
 **Budoucí rozšíření — pravý niri scroll (nekonečný pás):** columns layout dnes
 vždy škáluje šířky, aby se všechna okna vešla na monitor. Varianta s viewportem
@@ -216,7 +222,7 @@ jim přirozené souřadnice za hranou) a bar (ukazovat i zaparkovaná okna).
 
 ### Milestone 6 — Polish
 
-## Task 6.1: App→workspace pravidla + config reload — HOTOVO (runtime ověřeno; [app-workspaces] pravidla + explicitní „Reload config" v menubar menu místo FSEvents watch — vědomé rozhodnutí, viz odchylky)
+#### Task 6.1: App→workspace pravidla + config reload — HOTOVO (runtime ověřeno; [app-workspaces] pravidla + explicitní „Reload config" v menubar menu místo FSEvents watch — vědomé rozhodnutí, viz odchylky)
 - **Agent**: claude
 - **Files**: Sources/Config/, Sources/WMCore/Rules.swift
 - **Depends on**: 2.1
@@ -231,20 +237,20 @@ jim přirozené souřadnice za hranou) a bar (ukazovat i zaparkovaná okna).
   threadu), gaps, workspace assignments, bar, border, help overlay, animator,
   jazyk, hyper klíč (restart inputu). Layouty existujících workspaces nechává.
 
-## Task 6.2: Myší módy — hyper+drag move/resize + release mód — HOTOVO (kód; drop = zůstává floating, insert-do-mřížky při dropu odloženo — vrácení přes hyper+v / bar menu; release mód = toggle-floating)
+#### Task 6.2: Myší módy — hyper+drag move/resize + release mód — HOTOVO (kód; drop = zůstává floating, insert-do-mřížky při dropu odloženo — vrácení přes hyper+v / bar menu; release mód = toggle-floating)
 - **Agent**: claude
 - **Files**: Sources/InputSystem/MouseModes.swift
 - **Depends on**: 4.1
 - **Acceptance**: hyper+left-drag plynule přesouvá (okno floatne), hyper+right-drag resizuje, toggle release mód vyjme okno z mřížky a vrátí zpět
 - **Prompt seed**: CGEventTap mouse eventy při hyper, drag → přímé setFrame (bez animace), drop na tiled workspace → volba insert do mřížky vs zůstat floating.
 
-## Task 6.3: Multilang UI — HOTOVO
+#### Task 6.3: Multilang UI — HOTOVO
 - **Files**: Sources/Bar/L10n.swift, Config schema
 - **Acceptance**: `[general] language = "cs"` přepne menu/tooltipy baru do
   češtiny; default angličtina; neznámý jazyk = fallback EN. Další jazyk =
   přidat slovník do L10n.tables.
 
-## Task 6.4: Finální review + security check — HOTOVO
+#### Task 6.4: Finální review + security check — HOTOVO
 - code-reviewer: 0 CRITICAL, 2 HIGH (opraveno: autoFloated leak při
   windowRemoved — CGWindowID reuse; restart event tapu při hot-reloadu
   hyper klávesy musí jít přes main thread — run-loop binding), 1 MEDIUM
@@ -264,7 +270,7 @@ jim přirozené souřadnice za hranou) a bar (ukazovat i zaparkovaná okna).
 
 ### Milestone 7 — AI ready (IPC, MCP, skill)
 
-## Task 7.1: IPC socket + ancrectl CLI — HOTOVO (runtime ověřeno: state/dispatch/move-window/reload-config, error paths, socket 0600)
+#### Task 7.1: IPC socket + ancrectl CLI — HOTOVO (runtime ověřeno: state/dispatch/move-window/reload-config, error paths, socket 0600)
 - **Files**: App/ControlServer.swift, Sources/ancrectl/
 - **Acceptance**: `ancrectl workspace 3` přepne workspace; `ancrectl state`
   vrátí JSON stavu (monitory, workspaces, okna s tituly, layouty, floaty).
@@ -272,40 +278,40 @@ jim přirozené souřadnice za hranou) a bar (ukazovat i zaparkovaná okna).
 - **Poznámka**: commandy jdou přes existující Command.parse — CLI je jen
   transport. Model yabai/aerospace.
 
-## Task 7.2: MCP server — HOTOVO (mcp/index.js, plain JS bez build stepu; registrováno `claude mcp add ancre --scope user`; smoke test stdio prošel)
+#### Task 7.2: MCP server — HOTOVO (mcp/index.js, plain JS bez build stepu; registrováno `claude mcp add ancre --scope user`; smoke test stdio prošel)
 - **Files**: mcp/ (TypeScript balíček)
 - **Acceptance**: MCP tools ancre_state / ancre_dispatch /
   ancre_move_window nad socketem; agent umí přeuspořádat okna.
 
-## Task 7.3: Skill pro Claude Code — HOTOVO (.claude/skills/ancre/SKILL.md — transporty, grammar tabulky, window-targeted verby, recepty)
+#### Task 7.3: Skill pro Claude Code — HOTOVO (.claude/skills/ancre/SKILL.md — transporty, grammar tabulky, window-targeted verby, recepty)
 - **Files**: .claude/skills/ancre/
 - **Acceptance**: skill dokumentuje CLI/MCP + recepty (příprava workspace,
   úklid notifikačních appek).
 
 ### Milestone 8 — Workflow (2026-08-26)
 
-## Task 8.1: Multi-monitor matchery v [workspaces] — HOTOVO
+#### Task 8.1: Multi-monitor matchery v [workspaces] — HOTOVO
 - `"1" = ["PHL", "P34w"]` — první připojený monitor vyhrává (doma/práce).
 
-## Task 8.2: Window switcher (hyper+space) — HOTOVO
+#### Task 8.2: Window switcher (hyper+space) — HOTOVO
 - Spotlight-style panel: filtr přes app/titul, workspace badge, Enter=focus.
 - Non-activating KeyablePanel (borderless okna jinak nedostanou klávesnici).
 
-## Task 8.3: Scratchpad (hyper+s) — HOTOVO
+#### Task 8.3: Scratchpad (hyper+s) — HOTOVO
 - [scratchpad] app/width/height; toggle float top-center / park; launchne
   appku když neběží. ponytail: přepnutí workspace zaparkuje scratchpad s jeho
   domovskou ws — další toggle může chtít dva stisky.
 
-## Task 8.4: Window hints (hyper+o) — HOTOVO
+#### Task 8.4: Window hints (hyper+o) — HOTOVO
 - Písmenkové badge přes viditelná okna, stisk = focus, Esc = zavřít.
 
-## Task 8.5: Presety + arrange — HOTOVO
+#### Task 8.5: Presety + arrange — HOTOVO
 - `preset-save <name>` / `preset <name>` (commandy → bindovatelné, IPC, MCP);
   úložiště ~/Library/Application Support/ancre/presets.json.
 - IPC verb `arrange <json>` + MCP tool ancre_arrange: deklarativní
   {layouts, apps, active} jedním callem.
 
-## Task 8.6: Event stream — HOTOVO
+#### Task 8.6: Event stream — HOTOVO
 - `ancrectl subscribe` streamuje JSON eventy (state-changed při změně
   fokusu/workspace/pauzy, window-opened). Podklad pro sketchybar/agenty.
 
@@ -317,13 +323,13 @@ jim přirozené souřadnice za hranou) a bar (ukazovat i zaparkovaná okna).
   event stream.
 - hidutil re-apply po wake/výměně klávesnice (IOHIDManager notifikace).
 - Pravý niri scroll (viz poznámka u 5.1), layout edit mode.
-## Task 8.7: Auto-stack při migraci — HOTOVO
+#### Task 8.7: Auto-stack při migraci — HOTOVO
 - [general] auto-stack (default on) + auto-stack-min-width (300): workspace,
   jehož okna se na monitor nevejdou, se po reconcile přepne na stack; až se
   vejde, vrátí se původní layout. Ruční změna layoutu auto-restore ruší.
 - Ceiling: kontrola běží jen při reconfiguraci displayů, ne při přidání okna.
 
-## Task 8.8: Move log (učení pravidel, fáze 1) — HOTOVO
+#### Task 8.8: Move log (učení pravidel, fáze 1) — HOTOVO
 - [general] move-log (default on, vypínatelný): ruční přesuny oken (keybind,
   bar, drag, adopt — NE automatické IPC/arrange/presety) se appendují do
   ~/Library/Application Support/ancre/move-log.jsonl

@@ -5,11 +5,15 @@ sidebar:
   order: 8
 ---
 
+This page covers ancre's high-level architecture: the single command bus
+every input funnels through, the module boundaries in the Swift package, and
+the invariants that keep multi-threaded AX state safe.
+
 ## Command bus
 
 One path for every operation — nothing bypasses it:
 
-```
+```text
 hotkey / bar / mouse / IPC  →  Command  →  WM.dispatch(Command, state:)  →  [Effect]  →  AX layer
 ```
 
@@ -21,8 +25,10 @@ hotkey / bar / mouse / IPC  →  Command  →  WM.dispatch(Command, state:)  →
 | `LayoutEngine` | layout implementations (dwindle, scroll, templates). Stateless value types |
 | `AXBridge` | AXUIElement/AXObserver, window tracking, offscreen parking, DisplayManager (stable display IDs) |
 | `InputSystem` | hidutil remap + CGEventTap; independent of WMCore, resolves only binding strings |
+| `Animator` | window-frame animation, driven off WMCore effects |
 | `Bar` | SwiftUI workspace bar |
 | `Config` | TOML schema + loader, validation with warnings (a config typo never crashes the app) |
+| `ancrectl` | CLI + built-in MCP server, talks to the running app over the unix socket — see [Scripting & AI](/ancre/scripting/) |
 | `App` | glue: AX ↔ WMCore ↔ Input |
 
 ## Key invariants
@@ -41,4 +47,5 @@ hotkey / bar / mouse / IPC  →  Command  →  WM.dispatch(Command, state:)  →
 - **Windows refusing a frame**: snap-back is limited to 3 attempts, then
   accepted.
 
-Details and milestones: `CLAUDE.md` and `docs/PLAN.md` in the repository.
+Threading details: `CONTRIBUTING.md` in the repository. Milestones:
+`docs/PLAN.md`.

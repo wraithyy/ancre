@@ -8,6 +8,19 @@ sidebar:
 Hyper = CapsLock (změna klávesy: `[hyper].key` v configu). Podržení hyperu
 déle než 2 s zobrazí **cheatsheet všech zkratek** jako průsvitný overlay.
 
+Použití CapsLock jako hyperu znamená, že ho ancre při spuštění přemapuje na
+F18 přes `hidutil`, a globální event tap, který ho zachytává, vyžaduje
+permission **Input Monitoring** — viz
+[Instalace](/ancre/cs/installation/#permissions) a
+[Troubleshooting](/ancre/cs/troubleshooting/), pokud přestane fungovat po
+rebuildu.
+
+:::caution
+`right_cmd` a `right_option` jsou taky platné hodnoty `[hyper].key`, ale
+kolidují se systémovými zkratkami: `right_cmd` se Spotlightem, `right_option`
+s přepínáním jazyka vstupu. CapsLock se oběma vyhne.
+:::
+
 ## Klávesové zkratky
 
 | Zkratka | Akce |
@@ -44,9 +57,9 @@ Všechny zkratky lze přemapovat v sekci `[keybindings]` — viz
 - klik na ikonku = fokus okna
 - drag ikonky = přesun okna na jinou workspace
 - pravý klik = context menu (float, fullscreen, přesun, layout)
-- čárkovaný ring kolem ikonky = floating okno; badge = notifikace
+- čárkovaný ring kolem ikonky = float okno; badge = notifikace
 
 ## Menubar ◱
 
 Pauza tilingu, přeskládání, seznam monitorů (klik zkopíruje stabilní ID pro
-config), otevření a reload configu.
+config), otevření a znovunačtení configu.

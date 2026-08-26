@@ -18,7 +18,7 @@ na defaulty s warningem v logu. Průvodce: [Konfigurace](/ancre/cs/configuration
 | `gaps-inner` | číslo | `8` | ≥ 0 (záporné se clampne na 0 s warningem) | mezera mezi okny |
 | `gaps-outer` | číslo | `8` | ≥ 0 (clamp) | mezera k okraji obrazovky |
 | `animations` | bool | `true` | — | zapnutí animací |
-| `animation-duration-ms` | int | `180` | ms | délka animace |
+| `animation-duration-ms` | int | `180` | ms, tiše se clampne na 50-500 | délka animace |
 | `default-layout` | string | `"dwindle"` | `dwindle` \| `scroll` \| `stack` \| název z `[custom-layouts]`; neznámý → warning + fallback | výchozí layout |
 | `animations-exclude` | pole stringů | `[]` | bundle ID | appky s okamžitým placementem |
 | `language` | string | `"en"` | `"en"` \| `"cs"` (nevalidováno) | jazyk bar menu/tooltipů |
@@ -59,7 +59,7 @@ Mapa: workspace → monitor matcher. Hodnota je buď **jeden string**, nebo
 ```
 
 Matcher je stabilní ID monitoru (`vendor:model:serial`) nebo case-insensitive
-část názvu displeje. Entry s prázdným matcherem se zahodí s warningem.
+část názvu monitoru. Entry s prázdným matcherem se zahodí s warningem.
 
 ## `[workspace-labels]`
 
@@ -136,7 +136,7 @@ Mapa: název layoutu → šablona. Názvy rozšiřují množinu platných layout
 ## `[bar-overrides]`
 
 Per-monitor overrides klíčů `[bar]`. Podklíč = matcher: literál `"notch"`
-matchuje displeje s notchem; jiný klíč je monitor matcher (přesná shoda
+matchuje monitory s notchem; jiný klíč je monitor matcher (přesná shoda
 stabilního ID, nebo case-insensitive část názvu). Priorita: konkrétní
 matcher > `notch` > základní `[bar]`. Matchery se procházejí abecedně,
 aplikuje se první shoda.
@@ -192,10 +192,19 @@ icon-size = 17
 
 ## Shrnutí validace
 
-- Clamp: `gaps-inner`/`gaps-outer` na ≥ 0.
+- Clamp: `gaps-inner`/`gaps-outer` na ≥ 0; `animation-duration-ms` na
+  50–500 ms.
 - Validované s fallbackem: `default-layout`, `hyper.key`, `bar.position`,
   matchery `[workspaces]`, command stringy `[keybindings]`.
 - **Nevalidované** (špatná hodnota projde a zlobí až u spotřebitele):
   `align`, `notch-side`, `language`, barevné stringy.
 - `# [[rules]]` v `default.toml` je placeholder budoucí sekce window rules —
   loader ji zatím nečte.
+
+:::caution
+Chybějící klíč se nahradí vlastním defaultem a zbytek configu zůstane
+zachovaný. Klíč se špatným *typem* rozbije dekódování celého souboru a celý
+uživatelský config pro daný reload spadne na bundlované defaulty — ne jen
+provinilý klíč. Výjimkou jsou číselné klíče výše: přijmou int i float, jinak
+použijí vlastní default.
+:::

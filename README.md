@@ -6,10 +6,14 @@
 
 **Docs: https://wraithyy.github.io/ancre/**
 
-A Hyprland-inspired tiling window manager for macOS. Your windows arrange
-themselves side by side — no overlapping, no hunting — and one key drives
-everything. Built on the pure public Accessibility API: no private
-CGS/SkyLight calls, no SIP changes, no kernel extensions.
+A Hyprland-inspired tiling window manager for macOS: your windows arrange
+themselves side by side and one key drives everything.
+
+No private CGS/SkyLight window APIs, no SIP changes, no kernel extensions —
+with one documented exception: `_AXUIElementGetWindow` via `dlsym`, used to
+get a stable `CGWindowID` from an `AXUIElement` (the same trick yabai and
+Amethyst rely on, since there's no public API for it; it degrades gracefully
+if the symbol is ever unavailable).
 
 > **ancre** /ɑ̃kʁ/ — French for *anchor*. Your windows stop drifting.
 
@@ -37,8 +41,27 @@ desktops) and move focus with the keyboard.
 - **Window switcher, scratchpad, window hints, presets** — all one hyper
   shortcut away
 - **Everything themeable**: colors, fonts, sizes, opacities, per-monitor
-- **AI ready**: `ancrectl` CLI, unix-socket IPC, built-in MCP server, Claude
+- **AI ready**: `ancrectl` CLI, Unix-socket IPC, built-in MCP server, Claude
   skill — an agent rearranges your whole setup in one call
+
+## Before you launch — read this once
+
+Starting ancre does two visible things immediately:
+
+1. **CapsLock is remapped** to the hyper key (via `hidutil`). You get it
+   back the moment ancre quits; if the process ever dies uncleanly, restore
+   it with:
+   ```sh
+   hidutil property --set '{"UserKeyMapping":[]}'
+   ```
+2. **Your windows start tiling.** Press `hyper+p` to pause at any time, or
+   click the ancre icon in the menu bar (top-right strip of the screen) →
+   *Pause tiling*.
+
+The first launch shows an onboarding window: it checks the two needed
+permissions (**Accessibility**, **Input Monitoring**), deep-links to the
+right System Settings panes, and only starts tiling after you press
+**Start**. Re-show it anytime with `ancre --onboarding`. Requires macOS 14+.
 
 ## Install
 
@@ -67,25 +90,6 @@ cp .build/release/ancrectl /usr/local/bin/            # optional: CLI on PATH
 open .build/ancre.app                                 # launch (onboarding appears)
 ```
 
-### Before you launch — read this once
-
-Starting ancre does two visible things immediately:
-
-1. **CapsLock is remapped** to the hyper key (via `hidutil`). You get it
-   back the moment ancre quits; if the process ever dies uncleanly, restore
-   it with:
-   ```sh
-   hidutil property --set '{"UserKeyMapping":[]}'
-   ```
-2. **Your windows start tiling.** Press `hyper+p` to pause at any time, or
-   click the ancre icon in the menu bar (top-right strip of the screen) →
-   *Pause tiling*.
-
-The first launch shows an onboarding window first: it checks the two needed
-permissions (**Accessibility**, **Input Monitoring**), deep-links to the
-right System Settings panes, and only starts tiling after you press
-**Start**. Re-show it anytime with `ancre --onboarding`. Requires macOS 14+.
-
 ## Quickstart
 
 | Try | What happens |
@@ -100,17 +104,53 @@ right System Settings panes, and only starts tiling after you press
 ## Documentation
 
 Full docs live at **https://wraithyy.github.io/ancre/** (English + čeština).
-The same content in repo markdown:
+Most topics are covered in both repo markdown and on the web, but the two
+aren't a 1:1 mirror — some pages exist only on one side:
 
 | Topic | In repo | On the web |
 |---|---|---|
 | Keybindings, mouse, bar, menu bar | [docs/KEYBINDINGS.md](docs/KEYBINDINGS.md) | [controls](https://wraithyy.github.io/ancre/controls/) |
 | Configuration (all sections, bar modes, multi-monitor) | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | [configuration](https://wraithyy.github.io/ancre/configuration/) · [config reference](https://wraithyy.github.io/ancre/config-reference/) |
 | Scripting & AI (CLI, socket, MCP, presets, arrange) | [docs/SCRIPTING.md](docs/SCRIPTING.md) | [scripting](https://wraithyy.github.io/ancre/scripting/) |
+| Layouts (dwindle, scroll, stack) | — | [layouts](https://wraithyy.github.io/ancre/layouts/) |
+| Multi-monitor placement | — | [multi-monitor](https://wraithyy.github.io/ancre/multi-monitor/) |
+| Bar setup and customization | — | [bar](https://wraithyy.github.io/ancre/bar/) |
 | Coming from Hyprland | [docs/HYPRLAND.md](docs/HYPRLAND.md) | — |
 | Troubleshooting & uninstall | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | [troubleshooting](https://wraithyy.github.io/ancre/troubleshooting/) |
 | Architecture | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | [architecture](https://wraithyy.github.io/ancre/architecture/) |
 | Contributing | [CONTRIBUTING.md](CONTRIBUTING.md) | — |
+
+## Known limitations
+
+- Offscreen parking (hiding windows for inactive workspaces) relies on how
+  macOS clamps AX window positions near screen edges — behavior that varies
+  by macOS version; see `Sources/AXBridge/OffscreenParking.swift`
+- Animations auto-disable for apps whose AX responses are too slow to
+  animate smoothly
+- No App Store distribution: ancre needs Accessibility access and remaps
+  CapsLock via `hidutil`, both outside the App Store sandbox
+- A window that refuses a requested frame gets floated after 3 snap-back
+  attempts rather than fought indefinitely
+- The app is ad-hoc signed, not notarized — Gatekeeper is satisfied via the
+  Homebrew cask (or a manual quarantine clear from source), but there's no
+  Apple notarization ticket
+
+## How it compares
+
+ancre sits between yabai and AeroSpace/Amethyst on the trade-off each of
+those makes. Like AeroSpace and Amethyst, it uses only the public
+Accessibility API — no SIP-disabling private CGS/SkyLight calls like yabai
+needs for some features. Like yabai, it takes Hyprland's dwindle layout and
+one-modifier ergonomics as the model rather than i3/BSPWM-style manual
+splits. Configuration is a single declarative TOML file, and the whole
+stack — CLI, Unix socket, MCP server — is built to be driven by scripts and
+agents, not just a keyboard.
+
+## Feedback
+
+Found a bug or have a feature request? Open an issue on
+[GitHub Issues](https://github.com/wraithyy/ancre/issues). See
+[Releases](https://github.com/wraithyy/ancre/releases) for the changelog.
 
 ## License
 

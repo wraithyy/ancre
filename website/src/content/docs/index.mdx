@@ -1,10 +1,13 @@
 ---
 title: ancre
-description: Hyprland-inspired tiling window manager for macOS — pure public Accessibility API, no SIP tampering.
+description: Hyprland-inspired tiling window manager for macOS — no private CGS/SkyLight window APIs, no SIP tampering.
 ---
 
-Hyprland-inspired tiling window manager for macOS. Pure public Accessibility
-API — no private CGS/SkyLight, no SIP tampering.
+Hyprland-inspired tiling window manager for macOS. No private CGS/SkyLight
+window APIs, no SIP tampering — with one documented exception:
+`_AXUIElementGetWindow` via `dlsym`, used to get a stable `CGWindowID` from
+an `AXUIElement` (the same trick yabai and Amethyst rely on, since there's
+no public API for it).
 
 - **Layouts** — dwindle (Hyprland), columns ("scroll"), stack (monocle),
   custom layouts from config templates
@@ -19,10 +22,12 @@ API — no private CGS/SkyLight, no SIP tampering.
 
 ```sh
 git clone https://github.com/wraithyy/ancre && cd ancre
-swift build
+swift build -c release
 Scripts/bundle.sh
 open .build/ancre.app
 ```
+
+Prefer Homebrew? See [Installation](/ancre/installation/).
 
 Grant **Accessibility** and **Input Monitoring** when asked — details in
 [Installation](/ancre/installation/). Then:
@@ -35,6 +40,19 @@ ancrectl state    # JSON snapshot of monitors, workspaces, windows
 ```
 
 Hold hyper for 2 s to see the full [shortcut cheatsheet](/ancre/controls/).
+
+## Known limitations
+
+- Offscreen parking (hiding windows for inactive workspaces) relies on how
+  macOS clamps AX window positions near screen edges — behavior that varies
+  by macOS version.
+- Animations auto-disable for apps whose AX responses are too slow to
+  animate smoothly.
+- No App Store distribution: ancre needs Accessibility access and remaps
+  CapsLock via `hidutil`, both outside the App Store sandbox.
+- The app is ad-hoc signed, not notarized — Gatekeeper is satisfied via the
+  Homebrew cask (or a manual quarantine clear from source), but there's no
+  Apple notarization ticket.
 
 ## Where next
 

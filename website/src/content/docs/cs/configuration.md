@@ -9,9 +9,18 @@ Config žije v `~/.config/ancre/ancre.toml` — vytvoří se z defaultů při pr
 spuštění. Kompletní katalog klíčů s typy, defaulty a povolenými hodnotami:
 [Config reference](/ancre/cs/config-reference/).
 
-Změny aplikuje **Reload config** v menubar menu (nebo `ancrectl reload-config`)
-bez restartu. Chyba v configu nikdy neshodí app — fallback na defaulty
-s warningem v logu.
+Změny aplikuje **Znovu načíst config** v menubar menu (nebo
+`ancrectl reload-config`) bez restartu. Chyba v configu nikdy neshodí app —
+fallback na defaulty s warningem v logu.
+
+:::caution
+*Chybějící* klíč je vždy bezpečný — doplní se jeho default a zbytek configu
+zůstane nedotčený. Klíč se *špatným typem* bezpečný není: shodí celé
+dekódování, takže se pro daný reload zahodí **celý** uživatelský config a
+všechno spadne na bundlované defaulty. Výjimkou jsou číselné klíče
+(`gaps-inner`, `gaps-outer`, `opacity`, `height`, …), které přijmou int
+i float a při jiné hodnotě použijí vlastní default.
+:::
 
 ## Přehled sekcí
 
@@ -38,7 +47,7 @@ s warningem v logu.
 gaps-inner = 8
 gaps-outer = 8
 animations = true
-animation-duration-ms = 180
+animation-duration-ms = 180   # tiše se clampne na 50-500 ms
 # Appky, které se animují špatně — placement okamžitě:
 # animations-exclude = ["com.microsoft.teams2"]
 default-layout = "dwindle"   # dwindle | scroll | stack (monocle)

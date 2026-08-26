@@ -33,7 +33,10 @@ Jedna cesta pro každou operaci, žádné obcházení.
 | `Sources/AXBridge` | AXUIElement/AXObserver, WindowTracker + delegate, DisplayManager (stabilní ID displayů + reconfigurace), OffscreenParking (parking workaround izolovaný ZDE — při rozbití macOS updatem se patchuje jen tento soubor) |
 | `Sources/InputSystem` | hidutil remap, CGEventTap. Nezávislý na WMCore — resolvuje jen binding stringy ("hyper-shift-h") přes callback |
 | `Sources/Config` | TOMLKit schema + loader, `~/.config/ancre/ancre.toml`, validace s warningy (nikdy crash na config typo) |
-| `App/` | main.swift + WindowManagerController (glue AX↔WMCore↔Input) |
+| `Sources/Animator` | animace přeskládávání oken, závisí na WMCore + AXBridge |
+| `Sources/Bar` | workspace bar (menu bar / pod notch), závisí na WMCore |
+| `App/` | executable target `ancre`: main.swift + WindowManagerController (glue AX↔WMCore↔Input) |
+| `ancrectl` | executable target, CLI klient (socket/MCP) |
 
 ## Threading — nejdůležitější invariant
 

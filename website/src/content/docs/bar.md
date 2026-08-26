@@ -8,6 +8,8 @@ sidebar:
 The bar shows workspaces with window icons and notification badges, and
 supports drag&drop. Everything is driven by the `[bar]` section.
 
+![The ancre workspace bar sitting in the menu bar, dark theme](../../assets/ancre-menubar-preview-dark.png)
+
 ## Position
 
 ```toml

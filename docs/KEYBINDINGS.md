@@ -6,6 +6,19 @@ Hyper = CapsLock (change the physical key via `[hyper].key`; `f13`–`f20`,
 `right_cmd`, `right_option` also work). Hold hyper ~2 s → cheatsheet overlay
 with every binding; using a shortcut resets the timer.
 
+Making CapsLock behave as hyper needs a `hidutil` remap (CapsLock→F18)
+applied at launch, plus Input Monitoring permission for the CGEventTap that
+reads key presses — without it, hyper does nothing. If ancre crashes before
+it can revert the remap, CapsLock stays stuck as F18; fix it with
+`hidutil property --set '{"UserKeyMapping":[]}'` (see
+[TROUBLESHOOTING.md](TROUBLESHOOTING.md)).
+
+`right_cmd` and `right_option` are usable as hyper but collide with system
+shortcuts: `right_cmd` overlaps Spotlight's default Cmd-Space-style
+bindings on some setups, and `right_option` overlaps the input-source
+switcher. Prefer CapsLock or an unused F-key unless you've disabled those
+system shortcuts.
+
 ## Defaults
 
 | Shortcut | Action |
@@ -36,8 +49,8 @@ and forth.
 Everything is rebindable in `[keybindings]`; your entries merge with the
 defaults and an empty string `""` unbinds a default. Any command from the
 [request grammar](SCRIPTING.md) can be bound, including `preset <name>`,
-`layout <custom>`, `open-config`, `switcher`, `hints`. (`reload-config` is
-IPC/menu-only — it is not a bindable command.)
+`preset-save <name>`, `layout <custom>`, `open-config`, `switcher`, `hints`.
+(`reload-config` is IPC/menu-only — it is not a bindable command.)
 
 ## Mouse
 
