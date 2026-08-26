@@ -231,7 +231,7 @@ final class WindowManagerController: WindowTrackerDelegate {
         if request.hasPrefix("arrange ") {
             guard let data = request.dropFirst("arrange ".count).data(using: .utf8),
                   let arrangement = try? JSONDecoder().decode(Arrangement.self, from: data) else {
-                return "error: arrange expects JSON {layouts?, apps?, active?}"
+                return "error: arrange expects JSON {layouts?, apps?, windows?, active?, focus?}"
             }
             return applyArrangement(arrangement)
         }

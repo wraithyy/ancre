@@ -7,14 +7,18 @@
 import Foundation
 
 /// One request line -> one response over the ancre unix socket.
-func sendToAncre(_ request: String) -> Result<String, String> {
+/// `stream: true` (subscribe) writes chunks to stdout as they arrive instead
+/// of buffering, and skips the read timeout — the stream lives until EOF.
+func sendToAncre(_ request: String, stream: Bool = false) -> Result<String, String> {
     let path = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/Application Support/ancre/ancre.sock").path
     let fd = socket(AF_UNIX, SOCK_STREAM, 0)
     guard fd >= 0 else { return .failure("socket() failed") }
     defer { close(fd) }
-    var timeout = timeval(tv_sec: 5, tv_usec: 0)
-    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
+    if !stream {
+        var timeout = timeval(tv_sec: 5, tv_usec: 0)
+        setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
+    }
 
     var addr = sockaddr_un()
     addr.sun_family = sa_family_t(AF_UNIX)
@@ -42,7 +46,11 @@ func sendToAncre(_ request: String) -> Result<String, String> {
     while true {
         let n = read(fd, &chunk, chunk.count)
         guard n > 0 else { break }
-        response.append(contentsOf: chunk[0..<n])
+        if stream {
+            FileHandle.standardOutput.write(Data(chunk[0..<n]))
+        } else {
+            response.append(contentsOf: chunk[0..<n])
+        }
     }
     return .success((String(data: response, encoding: .utf8) ?? "").trimmingCharacters(in: .newlines))
 }
@@ -60,7 +68,7 @@ if arguments == ["mcp"] {
     exit(0)
 }
 
-switch sendToAncre(arguments.joined(separator: " ")) {
+switch sendToAncre(arguments.joined(separator: " "), stream: arguments == ["subscribe"]) {
 case .success(let text):
     print(text)
     exit(text.hasPrefix("error") ? 1 : 0)
