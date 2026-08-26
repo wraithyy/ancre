@@ -98,12 +98,19 @@ private struct OnboardingView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("ancre")
-                    .font(.system(size: 28, weight: .bold))
-                Text(L10n.onboardingSubtitle)
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
+            HStack(spacing: 14) {
+                // Brand app icon (from the bundle's ancre.icns; generic icon
+                // when running the bare binary).
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .frame(width: 56, height: 56)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("ancre")
+                        .font(.system(size: 28, weight: .bold))
+                    Text(L10n.onboardingSubtitle)
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                }
             }
 
             VStack(spacing: 10) {

@@ -6,6 +6,8 @@
 	<string>com.ancre.wm</string>
 	<key>CFBundleName</key>
 	<string>ancre</string>
+	<key>CFBundleIconFile</key>
+	<string>ancre</string>
 	<key>CFBundleExecutable</key>
 	<string>ancre</string>
 	<key>CFBundlePackageType</key>

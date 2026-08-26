@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 22" role="img" aria-label="ancre menubar template">
+  <g fill="#000">
+    <path d="M4 4h7v2H6v5H4V4Z"/>
+    <path d="M18 18h-7v-2h5v-5h2v7Z"/>
+    <path d="m11 7 4 4-4 4-4-4 4-4Z"/>
+  </g>
+</svg>

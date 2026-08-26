@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 520" role="img" aria-label="ancre README header">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1280" y2="520" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0B0D12"/>
+      <stop offset=".68" stop-color="#10151E"/>
+      <stop offset="1" stop-color="#191827"/>
+    </linearGradient>
+    <linearGradient id="line" x1="96" y1="96" x2="1128" y2="416" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4C8DFF"/>
+      <stop offset=".58" stop-color="#65D1FF"/>
+      <stop offset="1" stop-color="#8F6AF6"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="520" fill="url(#bg)"/>
+  <path d="M95 95h362v18H113v260H95V95Z" fill="url(#line)" opacity=".9"/>
+  <path d="M1185 425H823v-18h344V147h18v278Z" fill="url(#line)" opacity=".9"/>
+  <g transform="translate(120 142) scale(3.5)" fill="#EDF0F5">
+    <path d="M8 8h23v6H14v17H8V8Z"/>
+    <path d="M56 56H33v-6h17V33h6v23Z"/>
+    <path d="m32 22 10 10-10 10-10-10 10-10Z"/>
+  </g>
+  <text x="390" y="236" fill="#EDF0F5" font-family="Geist, Inter, Helvetica Neue, Arial, sans-serif" font-size="96" font-weight="500" letter-spacing="0">ancre</text>
+  <text x="398" y="296" fill="#AEB6C4" font-family="Geist, Inter, Helvetica Neue, Arial, sans-serif" font-size="34" font-weight="400" letter-spacing="0">tiling window manager for macOS power users</text>
+  <g fill="#AEB6C4" font-family="JetBrains Mono, SFMono-Regular, Menlo, monospace" font-size="22">
+    <text x="400" y="360">fixed point</text>
+    <text x="560" y="360">keyboard first</text>
+    <text x="758" y="360">native</text>
+  </g>
+</svg>

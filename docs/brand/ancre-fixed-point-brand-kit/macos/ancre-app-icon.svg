@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="ancre macOS app icon">
+  <defs>
+    <linearGradient id="plate" x1="168" y1="86" x2="856" y2="938" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1B2230"/>
+      <stop offset=".58" stop-color="#0B0D12"/>
+      <stop offset="1" stop-color="#171C25"/>
+    </linearGradient>
+    <linearGradient id="mark" x1="316" y1="260" x2="708" y2="764" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F8FAFF"/>
+      <stop offset="1" stop-color="#C8CED8"/>
+    </linearGradient>
+    <filter id="shadow" x="200" y="210" width="624" height="624" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="34" stdDeviation="28" flood-color="#000000" flood-opacity=".42"/>
+    </filter>
+  </defs>
+  <rect x="64" y="64" width="896" height="896" rx="208" fill="url(#plate)"/>
+  <rect x="92" y="92" width="840" height="840" rx="184" fill="none" stroke="#2F3747" stroke-width="3"/>
+  <rect x="194" y="194" width="636" height="636" rx="104" fill="#10151E" stroke="#30394A" stroke-width="4"/>
+  <g filter="url(#shadow)" fill="url(#mark)">
+    <path d="M320 320h184v48H368v136h-48V320Z"/>
+    <path d="M704 704H520v-48h136V520h48v184Z"/>
+    <path d="m512 432 80 80-80 80-80-80 80-80Z"/>
+  </g>
+</svg>

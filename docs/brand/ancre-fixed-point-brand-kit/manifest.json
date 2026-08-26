@@ -1,0 +1,25 @@
+{
+  "name": "ancre fixed point brand kit",
+  "created": "2026-08-26",
+  "logo_direction": "fixed point",
+  "formats": {
+    "vector": ["svg", "pdf"],
+    "raster": ["png", "ico", "icns"]
+  },
+  "primary_files": {
+    "brand_manual": "brand-manual/ancre-brand-manual.md",
+    "typography": "brand-manual/typography-free-fonts.md",
+    "tokens_css": "design-system/tokens.css",
+    "tokens_json": "design-system/tokens.json",
+    "core_mark": "logo/mark/ancre-mark.svg",
+    "app_icon": "macos/ancre.appiconset",
+    "menubar_icon": "menubar/AncreMenuTemplate.svg",
+    "readme_header": "github/ancre-readme-header.svg",
+    "docs_web": "web/docs/index.html"
+  },
+  "font_sources": {
+    "Geist": "https://vercel.com/font",
+    "Inter": "https://rsms.me/inter/",
+    "JetBrains Mono": "https://www.jetbrains.com/lp/mono/"
+  }
+}

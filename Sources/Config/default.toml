@@ -114,8 +114,8 @@ offset-y = 0
 # align = "left"
 # icon-size = 17
 # Overrides of [theme] just for the bar:
-# background-color = "#1e1e2eCC"
-# accent-color = "#89b4fa"
+# background-color = "#151A23CC"
+# accent-color = "#4C8DFF"
 # Dashed ring marking floating windows (default white):
 # float-color = "#FFFFFF"
 # badge-color = "#FF3B30"
@@ -146,13 +146,13 @@ offset-y = 0
 
 # Shared colors ("#RRGGBB" / "#RRGGBBAA"); absent = system accent/material.
 # [theme]
-# accent = "#89b4fa"
-# background = "#1e1e2eCC"
+# accent = "#4C8DFF"
+# background = "#151A23CC"
 
 # Focus border around the focused window.
 # [border]
 # enabled = true
-# color = "#89b4fa"   # default: theme accent
+# color = "#4C8DFF"   # default: theme accent
 # width = 2
 # radius = 10         # default matches the system window corner radius
 
@@ -165,7 +165,7 @@ offset-y = 0
 
 # Drag&drop layout preview (hyper+drag).
 # [preview]
-# color = "#89b4fa"   # default: theme accent
+# color = "#4C8DFF"   # default: theme accent
 # opacity = 0.3       # fill of the dragged window's future slot
 
 # Per-workspace bar appearance + layout. All keys optional.

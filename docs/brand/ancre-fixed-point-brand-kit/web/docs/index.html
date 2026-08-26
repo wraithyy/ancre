@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ancre documentation</title>
+    <link rel="icon" href="../favicon/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <svg viewBox="0 0 64 64" aria-hidden="true">
+            <path fill="currentColor" d="M8 8h23v6H14v17H8V8Z"/>
+            <path fill="currentColor" d="M56 56H33v-6h17V33h6v23Z"/>
+            <path fill="currentColor" d="m32 22 10 10-10 10-10-10 10-10Z"/>
+          </svg>
+          <div class="brand-name">ancre</div>
+        </div>
+        <nav class="nav" aria-label="Documentation">
+          <a href="#start">Start</a>
+          <a href="#layouts">Layouts</a>
+          <a href="#commands">Commands</a>
+          <a href="#configuration">Configuration</a>
+          <a href="#brand">Brand</a>
+        </nav>
+      </aside>
+
+      <main class="content">
+        <header class="mast" id="start">
+          <div>
+            <h1>ancre</h1>
+            <p class="lede">A tiling window manager for macOS power users. Keep windows moving around a fixed point: the task in front of you.</p>
+            <div class="actions">
+              <a class="button primary" href="#commands">Quick start</a>
+              <a class="button" href="#configuration">Configure</a>
+            </div>
+          </div>
+          <div class="workspace" aria-label="Workspace preview">
+            <div class="grid">
+              <div class="tile large">
+                <div class="bar mid"></div>
+                <div class="bar"></div>
+                <div class="bar short"></div>
+              </div>
+              <div class="tile">
+                <div class="bar mid"></div>
+                <div class="bar short"></div>
+              </div>
+              <div class="tile">
+                <div class="bar"></div>
+                <div class="bar short"></div>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <div class="docs-grid">
+          <div>
+            <section id="layouts">
+              <h2>Layouts</h2>
+              <p>Use predictable tiling modes for coding, browsing, terminal work, and mixed-focus sessions.</p>
+              <pre><code>ancrectl layout dwindle
+ancrectl focus east
+ancrectl move west</code></pre>
+            </section>
+
+            <section id="commands">
+              <h2>Commands</h2>
+              <p>Expose every action through a small command surface that can be bound to keyboard shortcuts or scripts.</p>
+              <pre><code>ancrectl windows
+ancrectl workspace 2
+ancrectl reload</code></pre>
+            </section>
+
+            <section id="configuration">
+              <h2>Configuration</h2>
+              <p>Keep configuration readable. Defaults should be useful, overrides should be explicit.</p>
+              <pre><code>[layouts]
+default = "dwindle"
+
+[gaps]
+inner = 8
+outer = 10</code></pre>
+            </section>
+          </div>
+
+          <aside class="spec" id="brand">
+            <h3>Brand tokens</h3>
+            <div class="swatches">
+              <div class="swatch"><span class="chip" style="background:#0B0D12"></span><span>Ink</span><span>#0B0D12</span></div>
+              <div class="swatch"><span class="chip" style="background:#151A23"></span><span>Graphite</span><span>#151A23</span></div>
+              <div class="swatch"><span class="chip" style="background:#EDF0F5"></span><span>Frost</span><span>#EDF0F5</span></div>
+              <div class="swatch"><span class="chip" style="background:#4C8DFF"></span><span>Blue</span><span>#4C8DFF</span></div>
+              <div class="swatch"><span class="chip" style="background:#65D1FF"></span><span>Cyan</span><span>#65D1FF</span></div>
+              <div class="swatch"><span class="chip" style="background:#8F6AF6"></span><span>Violet</span><span>#8F6AF6</span></div>
+              <div class="swatch"><span class="chip" style="background:#C8A96B"></span><span>Brass</span><span>#C8A96B</span></div>
+            </div>
+          </aside>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>

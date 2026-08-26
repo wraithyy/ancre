@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 64" role="img" aria-label="ancre menubar preview">
+  <rect width="160" height="64" rx="14" fill="#0B0D12"/>
+  <rect x="16" y="13" width="38" height="38" rx="9" fill="#151A23" stroke="#30394A"/>
+  <g transform="translate(24 21)" fill="#EDF0F5">
+    <path d="M4 4h7v2H6v5H4V4Z"/>
+    <path d="M18 18h-7v-2h5v-5h2v7Z"/>
+    <path d="m11 7 4 4-4 4-4-4 4-4Z"/>
+  </g>
+  <circle cx="74" cy="32" r="3" fill="#4C8DFF"/>
+  <rect x="88" y="28" width="48" height="8" rx="4" fill="#323A49"/>
+</svg>

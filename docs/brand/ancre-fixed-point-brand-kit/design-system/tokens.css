@@ -1,0 +1,57 @@
+:root {
+  color-scheme: dark light;
+
+  --ancre-ink: #0b0d12;
+  --ancre-graphite: #151a23;
+  --ancre-panel: #1c2230;
+  --ancre-rule: #30394a;
+  --ancre-frost: #edf0f5;
+  --ancre-muted: #aeb6c4;
+
+  --ancre-blue: #4c8dff;
+  --ancre-cyan: #65d1ff;
+  --ancre-violet: #8f6af6;
+  --ancre-brass: #c8a96b;
+
+  --ancre-danger: #ff6262;
+  --ancre-warning: #f2c14e;
+  --ancre-success: #5bd68d;
+
+  --ancre-font-brand: "Geist", "Inter", "Helvetica Neue", Arial, sans-serif;
+  --ancre-font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Geist", "Inter", sans-serif;
+  --ancre-font-mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+
+  --ancre-radius-xs: 4px;
+  --ancre-radius-sm: 6px;
+  --ancre-radius-md: 8px;
+  --ancre-radius-lg: 14px;
+
+  --ancre-space-1: 4px;
+  --ancre-space-2: 8px;
+  --ancre-space-3: 12px;
+  --ancre-space-4: 16px;
+  --ancre-space-5: 24px;
+  --ancre-space-6: 32px;
+  --ancre-space-7: 48px;
+  --ancre-space-8: 64px;
+
+  --ancre-shadow-panel: 0 18px 48px rgb(0 0 0 / 0.28);
+  --ancre-focus-ring: 0 0 0 3px rgb(76 141 255 / 0.42);
+}
+
+.ancre-docs-theme {
+  background: var(--ancre-ink);
+  color: var(--ancre-frost);
+  font-family: var(--ancre-font-ui);
+}
+
+.ancre-mark {
+  color: var(--ancre-frost);
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.ancre-command {
+  font-family: var(--ancre-font-mono);
+  color: var(--ancre-cyan);
+}

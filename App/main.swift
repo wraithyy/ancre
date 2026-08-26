@@ -13,13 +13,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        statusItem.button?.title = "◱"
+        statusItem.button?.image = AppDelegate.menubarIcon(paused: false)
+        statusItem.button?.imagePosition = .imageLeft
         buildMenu()
         startWhenTrusted()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         controller?.stop()
+    }
+
+    /// Brand menubar mark drawn from the AncreMenuTemplate.svg geometry
+    /// (22x22: two corner brackets + center diamond). Normal state is a
+    /// template image so macOS tints it; paused swaps to a non-template
+    /// variant whose diamond is brand danger red (brackets follow
+    /// labelColor, resolved per appearance at draw time).
+    static func menubarIcon(paused: Bool) -> NSImage {
+        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: true) { rect in
+            let s = rect.width / 22.0
+            func polygon(_ points: [(CGFloat, CGFloat)]) -> NSBezierPath {
+                let path = NSBezierPath()
+                path.move(to: NSPoint(x: points[0].0 * s, y: points[0].1 * s))
+                for point in points.dropFirst() {
+                    path.line(to: NSPoint(x: point.0 * s, y: point.1 * s))
+                }
+                path.close()
+                return path
+            }
+            let brackets = [
+                polygon([(4, 4), (11, 4), (11, 6), (6, 6), (6, 11), (4, 11)]),
+                polygon([(18, 18), (11, 18), (11, 16), (16, 16), (16, 11), (18, 11)]),
+            ]
+            let diamond = polygon([(11, 7), (15, 11), (11, 15), (7, 11)])
+            (paused ? NSColor.labelColor : .black).setFill()
+            brackets.forEach { $0.fill() }
+            (paused ? NSColor(red: 1.0, green: 0.384, blue: 0.384, alpha: 1.0) : .black).setFill()
+            diamond.fill()
+            return true
+        }
+        image.isTemplate = !paused
+        return image
     }
 
     /// Rebuilt after the controller starts so titles use the config language.
@@ -118,8 +151,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let controller = WindowManagerController(config: config)
         controller.onTilingPausedChanged = { [weak self] paused in
             self?.pauseItem?.state = paused ? .on : .off
-            // Paused tiling is visible at a glance on the status item.
-            self?.statusItem.button?.title = paused ? "◱✕" : "◱"
+            // Paused tiling is visible at a glance: the anchor diamond
+            // in the menubar mark turns red.
+            self?.statusItem.button?.image = AppDelegate.menubarIcon(paused: paused)
         }
         controller.start()
         self.controller = controller
