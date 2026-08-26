@@ -2,4 +2,3 @@
 .swiftpm/
 *.xcodeproj
 .DS_Store
-mcp/node_modules/

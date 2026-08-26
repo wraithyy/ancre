@@ -906,7 +906,12 @@ final class WindowManagerController: WindowTrackerDelegate {
     private struct Arrangement: Codable {
         var layouts: [String: String]?
         var apps: [String: String]?
+        /// Specific windows (id from state, as string keys) -> workspace —
+        /// finer than `apps` when one app's windows should split up.
+        var windows: [String: String]?
         var active: [String]?
+        /// Window to focus at the end.
+        var focus: UInt32?
     }
 
     private static var presetsURL: URL {
@@ -959,8 +964,21 @@ final class WindowManagerController: WindowTrackerDelegate {
                 execute(WM.moveWindow(wid, toWorkspace: workspaceName, state: &state))
             }
         }
+        for (idString, workspaceName) in arrangement.windows ?? [:] {
+            guard let raw = UInt32(idString), state.windows[WindowID(raw)] != nil,
+                  state.locate(workspace: workspaceName) != nil else { continue }
+            execute(WM.moveWindow(WindowID(raw), toWorkspace: workspaceName, state: &state))
+        }
         for workspaceName in arrangement.active ?? [] {
             run(.workspace(workspaceName))
+        }
+        if let focus = arrangement.focus, state.windows[WindowID(focus)] != nil {
+            let wid = WindowID(focus)
+            if let location = state.windowLocation[wid] {
+                run(.workspace(location.workspaceName))
+            }
+            execute(WM.focusChangedExternally(wid, state: &state))
+            execute([.focusWindow(wid)])
         }
         return "ok"
     }

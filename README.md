@@ -98,8 +98,8 @@ ancrectl reload-config
 
 Odpověď `ok`, `error: ...` (exit 1), nebo JSON.
 
-**MCP server** (`mcp/index.js`, registrace
-`claude mcp add ancre --scope user -- node .../mcp/index.js`): tools
+**MCP server** je vestavěný v CLI — registrace:
+`claude mcp add ancre --scope user -- ancrectl mcp` (žádný Node). Tools:
 `ancre_state`, `ancre_command`, `ancre_move_window`,
 `ancre_focus_window`, `ancre_set_floating`. Agent tak umí „připrav mi
 workspace na review" — najde okna podle titulů/bundle ID a přeuspořádá je.

@@ -97,7 +97,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // The onboarding renders before the controller sets the language.
         L10n.language = ConfigLoader.load().config.general.language
         let status = PermissionsModel.check()
-        if status.accessibility && status.input {
+        // `--onboarding` forces the window even with permissions granted
+        // (testing, screenshots).
+        let forced = CommandLine.arguments.contains("--onboarding")
+        if !forced, status.accessibility && status.input {
             startWindowManager()
             return
         }

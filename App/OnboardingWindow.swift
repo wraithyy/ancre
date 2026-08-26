@@ -66,7 +66,7 @@ final class OnboardingWindow {
     func show(onStart: @escaping () -> Void) {
         model.startPolling()
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 480, height: 560),
+            contentRect: NSRect(x: 0, y: 0, width: 480, height: 590),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -143,10 +143,11 @@ private struct OnboardingView: View {
             Label(L10n.onboardingAI, systemImage: "sparkles")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
-
+                .fixedSize(horizontal: false, vertical: true) // wrap, don't ellipsize
             Label(L10n.onboardingRemapWarning, systemImage: "keyboard")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
 
             Spacer()
 
@@ -162,7 +163,7 @@ private struct OnboardingView: View {
             }
         }
         .padding(24)
-        .frame(width: 480, height: 560)
+        .frame(width: 480, height: 590)
     }
 }
 

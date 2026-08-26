@@ -90,7 +90,7 @@ public enum L10n {
         "tip_resize": "resize — neighbors adjust",
         "tip_hold_key": "hold hyper",
         "tip_hold": "cheatsheet with every shortcut",
-        "onboarding_ai": "AI ready: the `ancrectl` CLI and an MCP server (mcp/) let agents inspect and arrange your windows — register with: claude mcp add ancre -- node <repo>/mcp/index.js",
+        "onboarding_ai": "AI ready: agents can inspect and arrange your windows via the ancrectl CLI or its built-in MCP server — register with: claude mcp add ancre -- ancrectl mcp",
     ]
 
     private static let tables: [String: [String: String]] = [
@@ -128,7 +128,7 @@ public enum L10n {
             "tip_resize": "resize — sousedi se přizpůsobí",
             "tip_hold_key": "podržet hyper",
             "tip_hold": "nápověda se všemi zkratkami",
-            "onboarding_ai": "AI ready: CLI `ancrectl` a MCP server (mcp/) — agenti můžou okna číst i přeskládat. Registrace: claude mcp add ancre -- node <repo>/mcp/index.js",
+            "onboarding_ai": "AI ready: agenti můžou okna číst i přeskládat přes CLI ancrectl nebo jeho vestavěný MCP server. Registrace: claude mcp add ancre -- ancrectl mcp",
         ],
     ]
 }

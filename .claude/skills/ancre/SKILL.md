@@ -12,7 +12,7 @@ command bus, exposed on a unix socket (`~/Library/Application Support/ancre/ancr
 
 1. **CLI**: `ancrectl <request>` (built at `.build/debug/ancrectl` in
    the repo, or on PATH if installed)
-2. **MCP tools** (server `ancre`): `ancre_state`, `ancre_command`,
+2. **MCP tools** (server `ancre`, vestavěný: `ancrectl mcp`): `ancre_state`, `ancre_command`,
    `ancre_move_window`, `ancre_focus_window`, `ancre_set_floating`
 
 Prefer MCP tools when available; the CLI is the fallback.
