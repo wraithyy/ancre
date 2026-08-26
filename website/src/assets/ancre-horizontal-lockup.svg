@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 96" role="img" aria-label="ancre">
+  <rect width="320" height="96" fill="none"/>
+  <g transform="translate(18 16)" fill="#EDF0F5">
+    <path d="M8 8h23v6H14v17H8V8Z"/>
+    <path d="M56 56H33v-6h17V33h6v23Z"/>
+    <path d="m32 22 10 10-10 10-10-10 10-10Z"/>
+  </g>
+  <text x="102" y="61" fill="#EDF0F5" font-family="Geist, Inter, Helvetica Neue, Arial, sans-serif" font-size="48" font-weight="500" letter-spacing="0">ancre</text>
+</svg>

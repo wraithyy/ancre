@@ -1,0 +1,44 @@
+---
+title: ancre
+description: Hyprland-inspired tiling window manager for macOS — pure public Accessibility API, no SIP tampering.
+---
+
+Hyprland-inspired tiling window manager for macOS. Pure public Accessibility
+API — no private CGS/SkyLight, no SIP tampering.
+
+- **Layouts** — dwindle (Hyprland), columns ("scroll"), stack (monocle),
+  custom layouts from config templates
+- **Workspaces 1–9** across monitors with stable assignment (survives replug)
+- **Workspace bar** — window icons, drag&drop, notification badges; positions
+  include the menu bar and the notch
+- **Hyper key** (CapsLock) for every shortcut + mouse modes (hyper+drag)
+- **AI ready** — unix socket + `ancrectl` CLI + built-in MCP server +
+  Claude skill
+
+## Quick start
+
+```sh
+git clone https://github.com/wraithyy/ancre && cd ancre
+swift build
+Scripts/bundle.sh
+open .build/ancre.app
+```
+
+Grant **Accessibility** and **Input Monitoring** when asked — details in
+[Installation](/ancre/installation/). Then:
+
+```sh
+hyper+1..9        # switch workspace     (hyper = CapsLock)
+hyper+h/j/k/l     # focus in direction
+hyper+t           # scroll layout
+ancrectl state    # JSON snapshot of monitors, workspaces, windows
+```
+
+Hold hyper for 2 s to see the full [shortcut cheatsheet](/ancre/controls/).
+
+## Where next
+
+- [Installation](/ancre/installation/) — build, permissions, first launch
+- [Controls](/ancre/controls/) — shortcuts, mouse modes, workspace bar
+- [Configuration](/ancre/configuration/) — `ancre.toml`, live reload
+- [Scripting & AI](/ancre/scripting/) — `ancrectl`, MCP server, Claude skill

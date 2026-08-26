@@ -1,0 +1,44 @@
+---
+title: ancre
+description: Hyprland-inspired tiling window manager pro macOS — čisté veřejné Accessibility API, žádný zásah do SIP.
+---
+
+Hyprland-inspired tiling window manager pro macOS. Čisté veřejné Accessibility
+API — žádné privátní CGS/SkyLight, žádný zásah do SIP.
+
+- **Layouty** — dwindle (Hyprland), columns („scroll"), stack (monocle),
+  vlastní layouty ze šablon v configu
+- **Workspaces 1–9** napříč monitory se stabilním přiřazením (přežije replug)
+- **Workspace bar** — ikonky oken, drag&drop, badge notifikací; pozice včetně
+  menubaru a notche
+- **Hyper klávesa** (CapsLock) pro všechny zkratky + myší módy (hyper+drag)
+- **AI ready** — unix socket + `ancrectl` CLI + vestavěný MCP server +
+  Claude skill
+
+## Quick start
+
+```sh
+git clone https://github.com/wraithyy/ancre && cd ancre
+swift build
+Scripts/bundle.sh
+open .build/ancre.app
+```
+
+Povol **Accessibility** a **Input Monitoring** — detaily
+v [Instalaci](/ancre/cs/installation/). Pak:
+
+```sh
+hyper+1..9        # přepnutí workspace   (hyper = CapsLock)
+hyper+h/j/k/l     # fokus směrem
+hyper+t           # scroll layout
+ancrectl state    # JSON snapshot monitorů, workspaces a oken
+```
+
+Podržení hyperu 2 s zobrazí celý [cheatsheet zkratek](/ancre/cs/controls/).
+
+## Kam dál
+
+- [Instalace](/ancre/cs/installation/) — build, permissions, první spuštění
+- [Ovládání](/ancre/cs/controls/) — zkratky, myší módy, workspace bar
+- [Konfigurace](/ancre/cs/configuration/) — `ancre.toml`, reload za běhu
+- [Skriptování a AI](/ancre/cs/scripting/) — `ancrectl`, MCP server, Claude skill

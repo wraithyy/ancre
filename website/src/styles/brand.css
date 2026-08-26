@@ -1,0 +1,43 @@
+/* ancre fixed-point brand — docs/brand/ancre-fixed-point-brand-kit */
+@import '@fontsource/geist-sans/400.css';
+@import '@fontsource/geist-sans/500.css';
+@import '@fontsource/geist-sans/600.css';
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
+
+:root {
+  --sl-font: 'Geist Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --sl-font-mono: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+
+  /* dark theme (default): Ink / Graphite / Panel / Rule / Frost / Muted */
+  --sl-color-accent-low: #16263f;
+  --sl-color-accent: #4c8dff;
+  --sl-color-accent-high: #a8c7ff;
+  --sl-color-white: #edf0f5;
+  --sl-color-gray-1: #dfe4ec;
+  --sl-color-gray-2: #aeb6c4;
+  --sl-color-gray-3: #8791a1;
+  --sl-color-gray-4: #30394a;
+  --sl-color-gray-5: #1c2230;
+  --sl-color-gray-6: #151a23;
+  --sl-color-black: #0b0d12;
+
+  /* cyan = navigation/focus */
+  --sl-color-text-accent: #65d1ff;
+}
+
+:root[data-theme='light'] {
+  --sl-color-accent-low: #d8e5ff;
+  --sl-color-accent: #2f6fe0;
+  --sl-color-accent-high: #1c3f80;
+  --sl-color-white: #0b0d12;
+  --sl-color-gray-1: #1c2230;
+  --sl-color-gray-2: #30394a;
+  --sl-color-gray-3: #5c677c;
+  --sl-color-gray-4: #aeb6c4;
+  --sl-color-gray-5: #dfe4ec;
+  --sl-color-gray-6: #f3f5f9;
+  --sl-color-gray-7: #f9fafc;
+  --sl-color-black: #ffffff;
+  --sl-color-text-accent: #1f7ea8;
+}
