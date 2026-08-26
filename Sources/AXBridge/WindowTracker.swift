@@ -245,12 +245,4 @@ public final class WindowTracker {
             completion(Array(windowCache.values))
         }
     }
-
-    // MARK: - Debug
-
-    var debugSnapshot: [(id: AXWindowID, pid: pid_t, title: String, frame: AXFrame)] {
-        AXRunLoopThread.shared.sync {
-            windowCache.values.map { ($0.id, $0.pid, $0.title, frameCache[$0.id] ?? $0.frame) }
-        }
-    }
 }

@@ -165,6 +165,35 @@ final class SetFloatingTests: XCTestCase {
     }
 }
 
+final class LayoutSwitchOrderTests: XCTestCase {
+    // Switching layouts must keep windows in their VISUAL (reading) order —
+    // even after swaps desynced the layout's internal insertion order.
+    func testSwitchPreservesGeometricOrderAfterSwaps() {
+        var (state, ids) = makeState(windowCount: 3)
+        state.monitors[0].workspaces[0].focusedWindow = ids[0]
+        _ = WM.dispatch(.move(.right), state: &state) // swap 0 with its right neighbor
+
+        let before = frames(state)
+        let readingOrder = ids.sorted { a, b in
+            let fa = before[a]!, fb = before[b]!
+            return abs(fa.minX - fb.minX) > 1 ? fa.minX < fb.minX : fa.minY < fb.minY
+        }
+
+        _ = WM.setLayout(ScrollColumnsLayout(), workspaceNamed: "1", state: &state)
+
+        XCTAssertEqual(state.monitors[0].activeWorkspace.tiledWindows, readingOrder,
+                       "columns must line up in the pre-switch reading order")
+    }
+
+    func testDwindleMoveKeepsOrderInSync() {
+        var (state, ids) = makeState(windowCount: 2)
+        state.monitors[0].workspaces[0].focusedWindow = ids[0]
+        _ = WM.dispatch(.move(.right), state: &state)
+        XCTAssertEqual(state.monitors[0].activeWorkspace.tiledWindows, [ids[1], ids[0]],
+                       "swap must be reflected in orderedWindows")
+    }
+}
+
 final class MoveWindowTests: XCTestCase {
     // Bar drag&drop moves arbitrary windows, not just the focused one.
     func testMoveUnfocusedWindowToOtherWorkspaceKeepsSourceFocus() {

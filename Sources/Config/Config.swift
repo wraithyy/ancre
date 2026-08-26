@@ -9,6 +9,14 @@ import Foundation
 import TOMLKit
 import WMCore
 
+/// TOML integers (`8`) don't coerce to Double in TOMLKit; users naturally
+/// write sizes without a decimal point. nil = key absent/not a number.
+private func lenientDouble<K: CodingKey>(_ c: KeyedDecodingContainer<K>, _ key: K) -> Double? {
+    if let d = try? c.decode(Double.self, forKey: key) { return d }
+    if let i = try? c.decode(Int.self, forKey: key) { return Double(i) }
+    return nil
+}
+
 public struct AppConfig: Codable {
     public struct General: Codable {
         public var gapsInner: Double
@@ -20,6 +28,9 @@ public struct AppConfig: Codable {
         public var animationsExclude: [String]
         /// UI language for bar menus/tooltips ("en", "cs"); default "en".
         public var language: String
+        /// When macOS activates an app (URL opened in the browser...), switch
+        /// to that window's workspace like stock macOS would show it.
+        public var followNativeFocus: Bool
 
         enum CodingKeys: String, CodingKey {
             case gapsInner = "gaps-inner"
@@ -29,26 +40,19 @@ public struct AppConfig: Codable {
             case defaultLayout = "default-layout"
             case animationsExclude = "animations-exclude"
             case language
+            case followNativeFocus = "follow-native-focus"
         }
 
         public init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
-            // TOML `8` is an integer and TOMLKit won't coerce it to Double;
-            // users naturally write gaps without a decimal point.
-            gapsInner = try Self.lenientDouble(c, .gapsInner)
-            gapsOuter = try Self.lenientDouble(c, .gapsOuter)
+            gapsInner = lenientDouble(c, .gapsInner) ?? 8
+            gapsOuter = lenientDouble(c, .gapsOuter) ?? 8
             animations = try c.decode(Bool.self, forKey: .animations)
             animationDurationMs = try c.decode(Int.self, forKey: .animationDurationMs)
             defaultLayout = try c.decode(String.self, forKey: .defaultLayout)
             animationsExclude = try c.decodeIfPresent([String].self, forKey: .animationsExclude) ?? []
             language = try c.decodeIfPresent(String.self, forKey: .language) ?? "en"
-        }
-
-        private static func lenientDouble(
-            _ c: KeyedDecodingContainer<CodingKeys>, _ key: CodingKeys
-        ) throws -> Double {
-            if let d = try? c.decode(Double.self, forKey: key) { return d }
-            return Double(try c.decode(Int.self, forKey: key))
+            followNativeFocus = try c.decodeIfPresent(Bool.self, forKey: .followNativeFocus) ?? true
         }
     }
 
@@ -128,37 +132,29 @@ public struct AppConfig: Codable {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             enabled = try c.decode(Bool.self, forKey: .enabled)
             position = try c.decode(String.self, forKey: .position)
-            opacity = try Self.lenientDouble(c, .opacity) ?? 1.0
-            height = try Self.lenientDouble(c, .height) ?? 28
+            opacity = lenientDouble(c, .opacity) ?? 1.0
+            height = lenientDouble(c, .height) ?? 28
             align = try c.decodeIfPresent(String.self, forKey: .align) ?? "center"
-            offsetX = try Self.lenientDouble(c, .offsetX) ?? 0
-            offsetY = try Self.lenientDouble(c, .offsetY) ?? 0
+            offsetX = lenientDouble(c, .offsetX) ?? 0
+            offsetY = lenientDouble(c, .offsetY) ?? 0
             backgroundColor = try c.decodeIfPresent(String.self, forKey: .backgroundColor)
             accentColor = try c.decodeIfPresent(String.self, forKey: .accentColor)
             floatColor = try c.decodeIfPresent(String.self, forKey: .floatColor)
             badgeColor = try c.decodeIfPresent(String.self, forKey: .badgeColor)
-            iconSize = try Self.lenientDouble(c, .iconSize) ?? 17
-            fontSize = try Self.lenientDouble(c, .fontSize) ?? 13
+            iconSize = lenientDouble(c, .iconSize) ?? 17
+            fontSize = lenientDouble(c, .fontSize) ?? 13
             fontFamily = try c.decodeIfPresent(String.self, forKey: .fontFamily)
-            spacing = try Self.lenientDouble(c, .spacing) ?? 6
-            cellSpacing = try Self.lenientDouble(c, .cellSpacing) ?? 4
-            cellRadius = try Self.lenientDouble(c, .cellRadius) ?? 6
-            cellPaddingX = try Self.lenientDouble(c, .cellPaddingX) ?? 8
-            cellPaddingY = try Self.lenientDouble(c, .cellPaddingY) ?? 3
-            pillPaddingX = try Self.lenientDouble(c, .pillPaddingX) ?? 10
-            pillPaddingY = try Self.lenientDouble(c, .pillPaddingY) ?? 3
-            activeOpacity = try Self.lenientDouble(c, .activeOpacity) ?? 0.55
-            inactiveIconOpacity = try Self.lenientDouble(c, .inactiveIconOpacity) ?? 0.75
-            ringWidth = try Self.lenientDouble(c, .ringWidth) ?? 1.5
+            spacing = lenientDouble(c, .spacing) ?? 6
+            cellSpacing = lenientDouble(c, .cellSpacing) ?? 4
+            cellRadius = lenientDouble(c, .cellRadius) ?? 6
+            cellPaddingX = lenientDouble(c, .cellPaddingX) ?? 8
+            cellPaddingY = lenientDouble(c, .cellPaddingY) ?? 3
+            pillPaddingX = lenientDouble(c, .pillPaddingX) ?? 10
+            pillPaddingY = lenientDouble(c, .pillPaddingY) ?? 3
+            activeOpacity = lenientDouble(c, .activeOpacity) ?? 0.55
+            inactiveIconOpacity = lenientDouble(c, .inactiveIconOpacity) ?? 0.75
+            ringWidth = lenientDouble(c, .ringWidth) ?? 1.5
             maxIcons = try c.decodeIfPresent(Int.self, forKey: .maxIcons) ?? 6
-        }
-
-        private static func lenientDouble(
-            _ c: KeyedDecodingContainer<CodingKeys>, _ key: CodingKeys
-        ) throws -> Double? {
-            if let d = try? c.decode(Double.self, forKey: key) { return d }
-            if let i = try? c.decode(Int.self, forKey: key) { return Double(i) }
-            return nil
         }
     }
 
@@ -385,7 +381,8 @@ public enum ConfigLoader {
             config.general.gapsInner = max(0, config.general.gapsInner)
             config.general.gapsOuter = max(0, config.general.gapsOuter)
         }
-        if LayoutKind(rawValue: config.general.defaultLayout) == nil {
+        let knownLayouts = Set(["dwindle", "scroll"]).union(config.customLayouts?.keys ?? [:].keys)
+        if !knownLayouts.contains(config.general.defaultLayout) {
             warnings.append("config: unknown default-layout \"\(config.general.defaultLayout)\", using \"\(defaults.general.defaultLayout)\"")
             config.general.defaultLayout = defaults.general.defaultLayout
         }

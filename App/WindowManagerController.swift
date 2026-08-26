@@ -86,6 +86,10 @@ final class WindowManagerController: WindowTrackerDelegate {
         let isNative: Bool
         var lastLocation: CGPoint
         var action: DropAction?
+        /// Where `action` was last computed — mouse events fire far more often
+        /// than visually distinct positions, so the layout simulation only
+        /// reruns after the cursor moves a few points.
+        var lastActionLocation: CGPoint?
     }
     private var mouseDrag: MouseDragState?
     /// Placement effects bypass animation (live mouse resize). (axQueue)
@@ -683,7 +687,10 @@ final class WindowManagerController: WindowTrackerDelegate {
                 frame.origin.x += dx
                 frame.origin.y += dy
                 _ = ax.setFrame(frame)
-                drag.action = updateDropAction(for: drag, at: location)
+                if drag.lastActionLocation == nil || abs(location.x - drag.lastActionLocation!.x) >= 5 || abs(location.y - drag.lastActionLocation!.y) >= 5 {
+                    drag.action = updateDropAction(for: drag, at: location)
+                    drag.lastActionLocation = location
+                }
             } else if state.windows[drag.window]?.isFloating == true {
                 frame.size.width = max(100, frame.size.width + dx)
                 frame.size.height = max(100, frame.size.height + dy)
@@ -1059,7 +1066,17 @@ final class WindowManagerController: WindowTrackerDelegate {
 
     func windowFocused(id: AXWindowID) {
         guard axWindows[id] != nil else { return }
-        execute(WM.focusChangedExternally(WindowID(id), state: &state))
+        let wid = WindowID(id)
+        // Follow native focus: when macOS activates an app (a URL clicked in
+        // Teams opening the browser...), pull that window's workspace into
+        // view instead of leaving the window parked on a hidden one.
+        if config.general.followNativeFocus,
+           let location = state.windowLocation[wid],
+           state.monitors.indices.contains(location.monitorIndex),
+           state.monitors[location.monitorIndex].activeWorkspace.name != location.workspaceName {
+            run(.workspace(location.workspaceName))
+        }
+        execute(WM.focusChangedExternally(wid, state: &state))
         updateFocusBorder()
         updateBar()
     }
@@ -1145,7 +1162,10 @@ final class WindowManagerController: WindowTrackerDelegate {
             if drag.button == .left {
                 if let location = Self.mouseLocation() {
                     drag.lastLocation = location
-                    drag.action = updateDropAction(for: drag, at: location)
+                    if drag.lastActionLocation == nil || abs(location.x - drag.lastActionLocation!.x) >= 5 || abs(location.y - drag.lastActionLocation!.y) >= 5 {
+                        drag.action = updateDropAction(for: drag, at: location)
+                        drag.lastActionLocation = location
+                    }
                     mouseDrag = drag
                 }
             } else {
@@ -1203,6 +1223,7 @@ final class WindowManagerController: WindowTrackerDelegate {
                 instantPlacement = false
             } else {
                 drag.action = updateDropAction(for: drag, at: location)
+                drag.lastActionLocation = location
             }
             mouseDrag = drag
             return

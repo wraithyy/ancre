@@ -10,6 +10,9 @@ animation-duration-ms = 180
 default-layout = "dwindle"   # dwindle | scroll
 # UI language for bar menus/tooltips: "en" (default) | "cs"
 # language = "en"
+# Follow native focus: when macOS activates an app (URL opened from another
+# app...), switch to that window's workspace. Default on.
+# follow-native-focus = true
 
 [hyper]
 # Physical key remapped to act as the hyper modifier.

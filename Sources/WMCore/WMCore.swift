@@ -81,11 +81,6 @@ public extension Layout {
     mutating func swapPositions(_ a: WindowID, _ b: WindowID) {}
 }
 
-public enum LayoutKind: String {
-    case dwindle
-    case scroll // reserved for a later milestone; not implemented yet
-}
-
 /// Picks the id whose rect center is nearest `from`'s center among
 /// `candidates` that actually lie in `direction`. Shared by `WM.dispatch(.focus)`
 /// and by `Layout.move` implementations so both use identical geometry.
@@ -140,16 +135,14 @@ public struct WindowNode {
 
 public struct Workspace {
     public var name: String
-    public var layoutKind: LayoutKind
     public var layout: any Layout
     /// Floating windows keep their own frame instead of participating in `layout`.
     public var floatingFrames: [WindowID: CGRect]
     public var focusedWindow: WindowID?
 
-    public init(name: String, layout: any Layout, layoutKind: LayoutKind = .dwindle, floatingFrames: [WindowID: CGRect] = [:], focusedWindow: WindowID? = nil) {
+    public init(name: String, layout: any Layout, floatingFrames: [WindowID: CGRect] = [:], focusedWindow: WindowID? = nil) {
         self.name = name
         self.layout = layout
-        self.layoutKind = layoutKind
         self.floatingFrames = floatingFrames
         self.focusedWindow = focusedWindow
     }
@@ -360,8 +353,18 @@ public enum WM {
             state.windows[window]?.isFloating = false
             state.autoFloated.remove(window)
         }
+        // Transplant in GEOMETRIC (reading) order — left to right, top to
+        // bottom — so windows land where they visually were, not in a stale
+        // insertion order.
+        let currentFrames = allFrames(for: workspace, monitor: monitor, state: state)
+        let orderedTiled = workspace.tiledWindows.sorted { a, b in
+            let fa = currentFrames[a] ?? .zero
+            let fb = currentFrames[b] ?? .zero
+            if abs(fa.minX - fb.minX) > 1 { return fa.minX < fb.minX }
+            return fa.minY < fb.minY
+        }
         var layout = newLayout
-        for window in workspace.tiledWindows + retryFloats.sorted(by: { $0.rawValue < $1.rawValue }) {
+        for window in orderedTiled + retryFloats.sorted(by: { $0.rawValue < $1.rawValue }) {
             layout.insert(window, after: layout.orderedWindows.last, container: monitor.visibleFrame, innerGap: state.innerGap, outerGap: state.outerGap)
         }
         workspace.layout = layout

@@ -136,9 +136,9 @@ public struct BarTheme {
 
     public init() {}
 
-    func font(size: Double, weight: Font.Weight, monospaced: Bool = false) -> Font {
+    func font(size: Double, weight: Font.Weight) -> Font {
         if let fontFamily { return .custom(fontFamily, size: size).weight(weight) }
-        return .system(size: size, weight: weight, design: monospaced ? .monospaced : .default)
+        return .system(size: size, weight: weight)
     }
 }
 
@@ -185,22 +185,27 @@ public final class BarController {
             let window = windows[snapshot.monitorID] ?? makeWindow()
             windows[snapshot.monitorID] = window
             window.setFrame(snapshot.barFrame, display: true)
-            window.contentView = NSHostingView(
-                rootView: BarView(
-                    workspaces: snapshot.workspaces,
-                    allWorkspaceNames: snapshot.allWorkspaceNames,
-                    availableLayouts: snapshot.availableLayouts,
-                    isFocused: snapshot.isFocusedMonitor,
-                    theme: theme,
-                    onSelect: onSelect,
-                    onMoveWindow: onMoveWindow,
-                    onMoveFocusedWindow: onMoveFocusedWindow,
-                    onFocusWindow: onFocusWindow,
-                    onSetLayout: onSetLayout,
-                    onToggleFloat: onToggleFloat,
-                    onToggleFullscreen: onToggleFullscreen
-                )
+            let rootView = BarView(
+                workspaces: snapshot.workspaces,
+                allWorkspaceNames: snapshot.allWorkspaceNames,
+                availableLayouts: snapshot.availableLayouts,
+                isFocused: snapshot.isFocusedMonitor,
+                theme: theme,
+                onSelect: onSelect,
+                onMoveWindow: onMoveWindow,
+                onMoveFocusedWindow: onMoveFocusedWindow,
+                onFocusWindow: onFocusWindow,
+                onSetLayout: onSetLayout,
+                onToggleFloat: onToggleFloat,
+                onToggleFullscreen: onToggleFullscreen
             )
+            // Reassign rootView so SwiftUI diffs the tree instead of a full
+            // NSHostingView teardown on every change (focus ring, badges...).
+            if let hosting = window.contentView as? NSHostingView<BarView> {
+                hosting.rootView = rootView
+            } else {
+                window.contentView = NSHostingView(rootView: rootView)
+            }
             window.orderFrontRegardless()
         }
         for (id, window) in windows where !seen.contains(id) {

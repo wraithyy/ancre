@@ -103,6 +103,11 @@ public struct DwindleLayout: Layout {
         others.removeValue(forKey: window)
         guard let neighbor = nearestNeighbor(from: myFrame, direction: direction, candidates: others) else { return false }
         self.root = Self.swapping(window, neighbor, in: root)
+        // Keep `order` in sync with the tree — layout transplants (setLayout)
+        // read it, and a stale order scrambles windows on layout switches.
+        if let a = order.firstIndex(of: window), let b = order.firstIndex(of: neighbor) {
+            order.swapAt(a, b)
+        }
         return true
     }
 
