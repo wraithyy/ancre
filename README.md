@@ -90,9 +90,13 @@ anytime with `ancre --onboarding`.
 
 ```sh
 brew tap wraithyy/tap
+brew trust wraithyy/tap          # third-party taps need a one-time trust
 brew install --cask ancre        # installs ancre.app + puts ancrectl on PATH
 open /Applications/ancre.app
 ```
+
+The app is ad-hoc signed (no paid developer certificate); the cask clears
+the quarantine flag for you, so Gatekeeper won't complain.
 
 ### From source
 
