@@ -74,7 +74,8 @@ key = "caps_lock"
 
 [bar]
 enabled = true
-# "top" | "bottom" reserve a strip; "menubar" lives INSIDE the system menu
+# "top" | "bottom" | "left" | "right" reserve a strip (left/right = vertical
+# bar, `height` is its thickness); "menubar" lives INSIDE the system menu
 # bar band (no tiling space lost) — the window shrinks to just the pill and
 # on a notched display sits beside the notch (notch-side = "left" | "right").
 # "notch" = hidden entirely; hovering the notch slides the pill out under it.
@@ -89,6 +90,19 @@ align = "center"
 offset-x = 0
 offset-y = 0
 # notch-side = "left"
+# Peek: bar idles at idle-opacity (0 = hidden, 0.3 = ghost) and shows fully
+# while hyper is held. Works for every position; notch mode peeks built in.
+# peek = false
+# idle-opacity = 0
+
+# Per-monitor overrides of [bar] keys (position, align, notch-side, offsets,
+# height, opacity, icon-size, font-size). Key "notch" matches notched
+# displays; any other key is a monitor matcher (stable id or name substring).
+# Matcher-specific beats "notch" beats base [bar].
+# [bar-overrides.notch]
+# position = "notch"
+# [bar-overrides."PHL"]
+# align = "left"
 # icon-size = 17
 # Overrides of [theme] just for the bar:
 # background-color = "#1e1e2eCC"

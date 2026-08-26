@@ -105,9 +105,13 @@ public struct AppConfig: Codable {
         public var ringWidth: Double
         /// Max app icons shown per workspace.
         public var maxIcons: Int
+        /// Peek mode: the bar idles at idle-opacity (0 = hidden) and shows at
+        /// full opacity while hyper is held.
+        public var peek: Bool
+        public var idleOpacity: Double
 
         enum CodingKeys: String, CodingKey {
-            case enabled, position, opacity, height, align, spacing
+            case enabled, position, opacity, height, align, spacing, peek
             case offsetX = "offset-x"
             case offsetY = "offset-y"
             case backgroundColor = "background-color"
@@ -128,6 +132,7 @@ public struct AppConfig: Codable {
             case ringWidth = "ring-width"
             case maxIcons = "max-icons"
             case notchSide = "notch-side"
+            case idleOpacity = "idle-opacity"
         }
 
         // Newer keys are optional with defaults so configs copied before they
@@ -160,6 +165,67 @@ public struct AppConfig: Codable {
             inactiveIconOpacity = lenientDouble(c, .inactiveIconOpacity) ?? 0.75
             ringWidth = lenientDouble(c, .ringWidth) ?? 1.5
             maxIcons = try c.decodeIfPresent(Int.self, forKey: .maxIcons) ?? 6
+            peek = try c.decodeIfPresent(Bool.self, forKey: .peek) ?? false
+            idleOpacity = lenientDouble(c, .idleOpacity) ?? 0
+        }
+    }
+
+    /// Partial [bar] override applied per monitor. Keys of [bar-overrides]:
+    /// "notch" matches notched displays, anything else is a monitor matcher
+    /// (stable id or name substring). A matcher-specific entry wins over
+    /// "notch", which wins over the base [bar].
+    public struct BarOverride: Codable {
+        public var position: String?
+        public var align: String?
+        public var notchSide: String?
+        public var offsetX: Double?
+        public var offsetY: Double?
+        public var height: Double?
+        public var opacity: Double?
+        public var iconSize: Double?
+        public var fontSize: Double?
+        public var peek: Bool?
+        public var idleOpacity: Double?
+
+        enum CodingKeys: String, CodingKey {
+            case position, align, opacity, height, peek
+            case notchSide = "notch-side"
+            case offsetX = "offset-x"
+            case offsetY = "offset-y"
+            case iconSize = "icon-size"
+            case fontSize = "font-size"
+            case idleOpacity = "idle-opacity"
+        }
+
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            position = try c.decodeIfPresent(String.self, forKey: .position)
+            align = try c.decodeIfPresent(String.self, forKey: .align)
+            notchSide = try c.decodeIfPresent(String.self, forKey: .notchSide)
+            offsetX = lenientDouble(c, .offsetX)
+            offsetY = lenientDouble(c, .offsetY)
+            height = lenientDouble(c, .height)
+            opacity = lenientDouble(c, .opacity)
+            iconSize = lenientDouble(c, .iconSize)
+            fontSize = lenientDouble(c, .fontSize)
+            peek = try c.decodeIfPresent(Bool.self, forKey: .peek)
+            idleOpacity = lenientDouble(c, .idleOpacity)
+        }
+
+        func applied(to bar: Bar) -> Bar {
+            var result = bar
+            if let position { result.position = position }
+            if let align { result.align = align }
+            if let notchSide { result.notchSide = notchSide }
+            if let offsetX { result.offsetX = offsetX }
+            if let offsetY { result.offsetY = offsetY }
+            if let height { result.height = height }
+            if let opacity { result.opacity = opacity }
+            if let iconSize { result.iconSize = iconSize }
+            if let fontSize { result.fontSize = fontSize }
+            if let peek { result.peek = peek }
+            if let idleOpacity { result.idleOpacity = idleOpacity }
+            return result
         }
     }
 
@@ -332,12 +398,35 @@ public struct AppConfig: Codable {
     public var preview: Preview?
     /// `[scratchpad]`: dropdown window app + size; absent = disabled.
     public var scratchpad: Scratchpad?
+    /// `[bar-overrides]`: per-monitor partial [bar] overrides.
+    public var barOverrides: [String: BarOverride]?
 
     enum CodingKeys: String, CodingKey {
         case general, hyper, keybindings, bar, workspaces, theme, border, help, preview, scratchpad
+        case barOverrides = "bar-overrides"
         case workspaceLabels = "workspace-labels"
         case appWorkspaces = "app-workspaces"
         case customLayouts = "custom-layouts"
+    }
+}
+
+extension AppConfig {
+    /// Effective [bar] config for one monitor: base, then the "notch" override
+    /// (if the display has one), then the first matcher-specific override.
+    public func bar(forMonitorID id: String, name: String, hasNotch: Bool) -> Bar {
+        var result = bar
+        guard let overrides = barOverrides else { return result }
+        if hasNotch, let notch = overrides["notch"] {
+            result = notch.applied(to: result)
+        }
+        for (key, override) in overrides.sorted(by: { $0.key < $1.key }) where key != "notch" {
+            let needle = key.lowercased()
+            if key == id || (!needle.isEmpty && name.lowercased().contains(needle)) {
+                result = override.applied(to: result)
+                break
+            }
+        }
+        return result
     }
 }
 
@@ -445,8 +534,9 @@ public enum ConfigLoader {
                 config.workspaces = assignments.filter { !$0.value.values.allSatisfy { $0.trimmingCharacters(in: .whitespaces).isEmpty } }
             }
         }
-        if !["top", "bottom"].contains(config.bar.position) {
-            warnings.append("config: bar position must be \"top\" or \"bottom\", using \"\(defaults.bar.position)\"")
+        let validPositions = ["top", "bottom", "left", "right", "menubar", "notch"]
+        if !validPositions.contains(config.bar.position) {
+            warnings.append("config: bar position must be one of \(validPositions.joined(separator: "/")), using \"\(defaults.bar.position)\"")
             config.bar.position = defaults.bar.position
         }
         return warnings

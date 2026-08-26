@@ -316,6 +316,9 @@ jim přirozené souřadnice za hranou) a bar (ukazovat i zaparkovaná okna).
   event stream.
 - hidutil re-apply po wake/výměně klávesnice (IOHIDManager notifikace).
 - Pravý niri scroll (viz poznámka u 5.1), layout edit mode.
+- Auto-stack při migraci: workspace zmigrovaný na monitor, kam se okna
+  nevejdou (počet × min šířka > šířka monitoru), dočasně přepnout na stack
+  a při návratu na původní monitor vrátit layout.
 
 ## Out of scope
 

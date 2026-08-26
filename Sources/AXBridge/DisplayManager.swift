@@ -21,6 +21,8 @@ public struct DisplayInfo: Equatable, Sendable {
     /// Bounds minus menu bar / Dock, in CG coordinates.
     public let visibleFrame: CGRect
     public let isBuiltin: Bool
+    /// Display has a camera notch (safe-area inset at the top).
+    public let hasNotch: Bool
 }
 
 /// Watches for displays being connected, disconnected or rearranged.
@@ -90,7 +92,8 @@ public final class DisplayManager {
                 name: screen.localizedName,
                 frame: CGDisplayBounds(displayID),
                 visibleFrame: cgRect(fromNSScreenRect: screen.visibleFrame, primaryHeight: primaryHeight),
-                isBuiltin: CGDisplayIsBuiltin(displayID) != 0
+                isBuiltin: CGDisplayIsBuiltin(displayID) != 0,
+                hasNotch: screen.safeAreaInsets.top > 0
             )
         }
     }

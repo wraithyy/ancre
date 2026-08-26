@@ -80,8 +80,11 @@ public struct BarMonitorSnapshot: Equatable {
     /// Menubar mode: `barFrame` is the menu-bar band and the window shrinks
     /// to the pill so the rest of the menu bar stays clickable.
     public let compact: Bool
+    /// Per-monitor resolved theme ([bar] + [bar-overrides]); nil = the
+    /// controller-wide default theme.
+    public let theme: BarTheme?
 
-    public init(monitorID: String, barFrame: NSRect, workspaces: [BarWorkspaceItem], isFocusedMonitor: Bool, allWorkspaceNames: [BarWorkspaceRef], availableLayouts: [String], compact: Bool = false) {
+    public init(monitorID: String, barFrame: NSRect, workspaces: [BarWorkspaceItem], isFocusedMonitor: Bool, allWorkspaceNames: [BarWorkspaceRef], availableLayouts: [String], compact: Bool = false, theme: BarTheme? = nil) {
         self.monitorID = monitorID
         self.barFrame = barFrame
         self.workspaces = workspaces
@@ -89,6 +92,7 @@ public struct BarMonitorSnapshot: Equatable {
         self.allWorkspaceNames = allWorkspaceNames
         self.availableLayouts = availableLayouts
         self.compact = compact
+        self.theme = theme
     }
 }
 
@@ -113,7 +117,7 @@ public extension NSColor {
 
 /// Visual knobs resolved from config ([theme] + [bar] overrides). Defaults
 /// here mirror the config defaults; the controller overwrites everything.
-public struct BarTheme {
+public struct BarTheme: Equatable {
     public var opacity = 1.0
     public var align = "center"
     public var offsetX = 0.0
@@ -145,6 +149,9 @@ public struct BarTheme {
     /// "top" | "bottom" | "menubar" | "notch" — notch = hidden until the
     /// mouse enters the notch zone, then the pill slides out under it.
     public var position = "top"
+    /// Peek: idle at idleOpacity (0 = invisible), full opacity on hyper hold.
+    public var peek = false
+    public var idleOpacity = 0.0
 
     public init() {}
 
@@ -169,6 +176,12 @@ public final class BarController {
     /// currently have their pill revealed.
     private var hoverZones: [String: NSWindow] = [:]
     private var revealed: Set<String> = []
+    /// While revealed, polls whether the cursor is still near the zone/pill.
+    private var revealWatchers: [String: Timer] = [:]
+    /// Reveal targets per notch-mode monitor, for hyper-peek.
+    private var notchTargets: [String: (target: NSRect, safeTop: CGFloat)] = [:]
+    /// Hyper held = keep notch pills out regardless of the cursor.
+    private var hyperPeek = false
 
     public init(
         theme: BarTheme,
@@ -201,13 +214,14 @@ public final class BarController {
             let window = windows[snapshot.monitorID] ?? makeWindow()
             windows[snapshot.monitorID] = window
             window.setFrame(snapshot.barFrame, display: true)
+            let monitorTheme = snapshot.theme ?? theme
             let rootView = BarView(
                 workspaces: snapshot.workspaces,
                 allWorkspaceNames: snapshot.allWorkspaceNames,
                 availableLayouts: snapshot.availableLayouts,
                 isFocused: snapshot.isFocusedMonitor,
                 fullWidth: !snapshot.compact,
-                theme: theme,
+                theme: monitorTheme,
                 onSelect: onSelect,
                 onMoveWindow: onMoveWindow,
                 onMoveFocusedWindow: onMoveFocusedWindow,
@@ -231,9 +245,27 @@ public final class BarController {
                 window.contentView = hosting
             }
             if snapshot.compact {
-                positionCompact(window, hosting: hosting, band: snapshot.barFrame)
+                positionCompact(window, hosting: hosting, band: snapshot.barFrame, theme: monitorTheme)
             }
-            if theme.position == "notch", let screen = notchedScreen(for: snapshot.barFrame) {
+            if monitorTheme.peek, monitorTheme.position != "notch" {
+                window.alphaValue = hyperPeek ? 1 : monitorTheme.idleOpacity
+                // Hovering the bar peeks it too, not just holding hyper.
+                let idle = monitorTheme.idleOpacity
+                wrapInTracking(window: window, hosting: hosting, onEnter: { [weak window] in
+                    guard let window else { return }
+                    NSAnimationContext.runAnimationGroup { context in
+                        context.duration = 0.15
+                        window.animator().alphaValue = 1
+                    }
+                }, onExit: { [weak self, weak window] in
+                    guard let self, let window, !self.hyperPeek else { return }
+                    NSAnimationContext.runAnimationGroup { context in
+                        context.duration = 0.2
+                        window.animator().alphaValue = idle
+                    }
+                })
+            }
+            if monitorTheme.position == "notch", let screen = notchedScreen(for: snapshot.barFrame) {
                 setupNotchMode(monitorID: snapshot.monitorID, window: window, hosting: hosting, screen: screen)
                 if !revealed.contains(snapshot.monitorID) {
                     window.orderOut(nil)
@@ -249,19 +281,48 @@ public final class BarController {
         }
     }
 
+    /// Hyper held down = peek all notch-hidden pills; released = hide them
+    /// again (unless the cursor is parked on one — the watcher handles that).
+    public func setHyperPeek(_ down: Bool) {
+        hyperPeek = down
+        // Peek-enabled bars fade between their idle opacity and full.
+        for (id, window) in windows {
+            guard let snapTheme = lastSnapshots[id]?.theme ?? (theme as BarTheme?),
+                  snapTheme.peek, snapTheme.position != "notch" else { continue }
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.15
+                window.animator().alphaValue = down ? 1 : snapTheme.idleOpacity
+            }
+        }
+        for (id, info) in notchTargets {
+            guard let window = windows[id] else { continue }
+            if down {
+                reveal(monitorID: id, window: window, target: info.target, safeTop: info.safeTop)
+            } else {
+                var keep = window.frame.insetBy(dx: -16, dy: -16)
+                if let zone = hoverZones[id] { keep = keep.union(zone.frame.insetBy(dx: -16, dy: -16)) }
+                if !keep.contains(NSEvent.mouseLocation) {
+                    conceal(monitorID: id, window: window)
+                }
+            }
+        }
+    }
+
     /// Closes all bar windows (hot-reload replaces the controller). Main thread.
     public func close() {
         for window in windows.values { window.orderOut(nil) }
         for zone in hoverZones.values { zone.orderOut(nil) }
+        for watcher in revealWatchers.values { watcher.invalidate() }
         windows.removeAll()
         hoverZones.removeAll()
         lastSnapshots.removeAll()
         revealed.removeAll()
+        revealWatchers.removeAll()
     }
 
     /// Menubar mode: shrink the window to the pill and place it in the band,
     /// dodging the notch via the screen's auxiliary top areas.
-    private func positionCompact(_ window: NSWindow, hosting: NSHostingView<BarView>, band: NSRect) {
+    private func positionCompact(_ window: NSWindow, hosting: NSHostingView<BarView>, band: NSRect, theme: BarTheme) {
         let size = hosting.fittingSize
         var usable = band
         if let screen = NSScreen.screens.first(where: { $0.frame.intersects(band) }),
@@ -295,7 +356,9 @@ public final class BarController {
         let auxRight = screen.auxiliaryTopRightArea
         let notchMinX = auxLeft?.maxX ?? screen.frame.midX - 90
         let notchMaxX = auxRight?.minX ?? screen.frame.midX + 90
-        let notchRect = NSRect(x: notchMinX, y: screen.frame.maxY - safeTop, width: notchMaxX - notchMinX, height: safeTop)
+        // Extend the zone a little below the notch so an approach that stops
+        // just under it still triggers.
+        let notchRect = NSRect(x: notchMinX, y: screen.frame.maxY - safeTop - 10, width: notchMaxX - notchMinX, height: safeTop + 10)
 
         // Pill target: centered under the notch, just below the menu band.
         let size = hosting.fittingSize
@@ -306,6 +369,7 @@ public final class BarController {
             height: size.height
         )
         window.setFrame(target, display: true)
+        notchTargets[monitorID] = (target, safeTop)
         wrapInTracking(window: window, hosting: hosting) { [weak self] in
             self?.conceal(monitorID: monitorID, window: window)
         }
@@ -340,11 +404,26 @@ public final class BarController {
             window.animator().setFrame(target, display: true)
             window.animator().alphaValue = 1
         }
+        // Stay out while the cursor is near (zone, pill, or the gap between);
+        // exit events alone misfire on a quick pass through the zone.
+        revealWatchers[monitorID]?.invalidate()
+        revealWatchers[monitorID] = Timer.scheduledTimer(withTimeInterval: 0.4, repeats: true) { [weak self, weak window] _ in
+            guard let self, let window else { return }
+            var keep = window.frame.insetBy(dx: -16, dy: -16)
+            if let zone = self.hoverZones[monitorID] {
+                keep = keep.union(zone.frame.insetBy(dx: -16, dy: -16))
+            }
+            if !self.hyperPeek, !keep.contains(NSEvent.mouseLocation) {
+                self.conceal(monitorID: monitorID, window: window)
+            }
+        }
     }
 
     private func conceal(monitorID: String, window: NSWindow) {
         guard revealed.contains(monitorID) else { return }
         revealed.remove(monitorID)
+        revealWatchers[monitorID]?.invalidate()
+        revealWatchers[monitorID] = nil
         NSAnimationContext.runAnimationGroup({ context in
             context.duration = 0.15
             window.animator().alphaValue = 0
@@ -356,8 +435,9 @@ public final class BarController {
 
     /// Ensures the pill's content view is wrapped in a tracking container so
     /// mouse-exit can hide it in notch mode.
-    private func wrapInTracking(window: NSWindow, hosting: NSHostingView<BarView>, onExit: @escaping () -> Void) {
+    private func wrapInTracking(window: NSWindow, hosting: NSHostingView<BarView>, onEnter: (() -> Void)? = nil, onExit: @escaping () -> Void) {
         if let container = window.contentView as? TrackingView {
+            container.onEnter = onEnter
             container.onExit = onExit
             if hosting.superview !== container {
                 container.subviews.forEach { $0.removeFromSuperview() }
@@ -365,7 +445,7 @@ public final class BarController {
             }
             return
         }
-        let container = TrackingView(onEnter: nil, onExit: onExit)
+        let container = TrackingView(onEnter: onEnter, onExit: onExit)
         container.embed(hosting)
         window.contentView = container
     }
@@ -397,36 +477,60 @@ private struct BarView: View {
     let onToggleFloat: (UInt32) -> Void
     let onToggleFullscreen: (UInt32) -> Void
 
+    /// left/right positions render the pill vertically.
+    private var isVertical: Bool { theme.position == "left" || theme.position == "right" }
+
     var body: some View {
-        HStack {
-            if fullWidth, theme.align != "left" { Spacer(minLength: 0) }
-            HStack(spacing: theme.spacing) {
-                ForEach(workspaces, id: \.name) { workspace in
-                    WorkspaceCell(
-                        workspace: workspace,
-                        allWorkspaceNames: allWorkspaceNames,
-                        availableLayouts: availableLayouts,
-                        isFocusedMonitor: isFocused,
-                        theme: theme,
-                        onSelect: onSelect,
-                        onMoveWindow: onMoveWindow,
-                        onMoveFocusedWindow: onMoveFocusedWindow,
-                        onFocusWindow: onFocusWindow,
-                        onSetLayout: onSetLayout,
-                        onToggleFloat: onToggleFloat,
-                        onToggleFullscreen: onToggleFullscreen
-                    )
+        if isVertical {
+            VStack {
+                if fullWidth, theme.align != "left" { Spacer(minLength: 0) }
+                VStack(spacing: theme.spacing) {
+                    cells
                 }
+                .padding(.horizontal, theme.pillPaddingY)
+                .padding(.vertical, theme.pillPaddingX)
+                .background(pillBackground)
+                .offset(y: fullWidth && theme.align == "center" ? theme.offsetX : 0)
+                if fullWidth, theme.align != "right" { Spacer(minLength: 0) }
             }
-            .padding(.horizontal, theme.pillPaddingX)
-            .padding(.vertical, theme.pillPaddingY)
-            .background(pillBackground)
-            .offset(x: fullWidth && theme.align == "center" ? theme.offsetX : 0)
-            if fullWidth, theme.align != "right" { Spacer(minLength: 0) }
+            .padding(.top, fullWidth && theme.align == "left" ? 8 + theme.offsetX : 0)
+            .padding(.bottom, fullWidth && theme.align == "right" ? 8 + theme.offsetX : 0)
+            .frame(maxWidth: fullWidth ? .infinity : nil, maxHeight: fullWidth ? .infinity : nil)
+        } else {
+            HStack {
+                if fullWidth, theme.align != "left" { Spacer(minLength: 0) }
+                HStack(spacing: theme.spacing) {
+                    cells
+                }
+                .padding(.horizontal, theme.pillPaddingX)
+                .padding(.vertical, theme.pillPaddingY)
+                .background(pillBackground)
+                .offset(x: fullWidth && theme.align == "center" ? theme.offsetX : 0)
+                if fullWidth, theme.align != "right" { Spacer(minLength: 0) }
+            }
+            .padding(.leading, fullWidth && theme.align == "left" ? 8 + theme.offsetX : 0)
+            .padding(.trailing, fullWidth && theme.align == "right" ? 8 + theme.offsetX : 0)
+            .frame(maxWidth: fullWidth ? .infinity : nil, maxHeight: fullWidth ? .infinity : nil)
         }
-        .padding(.leading, fullWidth && theme.align == "left" ? 8 + theme.offsetX : 0)
-        .padding(.trailing, fullWidth && theme.align == "right" ? 8 + theme.offsetX : 0)
-        .frame(maxWidth: fullWidth ? .infinity : nil, maxHeight: fullWidth ? .infinity : nil)
+    }
+
+    @ViewBuilder private var cells: some View {
+        ForEach(workspaces, id: \.name) { workspace in
+            WorkspaceCell(
+                workspace: workspace,
+                allWorkspaceNames: allWorkspaceNames,
+                availableLayouts: availableLayouts,
+                isFocusedMonitor: isFocused,
+                theme: theme,
+                onSelect: onSelect,
+                onMoveWindow: onMoveWindow,
+                onMoveFocusedWindow: onMoveFocusedWindow,
+                onFocusWindow: onFocusWindow,
+                onSetLayout: onSetLayout,
+                onToggleFloat: onToggleFloat,
+                onToggleFullscreen: onToggleFullscreen
+            )
+        }
     }
 
     @ViewBuilder private var pillBackground: some View {
@@ -464,78 +568,38 @@ private struct WorkspaceCell: View {
     private var badgeColor: Color { theme.badgeColor.map(Color.init) ?? Color.red }
     private var iconSize: CGFloat { theme.iconSize }
 
+    private var isVertical: Bool { theme.position == "left" || theme.position == "right" }
+
     var body: some View {
-        HStack(spacing: theme.cellSpacing) {
-            if let icon = workspace.icon {
-                Text(icon).font(.system(size: theme.fontSize))
-            }
-            if workspace.showNumber {
-                Text(workspace.name)
-                    .font(theme.font(size: theme.fontSize, weight: workspace.isActive ? .semibold : .regular))
-                    .foregroundStyle(workspace.isActive ? Color.primary : Color.secondary)
-            }
-            if let displayName = workspace.displayName {
-                Text(displayName)
-                    .font(theme.font(size: theme.fontSize - 1, weight: workspace.isActive ? .medium : .regular))
-                    .foregroundStyle(workspace.isActive ? Color.primary : Color.secondary)
-            }
-            ForEach(Array(workspace.windows.prefix(theme.maxIcons).enumerated()), id: \.element.windowID) { _, window in
-                if let icon = NSRunningApplication(processIdentifier: window.pid)?.icon {
-                    Image(nsImage: icon)
-                        .resizable()
-                        .frame(width: iconSize, height: iconSize)
-                        .opacity(window.isFocused ? 1 : theme.inactiveIconOpacity)
-                        .overlay(
-                            // Solid accent ring = focused, dashed = floating.
-                            RoundedRectangle(cornerRadius: 4)
-                                .stroke(
-                                    window.isFocused ? accent : floatColor,
-                                    style: StrokeStyle(lineWidth: window.isFocused || window.isFloating ? theme.ringWidth : 0, dash: window.isFloating && !window.isFocused ? [2.5] : [])
-                                )
-                        )
-                        .overlay(alignment: .bottomTrailing) {
-                            if window.isFullscreen {
-                                Image(systemName: "arrow.up.left.and.arrow.down.right")
-                                    .font(.system(size: max(6, theme.fontSize / 2), weight: .bold))
-                                    .foregroundStyle(.white)
-                                    .padding(1.5)
-                                    .background(Circle().fill(Color.black.opacity(0.6)))
-                                    .offset(x: 3, y: 3)
-                            }
-                        }
-                        .overlay(alignment: .topTrailing) {
-                            if let badge = window.badge {
-                                Text(badge.count > 2 ? "9+" : badge)
-                                    .font(.system(size: max(6, theme.fontSize / 2), weight: .bold))
-                                    .foregroundStyle(.white)
-                                    .padding(.horizontal, 2.5)
-                                    .padding(.vertical, 0.5)
-                                    .background(Capsule().fill(badgeColor))
-                                    .offset(x: 4, y: -4)
-                            }
-                        }
-                        .draggable(dragPrefix + String(window.windowID)) {
-                            // Bigger preview so the drag is clearly visible.
-                            Image(nsImage: icon).resizable().frame(width: 32, height: 32)
-                        }
-                        .onTapGesture { onFocusWindow(window.windowID) }
-                        .contextMenu {
-                            Button(L10n.focusWindow) { onFocusWindow(window.windowID) }
-                            Button(window.isFloating ? L10n.tileWindow : L10n.floatWindow) { onToggleFloat(window.windowID) }
-                            Button(L10n.toggleFullscreen) { onToggleFullscreen(window.windowID) }
-                            Menu(L10n.moveTo) {
-                                ForEach(allWorkspaceNames.filter { $0.name != workspace.name }, id: \.name) { target in
-                                    Button(target.title) { onMoveWindow(window.windowID, target.name) }
-                                }
-                            }
-                        }
+        Group {
+            if isVertical {
+                // Vertical bar: just the number with the icons stacked below —
+                // labels don't fit a narrow column.
+                VStack(spacing: theme.cellSpacing) {
+                    Text(workspace.name)
+                        .font(theme.font(size: theme.fontSize, weight: workspace.isActive ? .semibold : .regular))
+                        .foregroundStyle(workspace.isActive ? Color.primary : Color.secondary)
+                    windowIcons
+                    dropSlot
                 }
-            }
-            if isDropTarget {
-                // Placeholder slot where the dragged window's icon will land.
-                RoundedRectangle(cornerRadius: 4)
-                    .stroke(accent, style: StrokeStyle(lineWidth: theme.ringWidth, dash: [3]))
-                    .frame(width: iconSize, height: iconSize)
+            } else {
+                HStack(spacing: theme.cellSpacing) {
+                    if let icon = workspace.icon {
+                        Text(icon).font(.system(size: theme.fontSize))
+                    }
+                    if workspace.showNumber {
+                        Text(workspace.name)
+                            .font(theme.font(size: theme.fontSize, weight: workspace.isActive ? .semibold : .regular))
+                            .foregroundStyle(workspace.isActive ? Color.primary : Color.secondary)
+                    }
+                    if let displayName = workspace.displayName {
+                        Text(displayName)
+                            .font(theme.font(size: theme.fontSize - 1, weight: workspace.isActive ? .medium : .regular))
+                            .foregroundStyle(workspace.isActive ? Color.primary : Color.secondary)
+                    }
+                    windowIcons
+                    dropSlot
+                }
             }
         }
         .padding(.vertical, theme.cellPaddingY)
@@ -578,6 +642,71 @@ private struct WorkspaceCell: View {
             isDropTarget = targeted
         }
         .animation(.easeOut(duration: 0.12), value: isDropTarget)
+    }
+
+
+    @ViewBuilder private var windowIcons: some View {
+        ForEach(Array(workspace.windows.prefix(theme.maxIcons).enumerated()), id: \.element.windowID) { _, window in
+            if let icon = NSRunningApplication(processIdentifier: window.pid)?.icon {
+                Image(nsImage: icon)
+                    .resizable()
+                    .frame(width: iconSize, height: iconSize)
+                    .opacity(window.isFocused ? 1 : theme.inactiveIconOpacity)
+                    .overlay(
+                        // Solid accent ring = focused, dashed = floating.
+                        RoundedRectangle(cornerRadius: 4)
+                            .stroke(
+                                window.isFocused ? accent : floatColor,
+                                style: StrokeStyle(lineWidth: window.isFocused || window.isFloating ? theme.ringWidth : 0, dash: window.isFloating && !window.isFocused ? [2.5] : [])
+                            )
+                    )
+                    .overlay(alignment: .bottomTrailing) {
+                        if window.isFullscreen {
+                            Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                .font(.system(size: max(6, theme.fontSize / 2), weight: .bold))
+                                .foregroundStyle(.white)
+                                .padding(1.5)
+                                .background(Circle().fill(Color.black.opacity(0.6)))
+                                .offset(x: 3, y: 3)
+                        }
+                    }
+                    .overlay(alignment: .topTrailing) {
+                        if let badge = window.badge {
+                            Text(badge.count > 2 ? "9+" : badge)
+                                .font(.system(size: max(6, theme.fontSize / 2), weight: .bold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 2.5)
+                                .padding(.vertical, 0.5)
+                                .background(Capsule().fill(badgeColor))
+                                .offset(x: 4, y: -4)
+                        }
+                    }
+                    .draggable(dragPrefix + String(window.windowID)) {
+                        // Bigger preview so the drag is clearly visible.
+                        Image(nsImage: icon).resizable().frame(width: 32, height: 32)
+                    }
+                    .onTapGesture { onFocusWindow(window.windowID) }
+                    .contextMenu {
+                        Button(L10n.focusWindow) { onFocusWindow(window.windowID) }
+                        Button(window.isFloating ? L10n.tileWindow : L10n.floatWindow) { onToggleFloat(window.windowID) }
+                        Button(L10n.toggleFullscreen) { onToggleFullscreen(window.windowID) }
+                        Menu(L10n.moveTo) {
+                            ForEach(allWorkspaceNames.filter { $0.name != workspace.name }, id: \.name) { target in
+                                Button(target.title) { onMoveWindow(window.windowID, target.name) }
+                            }
+                        }
+                    }
+            }
+        }
+    }
+
+    @ViewBuilder private var dropSlot: some View {
+        if isDropTarget {
+            // Placeholder slot where the dragged window's icon will land.
+            RoundedRectangle(cornerRadius: 4)
+                .stroke(accent, style: StrokeStyle(lineWidth: theme.ringWidth, dash: [3]))
+                .frame(width: iconSize, height: iconSize)
+        }
     }
 
     private var backgroundColor: Color {

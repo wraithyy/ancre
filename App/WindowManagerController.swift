@@ -58,6 +58,9 @@ final class WindowManagerController: WindowTrackerDelegate {
     /// Current layout name per workspace, for the bar (Workspace itself only
     /// stores the layout instance, not its config name).
     private var workspaceLayoutNames: [String: String] = [:]
+    /// Effective [bar] config per monitor id ([bar] + [bar-overrides]),
+    /// resolved at every display reconfiguration. (axQueue)
+    private var barConfigs: [String: AppConfig.Bar] = [:]
     /// Keybind cheatsheet (main thread only). Nil when disabled in config.
     private var helpOverlay: HelpOverlay?
     private var helpTimer: Timer?
@@ -391,7 +394,9 @@ final class WindowManagerController: WindowTrackerDelegate {
             },
             onHyperStateChange: { [weak self] down in
                 DispatchQueue.main.async {
-                    guard let self, let helpOverlay = self.helpOverlay else { return }
+                    guard let self else { return }
+                    self.bar?.setHyperPeek(down)
+                    guard let helpOverlay = self.helpOverlay else { return }
                     self.helpTimer?.invalidate()
                     if down {
                         self.helpTimer = Timer.scheduledTimer(withTimeInterval: self.helpDelaySeconds, repeats: false) { _ in
@@ -459,9 +464,7 @@ final class WindowManagerController: WindowTrackerDelegate {
         }
     }
 
-    private func makeBarController() -> BarController? {
-        guard config.bar.enabled else { return nil }
-        let barConfig = config.bar
+    private static func makeTheme(bar barConfig: AppConfig.Bar, config: AppConfig) -> BarTheme {
         var theme = BarTheme()
         theme.opacity = barConfig.opacity
         theme.align = barConfig.align
@@ -486,6 +489,14 @@ final class WindowManagerController: WindowTrackerDelegate {
         theme.maxIcons = barConfig.maxIcons
         theme.notchSide = barConfig.notchSide
         theme.position = barConfig.position
+        theme.peek = barConfig.peek
+        theme.idleOpacity = barConfig.idleOpacity
+        return theme
+    }
+
+    private func makeBarController() -> BarController? {
+        guard config.bar.enabled else { return nil }
+        let theme = Self.makeTheme(bar: config.bar, config: config)
         return BarController(
                 theme: theme,
                 onSelect: { [weak self] name in
@@ -552,8 +563,11 @@ final class WindowManagerController: WindowTrackerDelegate {
         NSLog("applland: %d display(s): %@", infos.count,
               infos.map { "\($0.name) [\($0.id)]" }.joined(separator: ", "))
         parkingBounds = infos.dropFirst().reduce(infos[0].frame) { $0.union($1.frame) }
+        barConfigs = Dictionary(uniqueKeysWithValues: infos.map {
+            ($0.id, config.bar(forMonitorID: $0.id, name: $0.name, hasNotch: $0.hasNotch))
+        })
         let monitors = infos.map {
-            MonitorInfo(id: $0.id, name: $0.name, frame: $0.frame, visibleFrame: reserveBarStrip(in: $0.visibleFrame))
+            MonitorInfo(id: $0.id, name: $0.name, frame: $0.frame, visibleFrame: reserveBarStrip(in: $0.visibleFrame, bar: barConfigs[$0.id] ?? config.bar))
         }
         execute(WM.reconcileMonitors(
             monitors,
@@ -569,15 +583,25 @@ final class WindowManagerController: WindowTrackerDelegate {
 
     /// Carves the bar strip out of a monitor's usable area so tiles don't
     /// render under it. CG coordinates: top of the screen is minY.
-    private func reserveBarStrip(in visibleFrame: CGRect) -> CGRect {
-        guard config.bar.enabled else { return visibleFrame }
-        // menubar mode lives inside the system menu-bar band — no tiling
-        // space is reserved at all.
-        guard config.bar.position != "menubar", config.bar.position != "notch" else { return visibleFrame }
+    private func reserveBarStrip(in visibleFrame: CGRect, bar: AppConfig.Bar) -> CGRect {
+        guard bar.enabled else { return visibleFrame }
+        // menubar/notch modes live inside the system menu-bar band — no
+        // tiling space is reserved at all.
+        guard bar.position != "menubar", bar.position != "notch" else { return visibleFrame }
         var frame = visibleFrame
-        let reserved = config.bar.height + config.bar.offsetY
-        frame.size.height -= reserved
-        if config.bar.position != "bottom" { frame.origin.y += reserved }
+        let reserved = bar.height + bar.offsetY
+        switch bar.position {
+        case "left":
+            frame.origin.x += reserved
+            frame.size.width -= reserved
+        case "right":
+            frame.size.width -= reserved
+        case "bottom":
+            frame.size.height -= reserved
+        default: // top
+            frame.origin.y += reserved
+            frame.size.height -= reserved
+        }
         return frame
     }
 
@@ -593,19 +617,27 @@ final class WindowManagerController: WindowTrackerDelegate {
             return BarWorkspaceRef(name: name, title: title)
         }
         let availableLayouts = ["dwindle", "scroll", "stack"] + (config.customLayouts?.keys.sorted() ?? [])
-        let snapshots = state.monitors.enumerated().map { index, monitor -> (String, CGRect, [BarWorkspaceItem], Bool) in
+        let snapshots = state.monitors.enumerated().map { index, monitor -> (String, CGRect, [BarWorkspaceItem], Bool, Bool, BarTheme) in
+            let barConfig = barConfigs[monitor.id] ?? config.bar
             let strip: CGRect
-            if config.bar.position == "menubar" || config.bar.position == "notch" {
+            if barConfig.position == "menubar" || barConfig.position == "notch" {
                 // The system menu-bar band (frame top to visibleFrame top);
                 // fall back to the configured height on displays reporting 0.
-                let bandHeight = max(monitor.visibleFrame.minY - monitor.frame.minY, config.bar.height)
+                let bandHeight = max(monitor.visibleFrame.minY - monitor.frame.minY, barConfig.height)
                 strip = CGRect(x: monitor.frame.minX, y: monitor.frame.minY, width: monitor.frame.width, height: bandHeight)
+            } else if barConfig.position == "left" || barConfig.position == "right" {
+                strip = CGRect(
+                    x: barConfig.position == "left" ? monitor.visibleFrame.minX - barConfig.height : monitor.visibleFrame.maxX,
+                    y: monitor.visibleFrame.minY,
+                    width: barConfig.height,
+                    height: monitor.visibleFrame.height
+                )
             } else {
                 strip = CGRect(
                     x: monitor.visibleFrame.minX,
-                    y: config.bar.position == "bottom" ? monitor.visibleFrame.maxY : monitor.visibleFrame.minY - config.bar.height,
+                    y: barConfig.position == "bottom" ? monitor.visibleFrame.maxY : monitor.visibleFrame.minY - barConfig.height,
                     width: monitor.visibleFrame.width,
-                    height: config.bar.height
+                    height: barConfig.height
                 )
             }
             let items = monitor.workspaces.enumerated().compactMap { wsIndex, workspace -> BarWorkspaceItem? in
@@ -637,12 +669,12 @@ final class WindowManagerController: WindowTrackerDelegate {
                     layoutName: workspaceLayoutNames[workspace.name] ?? config.general.defaultLayout
                 )
             }
-            return (monitor.id, strip, items, index == state.focusedMonitorIndex)
+            let compact = barConfig.position == "menubar" || barConfig.position == "notch"
+            return (monitor.id, strip, items, index == state.focusedMonitorIndex, compact, Self.makeTheme(bar: barConfig, config: config))
         }
-        let compactBar = config.bar.position == "menubar" || config.bar.position == "notch"
         DispatchQueue.main.async {
             let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
-            bar.update(snapshots.map { id, strip, items, focused in
+            bar.update(snapshots.map { id, strip, items, focused, compact, theme in
                 BarMonitorSnapshot(
                     monitorID: id,
                     barFrame: DisplayManager.nsScreenRect(fromCGRect: strip, primaryHeight: primaryHeight),
@@ -650,7 +682,8 @@ final class WindowManagerController: WindowTrackerDelegate {
                     isFocusedMonitor: focused,
                     allWorkspaceNames: allWorkspaceNames,
                     availableLayouts: availableLayouts,
-                    compact: compactBar
+                    compact: compact,
+                    theme: theme
                 )
             })
         }
