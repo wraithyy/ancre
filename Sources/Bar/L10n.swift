@@ -23,6 +23,7 @@ public enum L10n {
     public static var monitors: String { t("monitors") }
     public static var openConfig: String { t("open_config") }
     public static var reloadConfig: String { t("reload_config") }
+    public static var switcherPlaceholder: String { t("switcher_placeholder") }
     public static func layoutMenu(_ current: String) -> String {
         String(format: t("layout_menu"), current)
     }
@@ -52,6 +53,7 @@ public enum L10n {
         "monitors": "Monitors (click to copy id)",
         "open_config": "Open config",
         "reload_config": "Reload config",
+        "switcher_placeholder": "Search windows…",
     ]
 
     private static let tables: [String: [String: String]] = [
@@ -71,6 +73,7 @@ public enum L10n {
             "monitors": "Monitory (klik zkopíruje id)",
             "open_config": "Otevřít config",
             "reload_config": "Znovu načíst config",
+            "switcher_placeholder": "Hledat okna…",
         ],
     ]
 }

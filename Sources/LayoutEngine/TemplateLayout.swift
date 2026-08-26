@@ -170,6 +170,7 @@ public enum LayoutFactory {
         switch name {
         case "dwindle": return DwindleLayout()
         case "scroll": return ScrollColumnsLayout()
+        case "stack": return StackLayout()
         default: return customLayouts[name].flatMap { TemplateLayout(spec: $0) }
         }
     }

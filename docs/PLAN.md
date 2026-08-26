@@ -280,9 +280,42 @@ jim přirozené souřadnice za hranou) a bar (ukazovat i zaparkovaná okna).
 - **Acceptance**: skill dokumentuje CLI/MCP + recepty (příprava workspace,
   úklid notifikačních appek).
 
-## Nápady dál (bez pořadí): presety/snapshoty rozložení (save/restore-session),
-event stream (subscribe focus/workspace changes pro sketchybar), config hooks
-(on-window-open → command), agentem učená app-workspaces pravidla.
+### Milestone 8 — Workflow (2026-08-26)
+
+## Task 8.1: Multi-monitor matchery v [workspaces] — HOTOVO
+- `"1" = ["PHL", "P34w"]` — první připojený monitor vyhrává (doma/práce).
+
+## Task 8.2: Window switcher (hyper+space) — HOTOVO
+- Spotlight-style panel: filtr přes app/titul, workspace badge, Enter=focus.
+- Non-activating KeyablePanel (borderless okna jinak nedostanou klávesnici).
+
+## Task 8.3: Scratchpad (hyper+s) — HOTOVO
+- [scratchpad] app/width/height; toggle float top-center / park; launchne
+  appku když neběží. ponytail: přepnutí workspace zaparkuje scratchpad s jeho
+  domovskou ws — další toggle může chtít dva stisky.
+
+## Task 8.4: Window hints (hyper+o) — HOTOVO
+- Písmenkové badge přes viditelná okna, stisk = focus, Esc = zavřít.
+
+## Task 8.5: Presety + arrange — HOTOVO
+- `preset-save <name>` / `preset <name>` (commandy → bindovatelné, IPC, MCP);
+  úložiště ~/Library/Application Support/applland/presets.json.
+- IPC verb `arrange <json>` + MCP tool applland_arrange: deklarativní
+  {layouts, apps, active} jedním callem.
+
+## Task 8.6: Event stream — HOTOVO
+- `appllandctl subscribe` streamuje JSON eventy (state-changed při změně
+  fokusu/workspace/pauzy, window-opened). Podklad pro sketchybar/agenty.
+
+## Backlog (další iterace):
+- Command palette ve switcheru: prefix `>` = commandy (layout, pause,
+  preset...), číslo = skok na workspace.
+- Učení pravidel: lokální log ručních přesunů oken → `suggest-rules` →
+  agent navrhne [app-workspaces].
+- Config hooks (on-window-open → command/shell) — zatím pokryto externě přes
+  event stream.
+- hidutil re-apply po wake/výměně klávesnice (IOHIDManager notifikace).
+- Pravý niri scroll (viz poznámka u 5.1), layout edit mode.
 
 ## Out of scope
 

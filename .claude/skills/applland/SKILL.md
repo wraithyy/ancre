@@ -51,6 +51,9 @@ Window-targeted verbs (id from state):
 | `move-window <id> <workspace>` | move any window to a workspace |
 | `focus-window <id>` | focus (switches to its workspace) |
 | `set-floating <id> true\|false` | float / return to tiling |
+| `preset-save <name>` / `preset <name>` | save/apply a named arrangement |
+| `arrange <json>` | declarative one-shot: `{"layouts":{"2":"scroll"},"apps":{"com.google.Chrome":"2"},"active":["1"]}` (or MCP tool `applland_arrange`) |
+| `subscribe` | stream JSON events (state-changed, window-opened) until disconnect |
 
 Responses: `ok`, `error: ...` (CLI exits 1), or JSON for `state`.
 

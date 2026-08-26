@@ -56,7 +56,7 @@ public enum WorkspaceAssignment {
     /// gets 1-5 / 6-9 rather than an interleaved mess.
     public static func plan(
         workspaceNames: [String],
-        assignments: [String: String],
+        assignments: [String: [String]],
         monitors: [MonitorInfo]
     ) -> [[String]] {
         guard !monitors.isEmpty else { return [] }
@@ -75,8 +75,12 @@ public enum WorkspaceAssignment {
         var result = [[String]](repeating: [], count: monitors.count)
         var unassigned: [String] = []
         for name in names {
-            if let matcher = assignments[name],
-               let index = monitors.firstIndex(where: { $0.matches(matcher) }) {
+            // Preference order: the first matcher with a connected monitor
+            // wins, so "1" = ["PHL", "P34w"] works at home and at the office.
+            let index = assignments[name]?.lazy
+                .compactMap { matcher in monitors.firstIndex(where: { $0.matches(matcher) }) }
+                .first
+            if let index {
                 result[index].append(name)
             } else {
                 unassigned.append(name)

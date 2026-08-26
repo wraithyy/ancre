@@ -191,13 +191,15 @@ public struct WMState {
     /// Config `[workspaces]`: workspace name -> monitor matcher (stable id or
     /// display name). Consulted on every display reconfiguration, not just at
     /// startup, so a monitor plugged in later still claims its workspaces.
-    public var workspaceAssignments: [String: String]
+    /// Workspace name -> preference-ordered monitor matchers; the first
+    /// matcher with a connected monitor wins (home vs office externals).
+    public var workspaceAssignments: [String: [String]]
     /// Windows floated automatically (couldn't fit their tile), as opposed to
     /// a user's toggle-floating. Retried as tiles on display reconfiguration —
     /// a window squeezed out on a small screen re-tiles on a big one.
     public var autoFloated: Set<WindowID> = []
 
-    public init(monitors: [Monitor], focusedMonitorIndex: Int = 0, windows: [WindowID: WindowNode] = [:], windowLocation: [WindowID: WindowLocation] = [:], innerGap: Double = 8, outerGap: Double = 8, workspaceAssignments: [String: String] = [:]) {
+    public init(monitors: [Monitor], focusedMonitorIndex: Int = 0, windows: [WindowID: WindowNode] = [:], windowLocation: [WindowID: WindowLocation] = [:], innerGap: Double = 8, outerGap: Double = 8, workspaceAssignments: [String: [String]] = [:]) {
         self.monitors = monitors
         self.focusedMonitorIndex = focusedMonitorIndex
         self.windows = windows
@@ -245,6 +247,11 @@ public enum Command: Equatable {
     case pauseTiling
     case retile
     case openConfig
+    case switcher
+    case scratchpad
+    case hints
+    case presetApply(String)
+    case presetSave(String)
 
     /// Parses the command grammar used by `Sources/Config/default.toml`'s
     /// `[keybindings]` values. Keep this in sync with that file.
@@ -288,6 +295,21 @@ public enum Command: Equatable {
         case "open-config":
             guard parts.count == 1 else { return nil }
             return .openConfig
+        case "switcher":
+            guard parts.count == 1 else { return nil }
+            return .switcher
+        case "scratchpad":
+            guard parts.count == 1 else { return nil }
+            return .scratchpad
+        case "hints":
+            guard parts.count == 1 else { return nil }
+            return .hints
+        case "preset":
+            guard parts.count == 2 else { return nil }
+            return .presetApply(parts[1])
+        case "preset-save":
+            guard parts.count == 2 else { return nil }
+            return .presetSave(parts[1])
         case "focus-monitor":
             guard parts.count == 2, let target = MonitorTarget(rawValue: parts[1]) else { return nil }
             return .focusMonitor(target)
@@ -333,7 +355,7 @@ public enum WM {
             return [] // AX-side, handled by the controller before dispatch
         case .setLayout:
             return [] // resolved by the controller (needs LayoutEngine)
-        case .pauseTiling, .retile, .openConfig:
+        case .pauseTiling, .retile, .openConfig, .switcher, .scratchpad, .hints, .presetApply, .presetSave:
             return [] // controller-side
         }
     }
@@ -449,7 +471,18 @@ public enum WM {
         guard let myFrame = frames[focused] else { return [] }
         var others = frames
         others.removeValue(forKey: focused)
-        guard let target = nearestNeighbor(from: myFrame, direction: direction, candidates: others) else { return [] }
+        var target = nearestNeighbor(from: myFrame, direction: direction, candidates: others)
+        if target == nil {
+            // Monocle/stack: frames are identical, geometry can't pick — cycle
+            // the stack order instead (right/down = next, left/up = previous).
+            let stacked = others.contains { abs($0.value.minX - myFrame.minX) < 1 && abs($0.value.minY - myFrame.minY) < 1 }
+            let tiled = workspace.tiledWindows
+            if stacked, tiled.count > 1, let idx = tiled.firstIndex(of: focused) {
+                let step = (direction == .right || direction == .down) ? 1 : tiled.count - 1
+                target = tiled[(idx + step) % tiled.count]
+            }
+        }
+        guard let target else { return [] }
         state.monitors[state.focusedMonitorIndex].activeWorkspace.focusedWindow = target
         return [.focusWindow(target)] + reanchor(target, state: &state)
     }
@@ -737,12 +770,9 @@ public enum WM {
         guard let window = workspace.focusedWindow, var node = state.windows[window] else { return [] }
         node.isFullscreen.toggle()
         state.windows[window] = node
-        if node.isFullscreen {
-            return [.setFrame(window, monitor.visibleFrame)]
-        }
-        let frames = allFrames(for: workspace, monitor: monitor, state: state)
-        guard let restored = frames[window] else { return [] }
-        return [.setFrame(window, restored)]
+        // allFrames overrides fullscreen windows to the whole monitor, so a
+        // plain reflow both enters and leaves fullscreen correctly.
+        return frameEffects(for: workspace, monitor: monitor, state: state) + [.focusWindow(window)]
     }
 
     // MARK: Helpers
@@ -750,6 +780,11 @@ public enum WM {
     public static func allFrames(for workspace: Workspace, monitor: Monitor, state: WMState) -> [WindowID: CGRect] {
         var frames = workspace.layout.frames(container: monitor.visibleFrame, innerGap: state.innerGap, outerGap: state.outerGap)
         for (id, rect) in workspace.floatingFrames { frames[id] = rect }
+        // Fullscreen is a sticky per-window state: every re-place (workspace
+        // switch, retile, reconcile) keeps such windows covering the monitor.
+        for id in frames.keys where state.windows[id]?.isFullscreen == true {
+            frames[id] = monitor.visibleFrame
+        }
         return frames
     }
 

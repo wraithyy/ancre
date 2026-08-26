@@ -7,7 +7,7 @@ animations = true
 animation-duration-ms = 180
 # Apps that always place instantly (animate badly):
 # animations-exclude = ["com.microsoft.teams2"]
-default-layout = "dwindle"   # dwindle | scroll
+default-layout = "dwindle"   # dwindle | scroll | stack (monocle)
 # UI language for bar menus/tooltips: "en" (default) | "cs"
 # language = "en"
 # Follow native focus: when macOS activates an app (URL opened from another
@@ -56,6 +56,9 @@ key = "caps_lock"
 "hyper-shift-t" = "layout dwindle"
 "hyper-p" = "pause-tiling"
 "hyper-r" = "retile"
+"hyper-space" = "switcher"
+"hyper-s" = "scratchpad"
+"hyper-o" = "hints"
 "hyper-comma" = "focus-monitor previous"
 "hyper-period" = "focus-monitor next"
 
@@ -71,6 +74,10 @@ key = "caps_lock"
 
 [bar]
 enabled = true
+# "top" | "bottom" reserve a strip; "menubar" lives INSIDE the system menu
+# bar band (no tiling space lost) — the window shrinks to just the pill and
+# on a notched display sits beside the notch (notch-side = "left" | "right").
+# "notch" = hidden entirely; hovering the notch slides the pill out under it.
 position = "top"
 # Pill background opacity 0..1 (native .bar material is already translucent)
 # and bar strip height in points.
@@ -81,6 +88,7 @@ height = 28
 align = "center"
 offset-x = 0
 offset-y = 0
+# notch-side = "left"
 # icon-size = 17
 # Overrides of [theme] just for the bar:
 # background-color = "#1e1e2eCC"
@@ -124,6 +132,13 @@ offset-y = 0
 # color = "#89b4fa"   # default: theme accent
 # width = 2
 # radius = 10         # default matches the system window corner radius
+
+# Scratchpad: hyper+s drops a floating window of this app over the current
+# workspace and hides it again (launches the app when not running).
+# [scratchpad]
+# app = "com.mitchellh.ghostty"
+# width = 0.6
+# height = 0.5
 
 # Drag&drop layout preview (hyper+drag).
 # [preview]

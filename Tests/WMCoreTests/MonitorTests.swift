@@ -24,7 +24,7 @@ private func makeWorkspace(_ name: String) -> Workspace {
 }
 
 /// State with the given displays connected and workspaces 1-9 placed on them.
-private func makeState(_ infos: [MonitorInfo], assignments: [String: String] = [:]) -> WMState {
+private func makeState(_ infos: [MonitorInfo], assignments: [String: [String]] = [:]) -> WMState {
     var state = WMState(monitors: [], workspaceAssignments: assignments)
     _ = WM.reconcileMonitors(infos, workspaceNames: names, makeWorkspace: makeWorkspace, state: &state)
     return state
@@ -53,7 +53,7 @@ final class WorkspaceAssignmentTests: XCTestCase {
     func testExplicitAssignmentByDisplayNameWins() {
         let plan = WorkspaceAssignment.plan(
             workspaceNames: names,
-            assignments: ["1": "P34w", "2": "12462:25292:0"],
+            assignments: ["1": ["P34w"], "2": ["12462:25292:0"]],
             monitors: [builtin, external]
         )
         XCTAssertEqual(plan, [["3", "4", "5", "6", "7", "8", "9"], ["1", "2"]])
@@ -62,7 +62,7 @@ final class WorkspaceAssignmentTests: XCTestCase {
     func testEveryMonitorEndsUpWithAtLeastOneWorkspace() {
         // Config assigning all workspaces to one display must not leave the
         // other one empty — Monitor.activeWorkspace indexes into the array.
-        let assignments = Dictionary(uniqueKeysWithValues: names.map { ($0, "Built-in") })
+        let assignments = Dictionary(uniqueKeysWithValues: names.map { ($0, ["Built-in"]) })
         let plan = WorkspaceAssignment.plan(workspaceNames: names, assignments: assignments, monitors: [builtin, external])
         XCTAssertEqual(plan[0], ["1", "2", "3", "4", "5", "6", "7", "8"])
         XCTAssertEqual(plan[1], ["9"])
@@ -75,7 +75,7 @@ final class WorkspaceAssignmentTests: XCTestCase {
     }
 
     func testUnknownMonitorInConfigFallsBackToAutomaticPlacement() {
-        let plan = WorkspaceAssignment.plan(workspaceNames: ["1", "2"], assignments: ["1": "Nonexistent"], monitors: [builtin])
+        let plan = WorkspaceAssignment.plan(workspaceNames: ["1", "2"], assignments: ["1": ["Nonexistent"]], monitors: [builtin])
         XCTAssertEqual(plan, [["1", "2"]])
     }
 }

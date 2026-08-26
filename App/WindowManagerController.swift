@@ -100,6 +100,10 @@ final class WindowManagerController: WindowTrackerDelegate {
     var onTilingPausedChanged: ((Bool) -> Void)?
     /// IPC for appllandctl / MCP.
     private var controlServer: ControlServer?
+    /// Spotlight-style window switcher (main thread only).
+    private var switcher: SwitcherOverlay?
+    /// Letter hints for visible windows (main thread only).
+    private var hints: HintsOverlay?
 
     init(config: AppConfig) {
         self.config = config
@@ -127,7 +131,7 @@ final class WindowManagerController: WindowTrackerDelegate {
             monitors: [],
             innerGap: config.general.gapsInner,
             outerGap: config.general.gapsOuter,
-            workspaceAssignments: config.workspaces ?? [:]
+            workspaceAssignments: config.workspaces?.mapValues(\.values) ?? [:]
         )
     }
 
@@ -217,6 +221,15 @@ final class WindowManagerController: WindowTrackerDelegate {
             break
         }
 
+        if request.hasPrefix("arrange ") {
+            guard let data = request.dropFirst("arrange ".count).data(using: .utf8),
+                  let arrangement = try? JSONDecoder().decode(Arrangement.self, from: data) else {
+                return "error: arrange expects JSON {layouts?, apps?, active?}"
+            }
+            return applyArrangement(arrangement)
+        }
+        if case .presetApply(let name)? = Command.parse(request) { return applyPreset(named: name) }
+        if case .presetSave(let name)? = Command.parse(request) { return savePreset(named: name) }
         guard let command = Command.parse(request) else {
             return "error: unknown command \"\(request)\""
         }
@@ -307,7 +320,7 @@ final class WindowManagerController: WindowTrackerDelegate {
             ))
             state.innerGap = newConfig.general.gapsInner
             state.outerGap = newConfig.general.gapsOuter
-            state.workspaceAssignments = newConfig.workspaces ?? [:]
+            state.workspaceAssignments = newConfig.workspaces?.mapValues(\.values) ?? [:]
 
             rebuildFocusBorder()
             let oldPreview = dropPreview
@@ -351,6 +364,15 @@ final class WindowManagerController: WindowTrackerDelegate {
             handler: { [weak self] combo in
                 guard let self, let command = self.binding(for: combo) else { return false }
                 self.tracker.perform { self.run(command) }
+                // Using a shortcut restarts the cheatsheet hold timer — hjkl
+                // navigation while holding hyper shouldn't pop the help.
+                DispatchQueue.main.async {
+                    guard let pending = self.helpTimer, pending.isValid, let helpOverlay = self.helpOverlay else { return }
+                    pending.invalidate()
+                    self.helpTimer = Timer.scheduledTimer(withTimeInterval: self.helpDelaySeconds, repeats: false) { _ in
+                        helpOverlay.show()
+                    }
+                }
                 return true
             },
             onHyperMouse: { [weak self] button, phase, location in
@@ -462,6 +484,8 @@ final class WindowManagerController: WindowTrackerDelegate {
         theme.inactiveIconOpacity = barConfig.inactiveIconOpacity
         theme.ringWidth = barConfig.ringWidth
         theme.maxIcons = barConfig.maxIcons
+        theme.notchSide = barConfig.notchSide
+        theme.position = barConfig.position
         return BarController(
                 theme: theme,
                 onSelect: { [weak self] name in
@@ -547,6 +571,9 @@ final class WindowManagerController: WindowTrackerDelegate {
     /// render under it. CG coordinates: top of the screen is minY.
     private func reserveBarStrip(in visibleFrame: CGRect) -> CGRect {
         guard config.bar.enabled else { return visibleFrame }
+        // menubar mode lives inside the system menu-bar band — no tiling
+        // space is reserved at all.
+        guard config.bar.position != "menubar", config.bar.position != "notch" else { return visibleFrame }
         var frame = visibleFrame
         let reserved = config.bar.height + config.bar.offsetY
         frame.size.height -= reserved
@@ -565,14 +592,22 @@ final class WindowManagerController: WindowTrackerDelegate {
             let title = [name, label?.icon, label?.name].compactMap { $0 }.joined(separator: " ")
             return BarWorkspaceRef(name: name, title: title)
         }
-        let availableLayouts = ["dwindle", "scroll"] + (config.customLayouts?.keys.sorted() ?? [])
+        let availableLayouts = ["dwindle", "scroll", "stack"] + (config.customLayouts?.keys.sorted() ?? [])
         let snapshots = state.monitors.enumerated().map { index, monitor -> (String, CGRect, [BarWorkspaceItem], Bool) in
-            let strip = CGRect(
-                x: monitor.visibleFrame.minX,
-                y: config.bar.position == "bottom" ? monitor.visibleFrame.maxY : monitor.visibleFrame.minY - config.bar.height,
-                width: monitor.visibleFrame.width,
-                height: config.bar.height
-            )
+            let strip: CGRect
+            if config.bar.position == "menubar" || config.bar.position == "notch" {
+                // The system menu-bar band (frame top to visibleFrame top);
+                // fall back to the configured height on displays reporting 0.
+                let bandHeight = max(monitor.visibleFrame.minY - monitor.frame.minY, config.bar.height)
+                strip = CGRect(x: monitor.frame.minX, y: monitor.frame.minY, width: monitor.frame.width, height: bandHeight)
+            } else {
+                strip = CGRect(
+                    x: monitor.visibleFrame.minX,
+                    y: config.bar.position == "bottom" ? monitor.visibleFrame.maxY : monitor.visibleFrame.minY - config.bar.height,
+                    width: monitor.visibleFrame.width,
+                    height: config.bar.height
+                )
+            }
             let items = monitor.workspaces.enumerated().compactMap { wsIndex, workspace -> BarWorkspaceItem? in
                 // hide-when-empty: skip empty workspaces, except the active one
                 // (the user must always see where they are).
@@ -587,7 +622,8 @@ final class WindowManagerController: WindowTrackerDelegate {
                         pid: pid,
                         isFocused: wid == globallyFocused,
                         badge: dockBadges[pid],
-                        isFloating: state.windows[wid]?.isFloating ?? false
+                        isFloating: state.windows[wid]?.isFloating ?? false,
+                        isFullscreen: state.windows[wid]?.isFullscreen ?? false
                     )
                 }
                 let label = config.workspaceLabels?[workspace.name]
@@ -603,6 +639,7 @@ final class WindowManagerController: WindowTrackerDelegate {
             }
             return (monitor.id, strip, items, index == state.focusedMonitorIndex)
         }
+        let compactBar = config.bar.position == "menubar" || config.bar.position == "notch"
         DispatchQueue.main.async {
             let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
             bar.update(snapshots.map { id, strip, items, focused in
@@ -612,7 +649,8 @@ final class WindowManagerController: WindowTrackerDelegate {
                     workspaces: items,
                     isFocusedMonitor: focused,
                     allWorkspaceNames: allWorkspaceNames,
-                    availableLayouts: availableLayouts
+                    availableLayouts: availableLayouts,
+                    compact: compactBar
                 )
             })
         }
@@ -638,6 +676,21 @@ final class WindowManagerController: WindowTrackerDelegate {
             return
         case .openConfig:
             DispatchQueue.main.async { NSWorkspace.shared.open(ConfigLoader.userConfigURL) }
+            return
+        case .switcher:
+            showSwitcher()
+            return
+        case .scratchpad:
+            toggleScratchpad()
+            return
+        case .hints:
+            showHints()
+            return
+        case .presetApply(let name):
+            _ = applyPreset(named: name)
+            return
+        case .presetSave(let name):
+            _ = savePreset(named: name)
             return
         default:
             break
@@ -751,6 +804,223 @@ final class WindowManagerController: WindowTrackerDelegate {
     /// Current global mouse position in CG (top-left) coordinates.
     private static func mouseLocation() -> CGPoint? {
         CGEvent(source: nil)?.location
+    }
+
+    /// Hyprland-style scratchpad: drops a floating window of the configured
+    /// app over the current workspace, or hides (parks) it again. Launches
+    /// the app when it isn't running. (axQueue)
+    /// ponytail: switching workspaces parks the scratchpad with its home
+    /// workspace — the next toggle may need a second press to re-sync.
+    private var scratchpadWindow: WindowID?
+
+    private func toggleScratchpad() {
+        guard let bundleID = config.scratchpad?.app else {
+            NSLog("applland: scratchpad has no [scratchpad].app configured")
+            return
+        }
+        guard let wid = state.windows.first(where: { $0.value.appBundleID == bundleID })?.key,
+              axWindows[wid.rawValue] != nil else {
+            NSLog("applland: scratchpad app %@ has no window, launching it", bundleID)
+            if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
+                DispatchQueue.main.async { NSWorkspace.shared.openApplication(at: url, configuration: .init()) }
+            }
+            return
+        }
+
+        if scratchpadWindow == wid, !parkedWindows.contains(wid.rawValue) {
+            park(wid)
+            scratchpadWindow = nil
+            updateFocusBorder()
+            updateBar()
+            return
+        }
+
+        // Show: float it (keeps current frame; no-op if floating) and drop it
+        // top-center on the focused monitor.
+        execute(WM.setFloating(wid, floating: true, state: &state))
+        guard state.monitors.indices.contains(state.focusedMonitorIndex) else { return }
+        let usable = state.monitors[state.focusedMonitorIndex].visibleFrame
+        let width = usable.width * (config.scratchpad?.width ?? 0.6)
+        let height = usable.height * (config.scratchpad?.height ?? 0.5)
+        let frame = CGRect(x: usable.midX - width / 2, y: usable.minY, width: width, height: height)
+        execute(WM.windowResizedByUser(wid, to: frame, state: &state))
+        assign(frame: AXFrame(origin: frame.origin, size: frame.size), to: wid)
+        execute(WM.focusChangedExternally(wid, state: &state))
+        execute([.focusWindow(wid)])
+        scratchpadWindow = wid
+    }
+
+    // MARK: - Arrangements & presets (axQueue)
+
+    /// A declarative window arrangement: per-workspace layouts, app→workspace
+    /// placement, and which workspaces to activate. Presets are named stored
+    /// arrangements; the IPC `arrange <json>` applies one directly (MCP).
+    private struct Arrangement: Codable {
+        var layouts: [String: String]?
+        var apps: [String: String]?
+        var active: [String]?
+    }
+
+    private static var presetsURL: URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/applland/presets.json")
+    }
+
+    private func loadPresets() -> [String: Arrangement] {
+        guard let data = try? Data(contentsOf: Self.presetsURL) else { return [:] }
+        return (try? JSONDecoder().decode([String: Arrangement].self, from: data)) ?? [:]
+    }
+
+    private func savePreset(named name: String) -> String {
+        var apps: [String: String] = [:]
+        var layouts: [String: String] = [:]
+        var active: [String] = []
+        for monitor in state.monitors {
+            active.append(monitor.activeWorkspace.name)
+            for workspace in monitor.workspaces {
+                layouts[workspace.name] = workspaceLayoutNames[workspace.name] ?? config.general.defaultLayout
+                for wid in workspace.allWindows {
+                    guard let bundle = state.windows[wid]?.appBundleID, !bundle.isEmpty else { continue }
+                    apps[bundle] = apps[bundle] ?? workspace.name // first placement wins
+                }
+            }
+        }
+        var presets = loadPresets()
+        presets[name] = Arrangement(layouts: layouts, apps: apps, active: active)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        guard let data = try? encoder.encode(presets) else { return "error: preset encoding failed" }
+        do {
+            try data.write(to: Self.presetsURL, options: .atomic)
+            NSLog("applland: preset \"%@\" saved", name)
+            return "ok"
+        } catch {
+            return "error: \(error.localizedDescription)"
+        }
+    }
+
+    @discardableResult
+    private func applyArrangement(_ arrangement: Arrangement) -> String {
+        for (workspaceName, layoutName) in arrangement.layouts ?? [:] {
+            applyLayout(named: layoutName, toWorkspace: workspaceName)
+        }
+        for (bundle, workspaceName) in arrangement.apps ?? [:] {
+            guard state.locate(workspace: workspaceName) != nil else { continue }
+            let windows = state.windows.filter { $0.value.appBundleID == bundle }.keys
+            for wid in windows {
+                execute(WM.moveWindow(wid, toWorkspace: workspaceName, state: &state))
+            }
+        }
+        for workspaceName in arrangement.active ?? [] {
+            run(.workspace(workspaceName))
+        }
+        return "ok"
+    }
+
+    private func applyPreset(named name: String) -> String {
+        guard let arrangement = loadPresets()[name] else {
+            return "error: unknown preset \"\(name)\""
+        }
+        NSLog("applland: applying preset \"%@\"", name)
+        return applyArrangement(arrangement)
+    }
+
+    // MARK: - Event stream (axQueue)
+
+    /// Compact state fingerprint; broadcast only on change.
+    private var lastBroadcast = ""
+
+    private func broadcastStateIfChanged() {
+        guard let controlServer else { return }
+        let focused = state.monitors.indices.contains(state.focusedMonitorIndex)
+            ? state.monitors[state.focusedMonitorIndex].activeWorkspace : nil
+        let line = "{\"event\":\"state-changed\",\"workspace\":\"\(focused?.name ?? "")\",\"focusedWindow\":\(focused?.focusedWindow?.rawValue ?? 0),\"tilingPaused\":\(tilingPaused)}"
+        guard line != lastBroadcast else { return }
+        lastBroadcast = line
+        controlServer.broadcast(line)
+    }
+
+    /// Letter badges over all visible windows; a keypress focuses. (axQueue)
+    private func showHints() {
+        let letters = Array("asdfghjklqwertyuiopzxcvbnm").map(String.init)
+        var entries: [HintEntry] = []
+        var visible: [(WindowID, CGRect)] = []
+        for monitor in state.monitors {
+            let frames = WM.allFrames(for: monitor.activeWorkspace, monitor: monitor, state: state)
+            for (wid, rect) in frames where rect.intersects(monitor.frame) && !parkedWindows.contains(wid.rawValue) {
+                visible.append((wid, rect))
+            }
+        }
+        visible.sort { a, b in
+            abs(a.1.minX - b.1.minX) > 1 ? a.1.minX < b.1.minX : a.1.minY < b.1.minY
+        }
+        for (index, item) in visible.prefix(letters.count).enumerated() {
+            entries.append(HintEntry(letter: letters[index], windowID: item.0.rawValue, frame: item.1))
+        }
+        let union = parkingBounds
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            if self.hints == nil {
+                self.hints = HintsOverlay { [weak self] windowID in
+                    guard let self else { return }
+                    self.tracker.perform {
+                        let wid = WindowID(windowID)
+                        self.execute(WM.focusChangedExternally(wid, state: &self.state))
+                        self.execute([.focusWindow(wid)])
+                    }
+                }
+            }
+            if self.hints?.isVisible == true {
+                self.hints?.hide()
+            } else {
+                self.hints?.show(entries: entries, union: union)
+            }
+        }
+    }
+
+    /// Builds the switcher entries from state and shows the overlay. (axQueue)
+    private func showSwitcher() {
+        var entries: [SwitcherEntry] = []
+        for monitor in state.monitors {
+            for workspace in monitor.workspaces {
+                let label = config.workspaceLabels?[workspace.name]
+                let workspaceTitle = [workspace.name, label?.icon, label?.name].compactMap { $0 }.joined(separator: " ")
+                let focused = workspace.focusedWindow
+                for wid in workspace.tiledWindows + Array(workspace.floatingFrames.keys) {
+                    guard let node = state.windows[wid] else { continue }
+                    entries.append(SwitcherEntry(
+                        id: wid.rawValue,
+                        pid: node.pid,
+                        appName: NSRunningApplication(processIdentifier: node.pid)?.localizedName ?? node.appBundleID,
+                        title: axWindows[wid.rawValue]?.title ?? node.title,
+                        workspaceTitle: workspaceTitle,
+                        isFocused: wid == focused
+                    ))
+                }
+            }
+        }
+        entries.sort { ($0.appName, $0.title) < ($1.appName, $1.title) }
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            // hyper+space again = toggle off.
+            if self.switcher?.isVisible == true {
+                self.switcher?.hide()
+                return
+            }
+            if self.switcher == nil {
+                self.switcher = SwitcherOverlay { [weak self] windowID in
+                    guard let self else { return }
+                    self.tracker.perform {
+                        let wid = WindowID(windowID)
+                        guard let location = self.state.windowLocation[wid] else { return }
+                        self.run(.workspace(location.workspaceName))
+                        self.execute(WM.focusChangedExternally(wid, state: &self.state))
+                        self.execute([.focusWindow(wid)])
+                    }
+                }
+            }
+            self.switcher?.show(entries: entries)
+        }
     }
 
     /// Decides what a drop at `location` would do (edge insert / center swap),
@@ -916,6 +1186,7 @@ final class WindowManagerController: WindowTrackerDelegate {
             drainPendingPlacements()
             updateFocusBorder()
             updateBar()
+            broadcastStateIfChanged()
         }
     }
 
@@ -1058,6 +1329,10 @@ final class WindowManagerController: WindowTrackerDelegate {
             frame: frame
         )
         adopt(node, frame: frame)
+        let workspace = state.windowLocation[node.id]?.workspaceName ?? ""
+        controlServer?.broadcast(
+            "{\"event\":\"window-opened\",\"id\":\(node.id.rawValue),\"bundleID\":\"\(node.appBundleID)\",\"workspace\":\"\(workspace)\"}"
+        )
     }
 
     func windowDestroyed(id: AXWindowID) {
@@ -1071,6 +1346,7 @@ final class WindowManagerController: WindowTrackerDelegate {
         // Teams opening the browser...), pull that window's workspace into
         // view instead of leaving the window parked on a hidden one.
         if config.general.followNativeFocus,
+           wid != scratchpadWindow, // the scratchpad hovers over any workspace
            let location = state.windowLocation[wid],
            state.monitors.indices.contains(location.monitorIndex),
            state.monitors[location.monitorIndex].activeWorkspace.name != location.workspaceName {

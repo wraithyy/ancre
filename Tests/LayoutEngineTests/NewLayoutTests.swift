@@ -91,10 +91,44 @@ final class TemplateLayoutTests: XCTestCase {
     }
 }
 
+final class StackLayoutTests: XCTestCase {
+    func testAllWindowsFillTheUsableArea() {
+        var layout = StackLayout()
+        let ids = (0..<3).map { WindowID(UInt32($0)) }
+        for id in ids { layout.insert(id, after: layout.orderedWindows.last, container: container, innerGap: 8, outerGap: 8) }
+        let frames = layout.frames(container: container, innerGap: 8, outerGap: 8)
+        for id in ids {
+            XCTAssertEqual(frames[id], container.insetBy(dx: 8, dy: 8))
+        }
+    }
+
+    func testFocusCyclesTheStack() {
+        var layout = StackLayout()
+        let ids = (0..<3).map { WindowID(UInt32($0)) }
+        for id in ids { layout.insert(id, after: layout.orderedWindows.last, container: container, innerGap: 0, outerGap: 0) }
+        var workspace = Workspace(name: "1", layout: layout)
+        workspace.focusedWindow = ids[0]
+        let monitor = Monitor(id: "m", frame: container, visibleFrame: container, workspaces: [workspace])
+        var state = WMState(monitors: [monitor])
+        for id in ids {
+            state.windows[id] = WindowNode(id: id, appBundleID: "t", pid: 1, title: "")
+            state.windowLocation[id] = WindowLocation(monitorIndex: 0, workspaceName: "1")
+        }
+
+        _ = WM.dispatch(.focus(.right), state: &state)
+        XCTAssertEqual(state.monitors[0].activeWorkspace.focusedWindow, ids[1], "right cycles forward")
+        _ = WM.dispatch(.focus(.left), state: &state)
+        XCTAssertEqual(state.monitors[0].activeWorkspace.focusedWindow, ids[0], "left cycles back")
+        _ = WM.dispatch(.focus(.left), state: &state)
+        XCTAssertEqual(state.monitors[0].activeWorkspace.focusedWindow, ids[2], "wraps around")
+    }
+}
+
 final class LayoutFactoryTests: XCTestCase {
     func testResolvesBuiltinsAndCustoms() {
         XCTAssertTrue(LayoutFactory.make("dwindle") is DwindleLayout)
         XCTAssertTrue(LayoutFactory.make("scroll") is ScrollColumnsLayout)
+        XCTAssertTrue(LayoutFactory.make("stack") is StackLayout)
         XCTAssertTrue(LayoutFactory.make("master", customLayouts: ["master": "h(0.6, *, *)"]) is TemplateLayout)
         XCTAssertNil(LayoutFactory.make("nonsense"))
         XCTAssertNil(LayoutFactory.make("bad", customLayouts: ["bad": "h(?)"]))

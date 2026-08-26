@@ -29,6 +29,9 @@ final class ControlServer {
     private var acceptSource: DispatchSourceRead?
     /// Max request size; anything longer is a misbehaving client.
     private let maxRequestBytes = 4096
+    /// Clients that sent "subscribe" — they keep their fd and receive
+    /// broadcast event lines until they disconnect.
+    private var subscribers: [Int32] = []
 
     init?(handler: @escaping Handler) {
         self.handler = handler
@@ -80,6 +83,9 @@ final class ControlServer {
         // bound the read with a timeout and do it off the accept queue.
         var timeout = timeval(tv_sec: 2, tv_usec: 0)
         setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
+        // A subscriber that vanished must not SIGPIPE the whole app on write.
+        var noSigpipe: Int32 = 1
+        setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &noSigpipe, socklen_t(MemoryLayout<Int32>.size))
         DispatchQueue.global(qos: .utility).async { [weak self] in
             guard let self else { close(fd); return }
             var buffer = Data()
@@ -98,6 +104,14 @@ final class ControlServer {
                 close(fd)
                 return
             }
+            if line == "subscribe" {
+                self.queue.async {
+                    var data = Data("subscribed\n".utf8)
+                    data.withUnsafeBytes { _ = write(fd, $0.baseAddress, $0.count) }
+                    self.subscribers.append(fd)
+                }
+                return
+            }
             self.handler(line) { response in
                 self.queue.async {
                     var data = Data(response.utf8)
@@ -105,6 +119,24 @@ final class ControlServer {
                     data.withUnsafeBytes { _ = write(fd, $0.baseAddress, $0.count) }
                     close(fd)
                 }
+            }
+        }
+    }
+
+    /// Pushes one event line to every subscriber; dead connections are
+    /// dropped. Safe from any thread.
+    func broadcast(_ line: String) {
+        queue.async { [weak self] in
+            guard let self, !self.subscribers.isEmpty else { return }
+            var data = Data(line.utf8)
+            data.append(0x0A)
+            self.subscribers.removeAll { fd in
+                let written = data.withUnsafeBytes { write(fd, $0.baseAddress, $0.count) }
+                if written <= 0 {
+                    close(fd)
+                    return true
+                }
+                return false
             }
         }
     }

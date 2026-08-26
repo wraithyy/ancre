@@ -47,6 +47,18 @@ server.tool(
 );
 
 server.tool(
+  "applland_arrange",
+  "Apply a whole declarative arrangement in one call: per-workspace layouts, app-to-workspace placement (all windows of a bundle id move), and which workspaces to activate. Example: {layouts: {'2': 'scroll'}, apps: {'com.google.Chrome': '2', 'dev.zed.Zed': '1'}, active: ['1']}.",
+  {
+    layouts: z.record(z.string()).optional().describe("workspace name -> layout (dwindle|scroll|custom)"),
+    apps: z.record(z.string()).optional().describe("bundle id -> workspace name"),
+    active: z.array(z.string()).optional().describe("workspaces to activate, one per monitor"),
+  },
+  async ({ layouts, apps, active }) =>
+    asText(await send("arrange " + JSON.stringify({ layouts, apps, active })))
+);
+
+server.tool(
   "applland_move_window",
   "Move a specific window (id from applland_state) to a workspace.",
   {

@@ -67,6 +67,9 @@ public struct AppConfig: Codable {
         public var height: Double
         /// Horizontal placement of the pill: "center" | "left" | "right".
         public var align: String
+        /// With position = "menubar" on a notched display, which side of the
+        /// notch hosts the pill: "left" | "right".
+        public var notchSide: String
         /// Shift of the pill along the alignment edge (points).
         public var offsetX: Double
         /// Shift of the strip away from the screen edge (points).
@@ -124,6 +127,7 @@ public struct AppConfig: Codable {
             case inactiveIconOpacity = "inactive-icon-opacity"
             case ringWidth = "ring-width"
             case maxIcons = "max-icons"
+            case notchSide = "notch-side"
         }
 
         // Newer keys are optional with defaults so configs copied before they
@@ -135,6 +139,7 @@ public struct AppConfig: Codable {
             opacity = lenientDouble(c, .opacity) ?? 1.0
             height = lenientDouble(c, .height) ?? 28
             align = try c.decodeIfPresent(String.self, forKey: .align) ?? "center"
+            notchSide = try c.decodeIfPresent(String.self, forKey: .notchSide) ?? "left"
             offsetX = lenientDouble(c, .offsetX) ?? 0
             offsetY = lenientDouble(c, .offsetY) ?? 0
             backgroundColor = try c.decodeIfPresent(String.self, forKey: .backgroundColor)
@@ -184,6 +189,25 @@ public struct AppConfig: Codable {
             width = (try? c.decode(Double.self, forKey: .width)) ?? Double((try? c.decode(Int.self, forKey: .width)) ?? 2)
             // 10 ≈ the system window corner radius, so the border hugs frames.
             radius = (try? c.decode(Double.self, forKey: .radius)) ?? Double((try? c.decode(Int.self, forKey: .radius)) ?? 10)
+        }
+    }
+
+    /// Scratchpad: a dropdown window (terminal, notes) toggled over any
+    /// workspace with the `scratchpad` command.
+    public struct Scratchpad: Codable {
+        /// Bundle id of the scratchpad app; nil disables the feature.
+        public var app: String?
+        /// Size as fractions of the monitor's usable area.
+        public var width: Double
+        public var height: Double
+
+        enum CodingKeys: String, CodingKey { case app, width, height }
+
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            app = try c.decodeIfPresent(String.self, forKey: .app)
+            width = lenientDouble(c, .width) ?? 0.6
+            height = lenientDouble(c, .height) ?? 0.5
         }
     }
 
@@ -266,10 +290,30 @@ public struct AppConfig: Codable {
     public var hyper: Hyper
     public var keybindings: [String: String]
     public var bar: Bar
-    /// `[workspaces]`: workspace name -> monitor, identified by stable id or
-    /// (case-insensitive substring of) the display name. Optional: absent means
-    /// "spread workspaces across whatever is connected".
-    public var workspaces: [String: String]?
+    /// One monitor matcher or a preference-ordered list: `"1" = "PHL"` or
+    /// `"1" = ["PHL", "P34w"]` — the first connected one wins.
+    public struct MonitorMatchers: Codable {
+        public let values: [String]
+
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.singleValueContainer()
+            if let one = try? c.decode(String.self) {
+                values = [one]
+            } else {
+                values = try c.decode([String].self)
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var c = encoder.singleValueContainer()
+            try c.encode(values)
+        }
+    }
+
+    /// `[workspaces]`: workspace name -> monitor(s), identified by stable id
+    /// or (case-insensitive substring of) the display name. Optional: absent
+    /// means "spread workspaces across whatever is connected".
+    public var workspaces: [String: MonitorMatchers]?
     /// `[workspace-labels]`: workspace name -> bar appearance.
     public var workspaceLabels: [String: WorkspaceLabel]?
     /// `[app-workspaces]`: bundle id -> workspace name new windows of that
@@ -286,9 +330,11 @@ public struct AppConfig: Codable {
     public var help: Help?
     /// `[preview]`: drag&drop layout preview; absent = accent, 0.3 fill.
     public var preview: Preview?
+    /// `[scratchpad]`: dropdown window app + size; absent = disabled.
+    public var scratchpad: Scratchpad?
 
     enum CodingKeys: String, CodingKey {
-        case general, hyper, keybindings, bar, workspaces, theme, border, help, preview
+        case general, hyper, keybindings, bar, workspaces, theme, border, help, preview, scratchpad
         case workspaceLabels = "workspace-labels"
         case appWorkspaces = "app-workspaces"
         case customLayouts = "custom-layouts"
@@ -381,7 +427,7 @@ public enum ConfigLoader {
             config.general.gapsInner = max(0, config.general.gapsInner)
             config.general.gapsOuter = max(0, config.general.gapsOuter)
         }
-        let knownLayouts = Set(["dwindle", "scroll"]).union(config.customLayouts?.keys ?? [:].keys)
+        let knownLayouts = Set(["dwindle", "scroll", "stack"]).union(config.customLayouts?.keys ?? [:].keys)
         if !knownLayouts.contains(config.general.defaultLayout) {
             warnings.append("config: unknown default-layout \"\(config.general.defaultLayout)\", using \"\(defaults.general.defaultLayout)\"")
             config.general.defaultLayout = defaults.general.defaultLayout
@@ -393,10 +439,10 @@ public enum ConfigLoader {
             config.hyper.key = defaults.hyper.key
         }
         if let assignments = config.workspaces {
-            let empty = assignments.filter { $0.value.trimmingCharacters(in: .whitespaces).isEmpty }.keys.sorted()
+            let empty = assignments.filter { $0.value.values.allSatisfy { $0.trimmingCharacters(in: .whitespaces).isEmpty } }.keys.sorted()
             if !empty.isEmpty {
                 warnings.append("config: [workspaces] entries with an empty monitor are ignored: \(empty.joined(separator: ", "))")
-                config.workspaces = assignments.filter { !$0.value.trimmingCharacters(in: .whitespaces).isEmpty }
+                config.workspaces = assignments.filter { !$0.value.values.allSatisfy { $0.trimmingCharacters(in: .whitespaces).isEmpty } }
             }
         }
         if !["top", "bottom"].contains(config.bar.position) {

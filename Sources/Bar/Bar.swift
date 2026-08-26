@@ -17,13 +17,16 @@ public struct BarWindowItem: Equatable {
     public let badge: String?
     /// Floating windows get a dashed ring and a "return to tiling" menu item.
     public let isFloating: Bool
+    /// Fullscreen windows get a corner glyph on their icon.
+    public let isFullscreen: Bool
 
-    public init(windowID: UInt32, pid: pid_t, isFocused: Bool, badge: String?, isFloating: Bool) {
+    public init(windowID: UInt32, pid: pid_t, isFocused: Bool, badge: String?, isFloating: Bool, isFullscreen: Bool) {
         self.windowID = windowID
         self.pid = pid
         self.isFocused = isFocused
         self.badge = badge
         self.isFloating = isFloating
+        self.isFullscreen = isFullscreen
     }
 }
 
@@ -74,14 +77,18 @@ public struct BarMonitorSnapshot: Equatable {
     public let allWorkspaceNames: [BarWorkspaceRef]
     /// Layout names offered in the context menu (built-ins + custom).
     public let availableLayouts: [String]
+    /// Menubar mode: `barFrame` is the menu-bar band and the window shrinks
+    /// to the pill so the rest of the menu bar stays clickable.
+    public let compact: Bool
 
-    public init(monitorID: String, barFrame: NSRect, workspaces: [BarWorkspaceItem], isFocusedMonitor: Bool, allWorkspaceNames: [BarWorkspaceRef], availableLayouts: [String]) {
+    public init(monitorID: String, barFrame: NSRect, workspaces: [BarWorkspaceItem], isFocusedMonitor: Bool, allWorkspaceNames: [BarWorkspaceRef], availableLayouts: [String], compact: Bool = false) {
         self.monitorID = monitorID
         self.barFrame = barFrame
         self.workspaces = workspaces
         self.isFocusedMonitor = isFocusedMonitor
         self.allWorkspaceNames = allWorkspaceNames
         self.availableLayouts = availableLayouts
+        self.compact = compact
     }
 }
 
@@ -133,6 +140,11 @@ public struct BarTheme {
     public var inactiveIconOpacity = 0.75
     public var ringWidth = 1.5
     public var maxIcons = 6
+    /// Which side of a notch hosts the pill in menubar position.
+    public var notchSide = "left"
+    /// "top" | "bottom" | "menubar" | "notch" — notch = hidden until the
+    /// mouse enters the notch zone, then the pill slides out under it.
+    public var position = "top"
 
     public init() {}
 
@@ -153,6 +165,10 @@ public final class BarController {
     private let onToggleFullscreen: (UInt32) -> Void
     private var windows: [String: NSWindow] = [:]
     private var lastSnapshots: [String: BarMonitorSnapshot] = [:]
+    /// Notch mode: invisible hover zones over the notch and which monitors
+    /// currently have their pill revealed.
+    private var hoverZones: [String: NSWindow] = [:]
+    private var revealed: Set<String> = []
 
     public init(
         theme: BarTheme,
@@ -190,6 +206,7 @@ public final class BarController {
                 allWorkspaceNames: snapshot.allWorkspaceNames,
                 availableLayouts: snapshot.availableLayouts,
                 isFocused: snapshot.isFocusedMonitor,
+                fullWidth: !snapshot.compact,
                 theme: theme,
                 onSelect: onSelect,
                 onMoveWindow: onMoveWindow,
@@ -201,10 +218,27 @@ public final class BarController {
             )
             // Reassign rootView so SwiftUI diffs the tree instead of a full
             // NSHostingView teardown on every change (focus ring, badges...).
-            if let hosting = window.contentView as? NSHostingView<BarView> {
-                hosting.rootView = rootView
+            let hosting: NSHostingView<BarView>
+            if let existing = window.contentView as? NSHostingView<BarView> {
+                existing.rootView = rootView
+                hosting = existing
+            } else if let container = window.contentView as? TrackingView,
+                      let inner = container.subviews.first as? NSHostingView<BarView> {
+                inner.rootView = rootView
+                hosting = inner
             } else {
-                window.contentView = NSHostingView(rootView: rootView)
+                hosting = NSHostingView(rootView: rootView)
+                window.contentView = hosting
+            }
+            if snapshot.compact {
+                positionCompact(window, hosting: hosting, band: snapshot.barFrame)
+            }
+            if theme.position == "notch", let screen = notchedScreen(for: snapshot.barFrame) {
+                setupNotchMode(monitorID: snapshot.monitorID, window: window, hosting: hosting, screen: screen)
+                if !revealed.contains(snapshot.monitorID) {
+                    window.orderOut(nil)
+                    continue
+                }
             }
             window.orderFrontRegardless()
         }
@@ -218,8 +252,122 @@ public final class BarController {
     /// Closes all bar windows (hot-reload replaces the controller). Main thread.
     public func close() {
         for window in windows.values { window.orderOut(nil) }
+        for zone in hoverZones.values { zone.orderOut(nil) }
         windows.removeAll()
+        hoverZones.removeAll()
         lastSnapshots.removeAll()
+        revealed.removeAll()
+    }
+
+    /// Menubar mode: shrink the window to the pill and place it in the band,
+    /// dodging the notch via the screen's auxiliary top areas.
+    private func positionCompact(_ window: NSWindow, hosting: NSHostingView<BarView>, band: NSRect) {
+        let size = hosting.fittingSize
+        var usable = band
+        if let screen = NSScreen.screens.first(where: { $0.frame.intersects(band) }),
+           screen.safeAreaInsets.top > 0 {
+            let aux = theme.notchSide == "right" ? screen.auxiliaryTopRightArea : screen.auxiliaryTopLeftArea
+            if let aux { usable = aux }
+        }
+        let x: CGFloat
+        switch theme.align {
+        case "left": x = usable.minX + 4 + theme.offsetX
+        case "right": x = usable.maxX - size.width - 4 - theme.offsetX
+        default: x = usable.midX - size.width / 2 + theme.offsetX
+        }
+        let clampedX = min(max(x, usable.minX), max(usable.minX, usable.maxX - size.width))
+        window.setFrame(
+            NSRect(x: clampedX, y: band.midY - size.height / 2, width: min(size.width, usable.width), height: size.height),
+            display: true
+        )
+    }
+
+    private func notchedScreen(for band: NSRect) -> NSScreen? {
+        NSScreen.screens.first { $0.frame.intersects(band) && $0.safeAreaInsets.top > 0 }
+    }
+
+    /// Creates the invisible hover zone over the notch and parks the pill
+    /// right under it; entering the zone slides the pill out, leaving the
+    /// pill hides it again.
+    private func setupNotchMode(monitorID: String, window: NSWindow, hosting: NSHostingView<BarView>, screen: NSScreen) {
+        let safeTop = screen.safeAreaInsets.top
+        let auxLeft = screen.auxiliaryTopLeftArea
+        let auxRight = screen.auxiliaryTopRightArea
+        let notchMinX = auxLeft?.maxX ?? screen.frame.midX - 90
+        let notchMaxX = auxRight?.minX ?? screen.frame.midX + 90
+        let notchRect = NSRect(x: notchMinX, y: screen.frame.maxY - safeTop, width: notchMaxX - notchMinX, height: safeTop)
+
+        // Pill target: centered under the notch, just below the menu band.
+        let size = hosting.fittingSize
+        let target = NSRect(
+            x: notchRect.midX - size.width / 2,
+            y: screen.frame.maxY - safeTop - size.height - 4,
+            width: size.width,
+            height: size.height
+        )
+        window.setFrame(target, display: true)
+        wrapInTracking(window: window, hosting: hosting) { [weak self] in
+            self?.conceal(monitorID: monitorID, window: window)
+        }
+
+        if hoverZones[monitorID] == nil {
+            let zone = NSWindow(contentRect: notchRect, styleMask: .borderless, backing: .buffered, defer: false)
+            zone.isOpaque = false
+            zone.backgroundColor = .clear
+            zone.hasShadow = false
+            zone.level = .statusBar
+            zone.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
+            let tracker = TrackingView(onEnter: { [weak self, weak window] in
+                guard let self, let window else { return }
+                self.reveal(monitorID: monitorID, window: window, target: target, safeTop: safeTop)
+            }, onExit: nil)
+            zone.contentView = tracker
+            zone.orderFrontRegardless()
+            hoverZones[monitorID] = zone
+        }
+    }
+
+    private func reveal(monitorID: String, window: NSWindow, target: NSRect, safeTop: CGFloat) {
+        guard !revealed.contains(monitorID) else { return }
+        revealed.insert(monitorID)
+        var start = target
+        start.origin.y += safeTop + target.height // begin tucked behind the notch band
+        window.setFrame(start, display: false)
+        window.alphaValue = 0
+        window.orderFrontRegardless()
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.18
+            window.animator().setFrame(target, display: true)
+            window.animator().alphaValue = 1
+        }
+    }
+
+    private func conceal(monitorID: String, window: NSWindow) {
+        guard revealed.contains(monitorID) else { return }
+        revealed.remove(monitorID)
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.15
+            window.animator().alphaValue = 0
+        }, completionHandler: {
+            window.orderOut(nil)
+            window.alphaValue = 1
+        })
+    }
+
+    /// Ensures the pill's content view is wrapped in a tracking container so
+    /// mouse-exit can hide it in notch mode.
+    private func wrapInTracking(window: NSWindow, hosting: NSHostingView<BarView>, onExit: @escaping () -> Void) {
+        if let container = window.contentView as? TrackingView {
+            container.onExit = onExit
+            if hosting.superview !== container {
+                container.subviews.forEach { $0.removeFromSuperview() }
+                container.embed(hosting)
+            }
+            return
+        }
+        let container = TrackingView(onEnter: nil, onExit: onExit)
+        container.embed(hosting)
+        window.contentView = container
     }
 
     private func makeWindow() -> NSWindow {
@@ -238,6 +386,8 @@ private struct BarView: View {
     let allWorkspaceNames: [BarWorkspaceRef]
     let availableLayouts: [String]
     let isFocused: Bool
+    /// false = menubar mode: just the pill, no full-strip spacers.
+    let fullWidth: Bool
     let theme: BarTheme
     let onSelect: (String) -> Void
     let onMoveWindow: (UInt32, String) -> Void
@@ -249,7 +399,7 @@ private struct BarView: View {
 
     var body: some View {
         HStack {
-            if theme.align != "left" { Spacer(minLength: 0) }
+            if fullWidth, theme.align != "left" { Spacer(minLength: 0) }
             HStack(spacing: theme.spacing) {
                 ForEach(workspaces, id: \.name) { workspace in
                     WorkspaceCell(
@@ -271,12 +421,12 @@ private struct BarView: View {
             .padding(.horizontal, theme.pillPaddingX)
             .padding(.vertical, theme.pillPaddingY)
             .background(pillBackground)
-            .offset(x: theme.align == "center" ? theme.offsetX : 0)
-            if theme.align != "right" { Spacer(minLength: 0) }
+            .offset(x: fullWidth && theme.align == "center" ? theme.offsetX : 0)
+            if fullWidth, theme.align != "right" { Spacer(minLength: 0) }
         }
-        .padding(.leading, theme.align == "left" ? 8 + theme.offsetX : 0)
-        .padding(.trailing, theme.align == "right" ? 8 + theme.offsetX : 0)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.leading, fullWidth && theme.align == "left" ? 8 + theme.offsetX : 0)
+        .padding(.trailing, fullWidth && theme.align == "right" ? 8 + theme.offsetX : 0)
+        .frame(maxWidth: fullWidth ? .infinity : nil, maxHeight: fullWidth ? .infinity : nil)
     }
 
     @ViewBuilder private var pillBackground: some View {
@@ -343,6 +493,16 @@ private struct WorkspaceCell: View {
                                     style: StrokeStyle(lineWidth: window.isFocused || window.isFloating ? theme.ringWidth : 0, dash: window.isFloating && !window.isFocused ? [2.5] : [])
                                 )
                         )
+                        .overlay(alignment: .bottomTrailing) {
+                            if window.isFullscreen {
+                                Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                    .font(.system(size: max(6, theme.fontSize / 2), weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .padding(1.5)
+                                    .background(Circle().fill(Color.black.opacity(0.6)))
+                                    .offset(x: 3, y: 3)
+                            }
+                        }
                         .overlay(alignment: .topTrailing) {
                             if let badge = window.badge {
                                 Text(badge.count > 2 ? "9+" : badge)
@@ -430,4 +590,39 @@ private struct WorkspaceCell: View {
         }
         return Color.primary.opacity(isFocusedMonitor ? 0.16 : 0.09)
     }
+}
+
+
+/// Plain NSView with a full-bounds tracking area calling the given closures.
+final class TrackingView: NSView {
+    var onEnter: (() -> Void)?
+    var onExit: (() -> Void)?
+
+    init(onEnter: (() -> Void)?, onExit: (() -> Void)?) {
+        self.onEnter = onEnter
+        self.onExit = onExit
+        super.init(frame: .zero)
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    func embed(_ view: NSView) {
+        view.frame = bounds
+        view.autoresizingMask = [.width, .height]
+        addSubview(view)
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.forEach(removeTrackingArea)
+        addTrackingArea(NSTrackingArea(
+            rect: bounds,
+            options: [.mouseEnteredAndExited, .activeAlways],
+            owner: self,
+            userInfo: nil
+        ))
+    }
+
+    override func mouseEntered(with event: NSEvent) { onEnter?() }
+    override func mouseExited(with event: NSEvent) { onExit?() }
 }
