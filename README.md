@@ -4,27 +4,35 @@
 
 # ancre
 
+[![CI](https://github.com/wraithyy/ancre/actions/workflows/ci.yml/badge.svg)](https://github.com/wraithyy/ancre/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/wraithyy/ancre?sort=semver)](https://github.com/wraithyy/ancre/releases)
+[![macOS 14+](https://img.shields.io/badge/macOS-14%2B-black?logo=apple)](https://github.com/wraithyy/ancre#requirements)
+[![Swift 6.0](https://img.shields.io/badge/Swift-6.0-F05138?logo=swift&logoColor=white)](Package.swift)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-wraithyy-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/wraithyy)
+
 **Docs: https://wraithyy.github.io/ancre/**
 
 A Hyprland-inspired tiling window manager for macOS: your windows arrange
 themselves side by side and one key drives everything.
 
-No private CGS/SkyLight window APIs, no SIP changes, no kernel extensions —
-with one documented exception: `_AXUIElementGetWindow` via `dlsym`, used to
-get a stable `CGWindowID` from an `AXUIElement` (the same trick yabai and
-Amethyst rely on, since there's no public API for it; it degrades gracefully
-if the symbol is ever unavailable).
-
 > **ancre** /ɑ̃kʁ/ — French for *anchor*. Your windows stop drifting.
 
-Inspired by [Hyprland](https://hypr.land) (layouts, ergonomics, the
-one-modifier philosophy) and [OmniWM](https://github.com/wraithyy/OmniWM)
-(proving a polished tiling WM on macOS is possible).
+<!-- media: hero screenshot + video (shotlist: Hero / README)
+<p align="center">
+  <img src="website/src/assets/hero-desktop.png" alt="ancre tiling a full desktop: dwindle layout with four windows and the workspace bar">
+</p>
+https://github.com/wraithyy/ancre/assets/hero-demo.mp4
+-->
 
 *New to tiling?* Instead of stacking windows on top of each other, a tiling
 window manager gives every window its own slot in a layout and keeps the
 screen fully used. You switch between numbered **workspaces** (virtual
 desktops) and move focus with the keyboard.
+
+Inspired by [Hyprland](https://hypr.land) (layouts, ergonomics, the
+one-modifier philosophy) and [OmniWM](https://github.com/wraithyy/OmniWM)
+(proving a polished tiling WM on macOS is possible).
 
 ## Highlights
 
@@ -139,8 +147,12 @@ aren't a 1:1 mirror — some pages exist only on one side:
 
 ancre sits between yabai and AeroSpace/Amethyst on the trade-off each of
 those makes. Like AeroSpace and Amethyst, it uses only the public
-Accessibility API — no SIP-disabling private CGS/SkyLight calls like yabai
-needs for some features. Like yabai, it takes Hyprland's dwindle layout and
+Accessibility API — no private CGS/SkyLight window APIs, no SIP changes, no
+kernel extensions like yabai needs for some features. One documented
+exception: `_AXUIElementGetWindow` via `dlsym`, used to get a stable
+`CGWindowID` from an `AXUIElement` (the same trick yabai and Amethyst rely
+on, since there's no public API for it; it degrades gracefully if the symbol
+is ever unavailable). Like yabai, it takes Hyprland's dwindle layout and
 one-modifier ergonomics as the model rather than i3/BSPWM-style manual
 splits. Configuration is a single declarative TOML file, and the whole
 stack — CLI, Unix socket, MCP server — is built to be driven by scripts and
@@ -151,6 +163,12 @@ agents, not just a keyboard.
 Found a bug or have a feature request? Open an issue on
 [GitHub Issues](https://github.com/wraithyy/ancre/issues). See
 [Releases](https://github.com/wraithyy/ancre/releases) for the changelog.
+
+## Support
+
+If ancre saves you time, you can
+[buy me a coffee](https://buymeacoffee.com/wraithyy). Entirely optional —
+issues and pull requests help just as much.
 
 ## License
 

@@ -24,6 +24,7 @@ export default defineConfig({
       },
       social: [
         { icon: 'github', label: 'GitHub', href: 'https://github.com/wraithyy/ancre' },
+        { icon: 'heart', label: 'Buy me a coffee', href: 'https://buymeacoffee.com/wraithyy' },
       ],
       editLink: {
         baseUrl: 'https://github.com/wraithyy/ancre/edit/main/website/',
