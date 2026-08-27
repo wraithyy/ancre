@@ -63,6 +63,14 @@ default-layout = "dwindle"   # dwindle | scroll | stack (monocle)
 # auto-stack = true          # workspace on a too-small monitor temporarily stacks
 # auto-stack-min-width = 300
 # move-log = true            # log manual moves to move-log.jsonl (for AI rule suggestions)
+# Apps ancre never manages — for apps that fight the tiler (Xcode).
+# New windows are left alone; a config reload releases already-managed ones.
+# ignore-apps = ["com.apple.dt.Xcode"]
+# Apps whose new windows start floating instead of tiled (hyper+v tiles them):
+# float-apps = ["com.apple.systempreferences"]
+# Daily anonymous check of GitHub Releases; a newer version shows a menubar
+# menu item linking to the release page. Never downloads or installs anything.
+# update-check = true
 ```
 
 ## `[keybindings]`

@@ -329,6 +329,15 @@ final class WindowManagerController: WindowTrackerDelegate {
             state.outerGap = newConfig.general.gapsOuter
             state.workspaceAssignments = newConfig.workspaces?.mapValues(\.values) ?? [:]
 
+            // Newly ignored apps: drop their windows from management (they
+            // stay at their current frame); newly un-ignored ones show up on
+            // the next rescan/retile.
+            let ignored = newConfig.general.ignoreApps
+            if !ignored.isEmpty {
+                let drop = state.windows.filter { ignored.contains($0.value.appBundleID) }.keys
+                for wid in drop { removeWindow(AXWindowID(wid.rawValue)) }
+            }
+
             rebuildFocusBorder()
             let oldPreview = dropPreview
             let previewColor = (newConfig.preview?.color ?? newConfig.theme?.accent).flatMap { NSColor(hex: $0) } ?? .controlAccentColor
@@ -736,6 +745,10 @@ final class WindowManagerController: WindowTrackerDelegate {
             return
         case .presetSave(let name):
             _ = savePreset(named: name)
+            return
+        case .quit:
+            NSLog("ancre: quit command — terminating")
+            DispatchQueue.main.async { NSApp.terminate(nil) }
             return
         default:
             break
@@ -1437,14 +1450,20 @@ final class WindowManagerController: WindowTrackerDelegate {
 
     private func register(_ window: AXWindow, app: AXAppInfo) {
         guard axWindows[window.id] == nil, !state.monitors.isEmpty else { return }
+        let bundleID = app.bundleIdentifier ?? ""
+        if config.general.ignoreApps.contains(bundleID) {
+            NSLog("ancre: ignore-apps: not managing window %u of %@", window.id, bundleID)
+            return
+        }
         axWindows[window.id] = window
         windowPids[window.id] = app.pid
         let frame = window.frame.cgRect
         let node = WindowNode(
             id: WindowID(window.id),
-            appBundleID: app.bundleIdentifier ?? "",
+            appBundleID: bundleID,
             pid: app.pid,
             title: window.title,
+            isFloating: config.general.floatApps.contains(bundleID),
             frame: frame
         )
         adopt(node, frame: frame)
@@ -1498,11 +1517,13 @@ final class WindowManagerController: WindowTrackerDelegate {
         guard let ax = axWindows[id], let pid = windowPids[id], !state.monitors.isEmpty else { return }
         let app = NSRunningApplication(processIdentifier: pid)
         let frame = ax.frame.cgRect
+        let bundleID = app?.bundleIdentifier ?? ""
         let node = WindowNode(
             id: WindowID(id),
-            appBundleID: app?.bundleIdentifier ?? "",
+            appBundleID: bundleID,
             pid: pid,
             title: ax.title,
+            isFloating: config.general.floatApps.contains(bundleID),
             frame: frame
         )
         adopt(node, frame: frame)

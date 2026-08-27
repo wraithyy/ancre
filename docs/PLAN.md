@@ -322,6 +322,11 @@ jim přirozené souřadnice za hranou) a bar (ukazovat i zaparkovaná okna).
 - Config hooks (on-window-open → command/shell) — zatím pokryto externě přes
   event stream.
 - hidutil re-apply po wake/výměně klávesnice (IOHIDManager notifikace).
+- In-place autoupdate přes Sparkle: appcast na docs GitHub Pages, EdDSA
+  podpis artefaktů v release.yml. Blokováno Developer ID podpisem — výměna
+  ad-hoc signed bundlu mění cdhash a TCC může zahodit Accessibility/Input
+  Monitoring grant (autoupdate by tiše rozbil WM). Do té doby stačí denní
+  update-check (UpdateChecker.swift, menu položka → release page).
 - Pravý niri scroll (viz poznámka u 5.1), layout edit mode.
 #### Task 8.7: Auto-stack při migraci — HOTOVO
 - [general] auto-stack (default on) + auto-stack-min-width (300): workspace,

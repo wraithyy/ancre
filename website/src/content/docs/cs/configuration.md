@@ -63,6 +63,14 @@ default-layout = "dwindle"   # dwindle | scroll | stack (monocle)
 # auto-stack = true          # workspace na malém monitoru dočasně do stack layoutu
 # auto-stack-min-width = 300
 # move-log = true            # log ručních přesunů do move-log.jsonl (pro AI návrhy pravidel)
+# Appky, které ancre nikdy nespravuje — pro appky, co s tilerem válčí (Xcode).
+# Nová okna nechá být; reload configu pustí i už spravovaná.
+# ignore-apps = ["com.apple.dt.Xcode"]
+# Appky, jejichž nová okna začínají jako floating (hyper+v je zadlaždicuje):
+# float-apps = ["com.apple.systempreferences"]
+# Denní anonymní dotaz na GitHub Releases; novější verze zobrazí položku
+# v menubar menu s odkazem na release page. Nikdy nic nestahuje ani neinstaluje.
+# update-check = true
 ```
 
 ## `[keybindings]`

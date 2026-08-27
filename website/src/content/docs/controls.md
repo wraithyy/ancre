@@ -52,6 +52,7 @@ with input-language switching. CapsLock avoids both.
 | `hyper+p` | pause tiling (toggle) |
 | `hyper+r` | rescan + retile everything |
 | `hyper+,` / `hyper+.` | focus previous/next monitor |
+| `hyper+shift+esc` | quit ancre (panic switch — windows stay where they are) |
 
 Every shortcut can be remapped in the `[keybindings]` section — see
 [Configuration](/ancre/configuration/).
@@ -62,11 +63,18 @@ Every shortcut can be remapped in the `[keybindings]` section — see
 ![Dragging a window by mouse into another position in the layout](../../assets/controls-dragdrop.gif)
 -->
 
-- **`hyper+left drag`** — move a window. The tile pops out of the grid;
-  dropping over another tile inserts it next to it (a placeholder shows the
-  future position).
-- **`hyper+right drag`** — resize. Tiled windows live-rearrange their
-  neighbors.
+Mouse is native — no hyper needed:
+
+- **native drag** (title bar) — the tile follows your cursor through the
+  layout: near an edge it **inserts** next to the target (a placeholder
+  shows the slot), over the center it **swaps**.
+- **native resize** (window edge) — neighbors re-ratio live.
+
+With hyper held, the same works from anywhere in the window:
+
+- **`hyper+left drag`** — same move/insert/swap, grabbing the window
+  anywhere.
+- **`hyper+right drag`** — resize from anywhere in the window.
 
 ## Workspace bar
 

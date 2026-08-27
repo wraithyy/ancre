@@ -252,6 +252,8 @@ public enum Command: Equatable {
     case hints
     case presetApply(String)
     case presetSave(String)
+    /// Terminate ancre (panic switch when tiling goes wrong).
+    case quit
 
     /// Parses the command grammar used by `Sources/Config/default.toml`'s
     /// `[keybindings]` values. Keep this in sync with that file.
@@ -310,6 +312,9 @@ public enum Command: Equatable {
         case "preset-save":
             guard parts.count == 2 else { return nil }
             return .presetSave(parts[1])
+        case "quit":
+            guard parts.count == 1 else { return nil }
+            return .quit
         case "focus-monitor":
             guard parts.count == 2, let target = MonitorTarget(rawValue: parts[1]) else { return nil }
             return .focusMonitor(target)
@@ -355,7 +360,7 @@ public enum WM {
             return [] // AX-side, handled by the controller before dispatch
         case .setLayout:
             return [] // resolved by the controller (needs LayoutEngine)
-        case .pauseTiling, .retile, .openConfig, .switcher, .scratchpad, .hints, .presetApply, .presetSave:
+        case .pauseTiling, .retile, .openConfig, .switcher, .scratchpad, .hints, .presetApply, .presetSave, .quit:
             return [] // controller-side
         }
     }

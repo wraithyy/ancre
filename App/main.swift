@@ -10,6 +10,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var permissionPollTimer: Timer?
     private var onboarding: OnboardingWindow?
     private var pauseItem: NSMenuItem?
+    private var updateTimer: Timer?
+    private var availableUpdate: String?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -17,6 +19,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.button?.imagePosition = .imageLeft
         buildMenu()
         startWhenTrusted()
+        if ConfigLoader.load().config.general.updateCheck {
+            scheduleUpdateChecks()
+        }
+    }
+
+    private func scheduleUpdateChecks() {
+        let check = { [weak self] in
+            UpdateChecker.check { version in
+                self?.availableUpdate = version
+                self?.buildMenu()
+            }
+        }
+        check()
+        updateTimer = Timer.scheduledTimer(withTimeInterval: 24 * 3600, repeats: true) { _ in check() }
+    }
+
+    @objc private func openReleasePage() {
+        NSWorkspace.shared.open(UpdateChecker.releasesURL)
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -60,6 +80,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         menu.addItem(NSMenuItem(title: "ancre", action: nil, keyEquivalent: ""))
         menu.addItem(.separator())
+
+        if let version = availableUpdate {
+            let update = NSMenuItem(title: L10n.updateAvailable(version), action: #selector(openReleasePage), keyEquivalent: "")
+            update.target = self
+            menu.addItem(update)
+            menu.addItem(.separator())
+        }
 
         if controller != nil {
             let pause = NSMenuItem(title: L10n.pauseTiling, action: #selector(togglePause), keyEquivalent: "p")

@@ -39,6 +39,15 @@ public struct AppConfig: Codable {
         /// Log manual window moves to Application Support/ancre/move-log.jsonl
         /// (input for agent-suggested [app-workspaces] rules).
         public var moveLog: Bool
+        /// Bundle ids ancre never manages — windows stay wherever the app
+        /// puts them (Xcode & friends that fight the tiler).
+        public var ignoreApps: [String]
+        /// Bundle ids whose new windows start floating instead of tiled
+        /// (still on a workspace; hyper+v tiles them).
+        public var floatApps: [String]
+        /// Once-a-day anonymous check of GitHub Releases for a newer version;
+        /// shows a menubar menu item, never installs anything.
+        public var updateCheck: Bool
 
         enum CodingKeys: String, CodingKey {
             case gapsInner = "gaps-inner"
@@ -52,6 +61,9 @@ public struct AppConfig: Codable {
             case autoStack = "auto-stack"
             case autoStackMinWidth = "auto-stack-min-width"
             case moveLog = "move-log"
+            case ignoreApps = "ignore-apps"
+            case floatApps = "float-apps"
+            case updateCheck = "update-check"
         }
 
         public init(from decoder: Decoder) throws {
@@ -67,6 +79,9 @@ public struct AppConfig: Codable {
             autoStack = try c.decodeIfPresent(Bool.self, forKey: .autoStack) ?? true
             autoStackMinWidth = lenientDouble(c, .autoStackMinWidth) ?? 300
             moveLog = try c.decodeIfPresent(Bool.self, forKey: .moveLog) ?? true
+            ignoreApps = try c.decodeIfPresent([String].self, forKey: .ignoreApps) ?? []
+            floatApps = try c.decodeIfPresent([String].self, forKey: .floatApps) ?? []
+            updateCheck = try c.decodeIfPresent(Bool.self, forKey: .updateCheck) ?? true
         }
     }
 
@@ -504,8 +519,20 @@ public enum ConfigLoader {
         try TOMLDecoder().decode(AppConfig.self, from: toml)
     }
 
+    /// `Bundle.module`'s generated accessor for executables looks next to
+    /// `Bundle.main.bundleURL` (the .app root), not Contents/Resources where
+    /// bundle.sh puts SPM resource bundles — a bundled ancre.app outside the
+    /// repo crashed at launch. Check Resources first, fall back to the accessor.
+    private static let resourceBundle: Bundle = {
+        if let url = Bundle.main.resourceURL?.appendingPathComponent("ancre_Config.bundle"),
+           let bundle = Bundle(url: url) {
+            return bundle
+        }
+        return Bundle.module
+    }()
+
     private static func bundledDefaultTOML() throws -> String {
-        guard let url = Bundle.module.url(forResource: "default", withExtension: "toml") else {
+        guard let url = resourceBundle.url(forResource: "default", withExtension: "toml") else {
             throw CocoaError(.fileNoSuchFile)
         }
         return try String(contentsOf: url, encoding: .utf8)
@@ -516,7 +543,7 @@ public enum ConfigLoader {
         guard !fm.fileExists(atPath: userConfigURL.path) else { return }
         do {
             try fm.createDirectory(at: userConfigURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-            guard let bundled = Bundle.module.url(forResource: "default", withExtension: "toml") else { return }
+            guard let bundled = resourceBundle.url(forResource: "default", withExtension: "toml") else { return }
             try fm.copyItem(at: bundled, to: userConfigURL)
         } catch {
             warnings.append("config: could not create \(userConfigURL.path): \(error)")

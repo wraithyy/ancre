@@ -27,6 +27,9 @@ back to defaults with a warning in the log. For a guided tour see
 | `auto-stack` | bool | `true` | — | workspace migrated to a too-small monitor temporarily stacks |
 | `auto-stack-min-width` | number | `300` | — | threshold: `count × min-width > monitor width` triggers auto-stack |
 | `move-log` | bool | `true` | — | log manual moves to `move-log.jsonl` (bundle ID + workspaces, no titles) |
+| `ignore-apps` | string[] | `[]` | bundle ids | apps ancre never manages; reload releases already-managed windows |
+| `float-apps` | string[] | `[]` | bundle ids | new windows of these apps start floating |
+| `update-check` | bool | `true` | — | daily GitHub Releases check; newer version = menubar menu item, nothing is installed |
 
 ## `[hyper]`
 

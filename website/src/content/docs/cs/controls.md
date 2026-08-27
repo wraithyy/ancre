@@ -53,6 +53,7 @@ s přepínáním jazyka vstupu. CapsLock se oběma vyhne.
 | `hyper+p` | pauza tilingu (toggle) |
 | `hyper+r` | rescan + přeskládat vše |
 | `hyper+,` / `hyper+.` | fokus předchozí/další monitor |
+| `hyper+shift+esc` | ukončit ancre (panic switch — okna zůstanou, kde jsou) |
 
 Všechny zkratky lze přemapovat v sekci `[keybindings]` — viz
 [Konfigurace](/ancre/cs/configuration/).
@@ -63,10 +64,17 @@ Všechny zkratky lze přemapovat v sekci `[keybindings]` — viz
 ![Přetažení okna myší na jinou pozici v layoutu](../../../assets/controls-dragdrop.gif)
 -->
 
-- **`hyper+levé táhnutí`** — přesun okna. Dlaždice se vytáhne z mřížky;
-  puštění nad jinou dlaždicí ji vloží vedle (ukazuje placeholder budoucí
-  pozice).
-- **`hyper+pravé táhnutí`** — resize. U dlaždic živě přerovnává sousedy.
+Myš funguje nativně — bez hyperu:
+
+- **nativní drag** (za title bar) — dlaždice následuje kurzor layoutem:
+  u okraje se **vloží** vedle cíle (placeholder ukazuje slot), nad středem
+  se **prohodí**.
+- **nativní resize** (za okraj okna) — sousedi živě mění poměry.
+
+S podrženým hyperem funguje totéž odkudkoli z okna:
+
+- **`hyper+levé táhnutí`** — stejný move/insert/swap, okno chytneš kdekoli.
+- **`hyper+pravé táhnutí`** — resize odkudkoli z okna.
 
 ## Workspace bar
 

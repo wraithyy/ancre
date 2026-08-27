@@ -26,6 +26,9 @@ na defaulty s warningem v logu. Průvodce: [Konfigurace](/ancre/cs/configuration
 | `auto-stack` | bool | `true` | — | workspace na malém monitoru dočasně do stack layoutu |
 | `auto-stack-min-width` | číslo | `300` | — | práh: `počet × min-width > šířka monitoru` |
 | `move-log` | bool | `true` | — | log ručních přesunů do `move-log.jsonl` (bundle ID + workspaces, bez titulků) |
+| `ignore-apps` | string[] | `[]` | bundle ids | appky, které ancre nikdy nespravuje; reload pustí i už spravovaná okna |
+| `float-apps` | string[] | `[]` | bundle ids | nová okna těchto appek začínají jako floating |
+| `update-check` | bool | `true` | — | denní dotaz na GitHub Releases; novější verze = položka v menubar menu, nic se neinstaluje |
 
 ## `[hyper]`
 

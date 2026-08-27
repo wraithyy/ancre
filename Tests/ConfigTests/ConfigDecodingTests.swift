@@ -29,6 +29,26 @@ final class ConfigDecodingTests: XCTestCase {
         XCTAssertNil(config.workspaceLabels)
         // Integer gaps must decode into Double fields.
         XCTAssertEqual(config.general.gapsInner, 8)
+        // Configs without the app-rule keys default to empty lists.
+        XCTAssertEqual(config.general.ignoreApps, [])
+        XCTAssertEqual(config.general.floatApps, [])
+    }
+
+    func testAppRulesDecode() throws {
+        let toml = """
+        [general]
+        ignore-apps = ["com.apple.dt.Xcode"]
+        float-apps = ["com.apple.systempreferences"]
+        [hyper]
+        key = "caps_lock"
+        [keybindings]
+        [bar]
+        enabled = true
+        position = "top"
+        """
+        let config = try TOMLDecoder().decode(AppConfig.self, from: toml)
+        XCTAssertEqual(config.general.ignoreApps, ["com.apple.dt.Xcode"])
+        XCTAssertEqual(config.general.floatApps, ["com.apple.systempreferences"])
     }
 
     func testFullThemingDecodes() throws {

@@ -21,6 +21,9 @@ public enum L10n {
     public static var pauseTiling: String { t("pause_tiling") }
     public static var retile: String { t("retile") }
     public static var monitors: String { t("monitors") }
+    public static func updateAvailable(_ version: String) -> String {
+        String(format: t("update_available"), version)
+    }
     public static var openConfig: String { t("open_config") }
     public static var reloadConfig: String { t("reload_config") }
     public static var switcherPlaceholder: String { t("switcher_placeholder") }
@@ -70,6 +73,7 @@ public enum L10n {
         "pause_tiling": "Pause tiling",
         "retile": "Retile windows",
         "monitors": "Monitors (click to copy id)",
+        "update_available": "Update to %@ available…",
         "open_config": "Open config",
         "reload_config": "Reload config",
         "switcher_placeholder": "Search windows…",
@@ -108,6 +112,7 @@ public enum L10n {
             "pause_tiling": "Pozastavit tiling",
             "retile": "Přeskládat okna",
             "monitors": "Monitory (klik zkopíruje id)",
+            "update_available": "Aktualizace %@ k dispozici…",
             "open_config": "Otevřít config",
             "reload_config": "Znovu načíst config",
             "switcher_placeholder": "Hledat okna…",

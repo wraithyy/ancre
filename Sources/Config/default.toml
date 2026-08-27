@@ -22,6 +22,15 @@ default-layout = "dwindle"   # dwindle | scroll | stack (monocle)
 # ~/Library/Application Support/ancre/move-log.jsonl — feed it to an agent
 # to suggest [app-workspaces] rules. Default on; false disables.
 # move-log = true
+# Apps ancre never manages (bundle ids): windows stay wherever the app puts
+# them. For apps that fight the tiler (Xcode). Applies to new windows; a
+# config reload releases already-managed ones at their current frame.
+# ignore-apps = ["com.apple.dt.Xcode"]
+# Apps whose new windows start floating instead of tiled (hyper+v tiles them).
+# float-apps = ["com.apple.systempreferences"]
+# Once a day, anonymously ask GitHub Releases for a newer version and show a
+# menubar menu item when there is one. Never downloads or installs anything.
+# update-check = true
 
 [hyper]
 # Physical key remapped to act as the hyper modifier.
@@ -70,6 +79,8 @@ key = "caps_lock"
 "hyper-o" = "hints"
 "hyper-comma" = "focus-monitor previous"
 "hyper-period" = "focus-monitor next"
+# Panic switch: terminate ancre entirely (windows stay where they are).
+"hyper-shift-escape" = "quit"
 
 # Pin workspaces to a display. The value is either the stable monitor id
 # (vendor:model:serial, logged at startup) or part of the display name.
@@ -79,7 +90,6 @@ key = "caps_lock"
 # "1" = "Built-in"
 # "9" = "P34w-20"
 
-# [[rules]] — Milestone 6
 
 [bar]
 enabled = true
@@ -163,7 +173,7 @@ offset-y = 0
 # width = 0.6
 # height = 0.5
 
-# Drag&drop layout preview (hyper+drag).
+# Drag&drop layout preview (window drag, native or hyper+drag).
 # [preview]
 # color = "#4C8DFF"   # default: theme accent
 # opacity = 0.3       # fill of the dragged window's future slot
