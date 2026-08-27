@@ -172,14 +172,16 @@ public final class BarController {
     private let onToggleFullscreen: (UInt32) -> Void
     private var windows: [String: NSWindow] = [:]
     private var lastSnapshots: [String: BarMonitorSnapshot] = [:]
-    /// Notch mode: invisible hover zones over the notch and which monitors
-    /// currently have their pill revealed.
-    private var hoverZones: [String: NSWindow] = [:]
+    /// Notch mode: which monitors currently have their pill revealed.
     private var revealed: Set<String> = []
     /// While revealed, polls whether the cursor is still near the zone/pill.
     private var revealWatchers: [String: Timer] = [:]
-    /// Reveal targets per notch-mode monitor, for hyper-peek.
-    private var notchTargets: [String: (target: NSRect, safeTop: CGFloat)] = [:]
+    /// Reveal target + notch hover zone per notch-mode monitor.
+    private var notchTargets: [String: (target: NSRect, safeTop: CGFloat, zone: NSRect)] = [:]
+    /// Polls the cursor against the notch zones while nothing is revealed —
+    /// NSTrackingArea enter events misfire on a quick pass into the menu-bar
+    /// band the same way exit events do (see revealWatchers).
+    private var hoverPoll: Timer?
     /// Hyper held = keep notch pills out regardless of the cursor.
     private var hyperPeek = false
     /// Fires with the CG-coordinate frames of visible bar windows whenever
@@ -285,6 +287,10 @@ public final class BarController {
                     window.orderOut(nil)
                     continue
                 }
+            } else {
+                // Was notch mode, isn't anymore — stop the hover poll from
+                // revealing it at the stale position.
+                notchTargets.removeValue(forKey: snapshot.monitorID)
             }
             window.orderFrontRegardless()
         }
@@ -292,6 +298,14 @@ public final class BarController {
             window.orderOut(nil)
             windows.removeValue(forKey: id)
             lastSnapshots.removeValue(forKey: id)
+            notchTargets.removeValue(forKey: id)
+            revealWatchers[id]?.invalidate()
+            revealWatchers[id] = nil
+            revealed.remove(id)
+        }
+        if notchTargets.isEmpty {
+            hoverPoll?.invalidate()
+            hoverPoll = nil
         }
         emitRegions()
     }
@@ -315,7 +329,7 @@ public final class BarController {
                 reveal(monitorID: id, window: window, target: info.target, safeTop: info.safeTop)
             } else {
                 var keep = window.frame.insetBy(dx: -16, dy: -16)
-                if let zone = hoverZones[id] { keep = keep.union(zone.frame.insetBy(dx: -16, dy: -16)) }
+                keep = keep.union(info.zone.insetBy(dx: -16, dy: -16))
                 if !keep.contains(NSEvent.mouseLocation) {
                     conceal(monitorID: id, window: window)
                 }
@@ -326,13 +340,14 @@ public final class BarController {
     /// Closes all bar windows (hot-reload replaces the controller). Main thread.
     public func close() {
         for window in windows.values { window.orderOut(nil) }
-        for zone in hoverZones.values { zone.orderOut(nil) }
         for watcher in revealWatchers.values { watcher.invalidate() }
+        hoverPoll?.invalidate()
+        hoverPoll = nil
         windows.removeAll()
-        hoverZones.removeAll()
         lastSnapshots.removeAll()
         revealed.removeAll()
         revealWatchers.removeAll()
+        notchTargets.removeAll()
     }
 
     /// Menubar mode: shrink the window to the pill and place it in the band,
@@ -362,9 +377,9 @@ public final class BarController {
         NSScreen.screens.first { $0.frame.intersects(band) && $0.safeAreaInsets.top > 0 }
     }
 
-    /// Creates the invisible hover zone over the notch and parks the pill
-    /// right under it; entering the zone slides the pill out, leaving the
-    /// pill hides it again.
+    /// Registers the notch hover zone and parks the pill right under it;
+    /// the hover poll slides the pill out when the cursor enters the zone,
+    /// leaving the pill hides it again.
     private func setupNotchMode(monitorID: String, window: NSWindow, hosting: NSHostingView<BarView>, screen: NSScreen) {
         let safeTop = screen.safeAreaInsets.top
         let auxLeft = screen.auxiliaryTopLeftArea
@@ -384,25 +399,21 @@ public final class BarController {
             height: size.height
         )
         window.setFrame(target, display: true)
-        notchTargets[monitorID] = (target, safeTop)
+        notchTargets[monitorID] = (target, safeTop, notchRect)
         wrapInTracking(window: window, hosting: hosting) { [weak self] in
             self?.conceal(monitorID: monitorID, window: window)
         }
 
-        if hoverZones[monitorID] == nil {
-            let zone = NSWindow(contentRect: notchRect, styleMask: .borderless, backing: .buffered, defer: false)
-            zone.isOpaque = false
-            zone.backgroundColor = .clear
-            zone.hasShadow = false
-            zone.level = .statusBar
-            zone.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
-            let tracker = TrackingView(onEnter: { [weak self, weak window] in
-                guard let self, let window else { return }
-                self.reveal(monitorID: monitorID, window: window, target: target, safeTop: safeTop)
-            }, onExit: nil)
-            zone.contentView = tracker
-            zone.orderFrontRegardless()
-            hoverZones[monitorID] = zone
+        if hoverPoll == nil {
+            hoverPoll = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+                guard let self else { return }
+                let mouse = NSEvent.mouseLocation
+                for (id, info) in self.notchTargets where !self.revealed.contains(id) {
+                    if info.zone.contains(mouse), let window = self.windows[id] {
+                        self.reveal(monitorID: id, window: window, target: info.target, safeTop: info.safeTop)
+                    }
+                }
+            }
         }
     }
 
@@ -430,8 +441,8 @@ public final class BarController {
         revealWatchers[monitorID] = Timer.scheduledTimer(withTimeInterval: 0.4, repeats: true) { [weak self, weak window] _ in
             guard let self, let window else { return }
             var keep = window.frame.insetBy(dx: -16, dy: -16)
-            if let zone = self.hoverZones[monitorID] {
-                keep = keep.union(zone.frame.insetBy(dx: -16, dy: -16))
+            if let zone = self.notchTargets[monitorID]?.zone {
+                keep = keep.union(zone.insetBy(dx: -16, dy: -16))
             }
             if !self.hyperPeek, !keep.contains(NSEvent.mouseLocation) {
                 self.conceal(monitorID: monitorID, window: window)
