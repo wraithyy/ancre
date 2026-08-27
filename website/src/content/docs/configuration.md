@@ -139,6 +139,11 @@ by default (`open -n`), or whatever `command` you set — and every later press
 toggles that same window in and out. Set `command` when the app has a cheaper
 way to open a fresh window than a whole second instance.
 
+That window lives **outside** the tiling model: it belongs to no workspace,
+gets no tile, never shows up in the bar, the switcher or window hints, and
+switching workspaces leaves it hovering where it is. The menu bar menu carries
+the same toggle (**Scratchpad: <app>**), and says whether the app is running.
+
 ## A complete example
 
 A real single-user setup, lightly edited. Workspaces 1–5 live on whichever

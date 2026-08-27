@@ -46,7 +46,7 @@ with input-language switching. CapsLock avoids both.
 | `hyper+f` | fullscreen toggle |
 | `hyper+t` / `hyper+shift+t` | layout scroll / dwindle |
 | `hyper+space` | window switcher (fuzzy search across all windows) |
-| `hyper+s` | scratchpad (a floating terminal/app summoned on demand) |
+| `hyper+s` | scratchpad — a terminal/app summoned on demand in its own window, outside tiling (also in the menu bar menu) |
 | `hyper+o` | hints — every window gets a letter, press it to jump there |
 | `hyper+a` | adopt frontmost window into the current workspace |
 | `hyper+p` | pause tiling (toggle) |

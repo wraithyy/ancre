@@ -298,14 +298,24 @@ jim přirozené souřadnice za hranou) a bar (ukazovat i zaparkovaná okna).
 - Non-activating KeyablePanel (borderless okna jinak nedostanou klávesnici).
 
 #### Task 8.3: Scratchpad (hyper+s) — HOTOVO
-- [scratchpad] app/width/height/command; toggle float top-center / park.
+- [scratchpad] app/width/height/command; toggle drop top-center / park.
   Scratchpad má vlastní okno — nikdy nepřebírá existující okno té appky
   (dřív bral první okno podle bundle ID, takže sebral to, ve kterém user
   pracoval). První toggle bez okna spawnuje: `command` (shell), jinak
   `NSWorkspace.openApplication` s `createsNewApplicationInstance` když app
-  běží; `scratchpadPending` (timeout 15 s) adoptuje nově registrované okno.
-  ponytail: přepnutí workspace zaparkuje scratchpad s jeho domovskou ws —
-  další toggle může chtít dva stisky.
+  běží; `scratchpadPending` (timeout 15 s) adoptuje nově vzniklé okno.
+- Okno žije MIMO model: neregistruje se do `state` ani `axWindows`, jediná
+  reference je `scratchpadAX` (+ `scratchpadVisible`). Tím padá workspace
+  location, bar/switcher/hints, enforceTiling, parking při přepnutí workspace
+  i původní float chování. Frame se sype přímo na AX element (animator),
+  hide = `OffscreenParking.parkFrame` + vrácení fokusu na focused okno
+  aktivní workspace. `register` ho skipuje i při rescanu (retile), `adopt-window`
+  ho odmítá, `windowDestroyed`/`appTerminated` referenci uklidí.
+  ponytail: po restartu ancre je staré scratchpad okno normální okno (žádná
+  persistence) — další hyper+s otevře nové.
+- Menubar menu: položka „Scratchpad: <appka> (běží/neběží)" se stejným
+  togglem, tooltip vysvětluje feature, nenastavený scratchpad = inertní
+  položka (validateMenuItem).
 
 #### Task 8.4: Window hints (hyper+o) — HOTOVO
 - Písmenkové badge přes viditelná okna, stisk = focus, Esc = zavřít.

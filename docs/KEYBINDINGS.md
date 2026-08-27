@@ -29,7 +29,7 @@ system shortcuts.
 | `hyper + 1…9` | switch workspace |
 | `hyper + shift + 1…9` | send focused window to workspace |
 | `hyper + space` | window switcher (fuzzy search) |
-| `hyper + s` | scratchpad toggle |
+| `hyper + s` | scratchpad toggle (own window, outside tiling; also in the menu bar menu) |
 | `hyper + o` | window hints (focus by letter) |
 | `hyper + v` | toggle floating (window leaves the grid and moves freely) |
 | `hyper + f` | toggle fullscreen |

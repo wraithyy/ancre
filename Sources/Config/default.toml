@@ -166,10 +166,12 @@ offset-y = 0
 # width = 2
 # radius = 10         # default matches the system window corner radius
 
-# Scratchpad: hyper+s drops a floating window of this app over the current
-# workspace and hides it again. The scratchpad owns its own window — windows
-# you already work in are never hijacked; the first toggle opens a new one
-# (a second app instance by default, or `command` when set).
+# Scratchpad: hyper+s drops a window of this app over the current workspace
+# and hides it again (also from the menubar menu). The scratchpad owns its own
+# window — windows you already work in are never hijacked; the first toggle
+# opens a new one (a second app instance by default, or `command` when set).
+# That window lives outside tiling entirely: no workspace, no tile, never
+# rearranged, and it stays put when you switch workspaces.
 # [scratchpad]
 # app = "com.mitchellh.ghostty"
 # width = 0.6

@@ -28,7 +28,7 @@ app (it falls back to defaults and logs a warning).
 | `[border]` | focus border: `enabled`, `color`, `width`, `radius` |
 | `[preview]` | drag&drop placeholder: `color`, `opacity` |
 | `[help]` | cheatsheet: `enabled`, `delay-ms`, `opacity`, `font-size`, `columns`, `corner-radius` |
-| `[scratchpad]` | `app` (bundle id), `width`, `height` (fractions of the screen), `command` (shell command opening a new window; default `open -n` on the app) |
+| `[scratchpad]` | `app` (bundle id), `width`, `height` (fractions of the screen), `command` (shell command opening a new window; default `open -n` on the app). Its window stays outside tiling: own window, no workspace, no tile |
 
 ## Vertical bars, menubar mode, notch mode
 

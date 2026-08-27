@@ -185,7 +185,7 @@ icon-size = 17
 | `app` | string | unset (feature vypnutá) | bundle ID drop-down appky; spustí ji, když neběží |
 | `width` | číslo | `0.6` | frakce šířky monitoru |
 | `height` | číslo | `0.5` | frakce výšky monitoru |
-| `command` | string | `open -n` na appku | shell příkaz, který otevře **nové** okno; scratchpad má vlastní okno a nikdy nepřebírá to, ve kterém pracuješ |
+| `command` | string | `open -n` na appku | shell příkaz, který otevře **nové** okno; scratchpad má vlastní okno, nikdy nepřebírá to, ve kterém pracuješ, a zůstává mimo tiling (žádná workspace, dlaždice ani záznam v baru/switcheru) |
 
 ## `[preview]`
 

@@ -139,6 +139,11 @@ pracuješ. První stisk jedno otevře — defaultně druhou instanci appky
 přepíná to samé okno. `command` nastav, když appka umí otevřít nové okno
 levněji než celou druhou instancí.
 
+Tohle okno žije **mimo** tiling model: nepatří do žádné workspace, nedostane
+dlaždici, neobjeví se v baru, switcheru ani window hints a přepnutí workspace
+ho nechá viset tam, kde je. Menubar menu má stejný toggle
+(**Scratchpad: <appka>**) a říká, jestli appka běží.
+
 ## Kompletní příklad
 
 Reálné nastavení jednoho uživatele, lehce upravené. Workspaces 1–5 žijí na tom
