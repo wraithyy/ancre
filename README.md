@@ -50,7 +50,10 @@ one-modifier philosophy) and [OmniWM](https://github.com/wraithyy/OmniWM)
   shortcut away
 - **Everything themeable**: colors, fonts, sizes, opacities, per-monitor
 - **AI ready**: `ancrectl` CLI, Unix-socket IPC, built-in MCP server, Claude
-  skill — an agent rearranges your whole setup in one call
+  skill — an agent rearranges your whole setup in one call. `ancrectl mcp`
+  plugs into any MCP client (Claude Code & Desktop, ChatGPT desktop/Codex,
+  Cursor, Antigravity, opencode, pi, OpenClaw, Hermes) — per-client setup in
+  [docs/SCRIPTING.md](docs/SCRIPTING.md#mcp-with-any-agent)
 
 ## Before you launch — read this once
 
@@ -119,7 +122,7 @@ aren't a 1:1 mirror — some pages exist only on one side:
 |---|---|---|
 | Keybindings, mouse, bar, menu bar | [docs/KEYBINDINGS.md](docs/KEYBINDINGS.md) | [controls](https://wraithyy.github.io/ancre/controls/) |
 | Configuration (all sections, bar modes, multi-monitor) | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | [configuration](https://wraithyy.github.io/ancre/configuration/) · [config reference](https://wraithyy.github.io/ancre/config-reference/) |
-| Scripting & AI (CLI, socket, MCP, presets, arrange) | [docs/SCRIPTING.md](docs/SCRIPTING.md) | [scripting](https://wraithyy.github.io/ancre/scripting/) |
+| Scripting & AI (CLI, socket, MCP for every agent, presets, arrange) | [docs/SCRIPTING.md](docs/SCRIPTING.md) | [scripting](https://wraithyy.github.io/ancre/scripting/) |
 | Layouts (dwindle, scroll, stack) | — | [layouts](https://wraithyy.github.io/ancre/layouts/) |
 | Multi-monitor placement | — | [multi-monitor](https://wraithyy.github.io/ancre/multi-monitor/) |
 | Bar setup and customization | — | [bar](https://wraithyy.github.io/ancre/bar/) |
