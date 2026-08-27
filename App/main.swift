@@ -10,6 +10,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var permissionPollTimer: Timer?
     private var onboarding: OnboardingWindow?
     private var pauseItem: NSMenuItem?
+    private var scratchpadItem: NSMenuItem?
+    private var scratchpadVisible = false
+    private var scratchpadConfigured = false
     private var updateTimer: Timer?
     private var availableUpdate: String?
 
@@ -102,6 +105,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
             menu.addItem(.separator())
 
+            // Same toggle as hyper+s; the title says which app and whether
+            // it's running, the tooltip explains what a scratchpad is.
+            let scratchpad = NSMenuItem(title: "", action: #selector(toggleScratchpad), keyEquivalent: "s")
+            scratchpad.target = self
+            scratchpad.toolTip = L10n.scratchpadTooltip
+            menu.addItem(scratchpad)
+            scratchpadItem = scratchpad
+            refreshScratchpadItem()
+
+            menu.addItem(.separator())
+
             // Monitors with their stable ids — click copies the id for the
             // [workspaces] config section.
             let monitorsItem = NSMenuItem(title: L10n.monitors, action: nil, keyEquivalent: "")
@@ -128,7 +142,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             menu.addItem(.separator())
         }
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        menu.delegate = self
         statusItem.menu = menu
+    }
+
+    /// Title/state of the scratchpad item, refreshed every time the menu opens
+    /// (the app can start or quit between openings).
+    private func refreshScratchpadItem() {
+        guard let item = scratchpadItem else { return }
+        let bundleID = ConfigLoader.load().config.scratchpad?.app
+        let name = bundleID.flatMap { id in
+            NSWorkspace.shared.urlForApplication(withBundleIdentifier: id)
+                .flatMap { Bundle(url: $0)?.infoDictionary?["CFBundleName"] as? String } ?? id
+        }
+        let running = bundleID.map { !NSRunningApplication.runningApplications(withBundleIdentifier: $0).isEmpty } ?? false
+        item.title = L10n.scratchpad(app: name, running: running)
+        item.state = scratchpadVisible ? .on : .off
+        scratchpadConfigured = bundleID != nil
+    }
+
+    @objc private func toggleScratchpad() {
+        controller?.toggleScratchpadFromMenu()
     }
 
     @objc private func togglePause() {
@@ -184,10 +218,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // in the menubar mark turns red.
             self?.statusItem.button?.image = AppDelegate.menubarIcon(paused: paused)
         }
+        controller.onScratchpadVisibleChanged = { [weak self] visible in
+            self?.scratchpadVisible = visible
+            self?.refreshScratchpadItem()
+        }
         controller.start()
         self.controller = controller
         buildMenu() // full menu, localized per config
         NSLog("ancre: window manager started")
+    }
+}
+
+extension AppDelegate: NSMenuDelegate {
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        refreshScratchpadItem()
+    }
+
+    /// Only the scratchpad item can be inert — an unconfigured scratchpad is
+    /// shown (with its tooltip explaining the feature) but not clickable.
+    func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        item !== scratchpadItem || scratchpadConfigured
     }
 }
 

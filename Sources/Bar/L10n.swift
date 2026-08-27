@@ -21,6 +21,11 @@ public enum L10n {
     public static var pauseTiling: String { t("pause_tiling") }
     public static var retile: String { t("retile") }
     public static var monitors: String { t("monitors") }
+    public static func scratchpad(app: String?, running: Bool) -> String {
+        guard let app else { return t("scratchpad_off") }
+        return String(format: t(running ? "scratchpad_running" : "scratchpad_idle"), app)
+    }
+    public static var scratchpadTooltip: String { t("scratchpad_tooltip") }
     public static func updateAvailable(_ version: String) -> String {
         String(format: t("update_available"), version)
     }
@@ -73,6 +78,10 @@ public enum L10n {
         "pause_tiling": "Pause tiling",
         "retile": "Retile windows",
         "monitors": "Monitors (click to copy id)",
+        "scratchpad_running": "Scratchpad: %@ (running)",
+        "scratchpad_idle": "Scratchpad: %@ (not running)",
+        "scratchpad_off": "Scratchpad: not configured",
+        "scratchpad_tooltip": "A drop-down window of one app, summoned over any workspace with hyper+s and hidden again. It lives outside tiling: no workspace, no tile, never rearranged. Set [scratchpad].app in the config.",
         "update_available": "Update to %@ available…",
         "open_config": "Open config",
         "reload_config": "Reload config",
@@ -112,6 +121,10 @@ public enum L10n {
             "pause_tiling": "Pozastavit tiling",
             "retile": "Přeskládat okna",
             "monitors": "Monitory (klik zkopíruje id)",
+            "scratchpad_running": "Scratchpad: %@ (běží)",
+            "scratchpad_idle": "Scratchpad: %@ (neběží)",
+            "scratchpad_off": "Scratchpad: nenastavený",
+            "scratchpad_tooltip": "Vysouvací okno jedné aplikace, přivolané přes hyper+s nad jakoukoli workspace a stejně tak schované. Žije mimo tiling: žádná workspace, žádná dlaždice, nikdy se nepřeskládá. Nastav [scratchpad].app v configu.",
             "update_available": "Aktualizace %@ k dispozici…",
             "open_config": "Otevřít config",
             "reload_config": "Znovu načíst config",
