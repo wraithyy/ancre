@@ -867,41 +867,39 @@ final class WindowManagerController: WindowTrackerDelegate {
         CGEvent(source: nil)?.location
     }
 
-    /// Hyprland-style scratchpad: drops a floating window of the configured
-    /// app over the current workspace, or hides (parks) it again. The
-    /// scratchpad owns its own window — it never hijacks a window you are
-    /// working in; the first toggle spawns one (a second app instance, or
-    /// `[scratchpad].command` when set). (axQueue)
-    /// ponytail: switching workspaces parks the scratchpad with its home
-    /// workspace — the next toggle may need a second press to re-sync.
-    private var scratchpadWindow: WindowID?
-    /// Set while waiting for the spawned scratchpad window to register.
+    /// Hyprland-style special workspace: the scratchpad window lives entirely
+    /// OUTSIDE ancre's model — it is never registered in `state` or
+    /// `axWindows`, so it has no workspace, no tile, no bar/switcher/hints
+    /// entry, and workspace switches leave it alone. `scratchpadAX` is the one
+    /// reference to it; the window it wraps is owned by the scratchpad only,
+    /// never a window you were already working in.
+    private var scratchpadAX: AXWindow?
+    private var scratchpadVisible = false
+    /// Set while waiting for the spawned scratchpad window to show up.
     private var scratchpadPending = false
+    /// Called on the main thread when the scratchpad shows or hides (menubar).
+    var onScratchpadVisibleChanged: ((Bool) -> Void)?
 
     private func toggleScratchpad() {
         guard let scratchpad = config.scratchpad, let bundleID = scratchpad.app else {
             NSLog("ancre: scratchpad has no [scratchpad].app configured")
             return
         }
-        if let wid = scratchpadWindow, axWindows[wid.rawValue] == nil { scratchpadWindow = nil }
-        guard let wid = scratchpadWindow else {
+        guard let ax = scratchpadAX else {
             spawnScratchpad(scratchpad, bundleID: bundleID)
             return
         }
-
-        if !parkedWindows.contains(wid.rawValue) {
-            park(wid)
-            updateFocusBorder()
-            updateBar()
-            return
+        if scratchpadVisible {
+            hideScratchpad(ax)
+        } else {
+            showScratchpad(ax)
         }
-        showScratchpad(wid)
     }
 
-    /// Opens a window dedicated to the scratchpad and adopts it on register().
+    /// Opens a window dedicated to the scratchpad; `register` adopts it.
     private func spawnScratchpad(_ scratchpad: AppConfig.Scratchpad, bundleID: String) {
         scratchpadPending = true
-        // Don't wait forever: a failed launch would otherwise steal whatever
+        // Don't wait forever: a failed launch would otherwise claim whatever
         // window of that app shows up next.
         DispatchQueue.main.asyncAfter(deadline: .now() + 15) { [weak self] in
             self?.tracker.perform { self?.scratchpadPending = false }
@@ -921,7 +919,7 @@ final class WindowManagerController: WindowTrackerDelegate {
             scratchpadPending = false
             return
         }
-        let running = state.windows.values.contains { $0.appBundleID == bundleID }
+        let running = !NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).isEmpty
         let configuration = NSWorkspace.OpenConfiguration()
         // A running app just gets activated by openApplication — ask for a
         // separate instance so the scratchpad gets a window of its own.
@@ -930,20 +928,43 @@ final class WindowManagerController: WindowTrackerDelegate {
         DispatchQueue.main.async { NSWorkspace.shared.openApplication(at: url, configuration: configuration) }
     }
 
-    /// Floats the scratchpad window and drops it top-center on the focused
-    /// monitor.
-    private func showScratchpad(_ wid: WindowID) {
-        execute(WM.setFloating(wid, floating: true, state: &state))
+    /// Drops the scratchpad top-center on the focused monitor and focuses it.
+    /// Frames are set straight on the AX element — no WM state involved.
+    private func showScratchpad(_ ax: AXWindow) {
         guard state.monitors.indices.contains(state.focusedMonitorIndex) else { return }
         let usable = state.monitors[state.focusedMonitorIndex].visibleFrame
         let width = usable.width * (config.scratchpad?.width ?? 0.6)
         let height = usable.height * (config.scratchpad?.height ?? 0.5)
-        let frame = CGRect(x: usable.midX - width / 2, y: usable.minY, width: width, height: height)
-        execute(WM.windowResizedByUser(wid, to: frame, state: &state))
-        assign(frame: AXFrame(origin: frame.origin, size: frame.size), to: wid)
-        execute(WM.focusChangedExternally(wid, state: &state))
-        execute([.focusWindow(wid)])
-        scratchpadWindow = wid
+        let frame = AXFrame(
+            origin: CGPoint(x: usable.midX - width / 2, y: usable.minY),
+            size: CGSize(width: width, height: height)
+        )
+        setScratchpadVisible(true)
+        animator.setFrame(ax, bundleID: config.scratchpad?.app ?? "", to: frame, animated: !instantPlacement) { _ in }
+        ax.setFocused()
+    }
+
+    /// Parks the scratchpad offscreen and hands the keyboard back to the
+    /// focused window of the active workspace.
+    private func hideScratchpad(_ ax: AXWindow) {
+        guard !parkingBounds.isEmpty else { return }
+        animator.cancel(ax.id)
+        setScratchpadVisible(false)
+        _ = ax.setFrame(OffscreenParking.parkFrame(size: ax.frame.size, bounds: parkingBounds))
+        if state.monitors.indices.contains(state.focusedMonitorIndex),
+           let wid = state.monitors[state.focusedMonitorIndex].activeWorkspace.focusedWindow {
+            execute([.focusWindow(wid)])
+        }
+    }
+
+    private func setScratchpadVisible(_ visible: Bool) {
+        scratchpadVisible = visible
+        DispatchQueue.main.async { [onScratchpadVisibleChanged] in onScratchpadVisibleChanged?(visible) }
+    }
+
+    /// Menubar item: same toggle as the `scratchpad` command. (any thread)
+    func toggleScratchpadFromMenu() {
+        tracker.perform { self.toggleScratchpad() }
     }
 
     // MARK: - Arrangements & presets (axQueue)
@@ -1293,6 +1314,7 @@ final class WindowManagerController: WindowTrackerDelegate {
     /// "bring that here".
     private func adoptFrontmostWindow() {
         guard let id = tracker.frontmostFocusedWindowID(),
+              id != scratchpadAX?.id, // the scratchpad is deliberately unmanaged
               state.monitors.indices.contains(state.focusedMonitorIndex) else { return }
         let wid = WindowID(id)
         let target = state.monitors[state.focusedMonitorIndex].activeWorkspace.name
@@ -1486,6 +1508,16 @@ final class WindowManagerController: WindowTrackerDelegate {
     private func register(_ window: AXWindow, app: AXAppInfo) {
         guard axWindows[window.id] == nil, !state.monitors.isEmpty else { return }
         let bundleID = app.bundleIdentifier ?? ""
+        // The scratchpad window stays unmanaged — also on a rescan, which
+        // would otherwise pull it into the layout it is meant to hover over.
+        if window.id == scratchpadAX?.id { return }
+        if scratchpadPending, bundleID == config.scratchpad?.app {
+            scratchpadPending = false
+            scratchpadAX = window
+            NSLog("ancre: scratchpad claimed window %u of %@", window.id, bundleID)
+            showScratchpad(window)
+            return
+        }
         if config.general.ignoreApps.contains(bundleID) {
             NSLog("ancre: ignore-apps: not managing window %u of %@", window.id, bundleID)
             return
@@ -1493,20 +1525,15 @@ final class WindowManagerController: WindowTrackerDelegate {
         axWindows[window.id] = window
         windowPids[window.id] = app.pid
         let frame = window.frame.cgRect
-        let isScratchpad = scratchpadPending && bundleID == config.scratchpad?.app
         let node = WindowNode(
             id: WindowID(window.id),
             appBundleID: bundleID,
             pid: app.pid,
             title: window.title,
-            isFloating: isScratchpad || config.general.floatApps.contains(bundleID),
+            isFloating: config.general.floatApps.contains(bundleID),
             frame: frame
         )
         adopt(node, frame: frame)
-        if isScratchpad {
-            scratchpadPending = false
-            showScratchpad(node.id)
-        }
         let workspace = state.windowLocation[node.id]?.workspaceName ?? ""
         controlServer?.broadcast(
             "{\"event\":\"window-opened\",\"id\":\(node.id.rawValue),\"bundleID\":\"\(node.appBundleID)\",\"workspace\":\"\(workspace)\"}"
@@ -1514,6 +1541,11 @@ final class WindowManagerController: WindowTrackerDelegate {
     }
 
     func windowDestroyed(id: AXWindowID) {
+        if id == scratchpadAX?.id {
+            scratchpadAX = nil
+            setScratchpadVisible(false)
+            return
+        }
         removeWindow(id)
     }
 
@@ -1524,7 +1556,6 @@ final class WindowManagerController: WindowTrackerDelegate {
         // Teams opening the browser...), pull that window's workspace into
         // view instead of leaving the window parked on a hidden one.
         if config.general.followNativeFocus,
-           wid != scratchpadWindow, // the scratchpad hovers over any workspace
            let location = state.windowLocation[wid],
            state.monitors.indices.contains(location.monitorIndex),
            state.monitors[location.monitorIndex].activeWorkspace.name != location.workspaceName {
@@ -1570,6 +1601,10 @@ final class WindowManagerController: WindowTrackerDelegate {
     }
 
     func appTerminated(pid: pid_t) {
+        if scratchpadAX?.pid == pid {
+            scratchpadAX = nil
+            setScratchpadVisible(false)
+        }
         for id in windowPids.filter({ $0.value == pid }).keys {
             removeWindow(id)
         }
