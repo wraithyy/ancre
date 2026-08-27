@@ -1,64 +1,69 @@
 # ancre
 
-Hyprland-inspired tiling window manager pro macOS. Swift, čisté veřejné
-Accessibility API — žádné privátní CGS/SkyLight API, žádný SIP zásah.
-Plán + milestones: `docs/PLAN.md` (M1–M8 hotové; zbývá backlog — command
-palette, config hooks, LaunchAgent). `AGENTS.md` = tytéž instrukce pro cizí
-agenty (OpenHands), hlavně co v Linuxovém sandboxu nejde ověřit.
+Hyprland-inspired tiling window manager for macOS. Swift, pure public
+Accessibility API — no private CGS/SkyLight API, no SIP tampering.
+Plan + milestones: `docs/PLAN.md` (M1–M8 done; backlog remains — command
+palette, config hooks, LaunchAgent). `AGENTS.md` = same instructions for
+external agents (OpenHands), mainly what can't be verified in a Linux sandbox.
 
 ## Build & test
 
 ```
-swift build            # celý balíček
-swift test             # unit testy (WMCore, LayoutEngine, Config)
-Scripts/bundle.sh      # sestaví .build/ancre.app (ad-hoc podpis, stabilní identifier)
+swift build            # whole package
+swift test              # unit tests (WMCore, LayoutEngine, Config)
+Scripts/bundle.sh      # builds .build/ancre.app (ad-hoc signed, stable identifier)
 open .build/ancre.app
 ```
 
-Žádný .xcodeproj — čistý SPM + bundle skript. Runtime vyžaduje Accessibility
-(+ Input Monitoring) permission; bez ní app čeká a polluje AXIsProcessTrusted.
-Pozor: spuštění appky přemapuje CapsLock→F18 (hidutil) a začne přeskládávat
-okna — netestovat bezhlavě. Revert: `hidutil property --set '{"UserKeyMapping":[]}'`.
+No `.xcodeproj` — plain SPM + bundle script. Runtime requires Accessibility
+(+ Input Monitoring) permission; without it the app waits and spams
+AXIsProcessTrusted. Watch out: launching the app remaps CapsLock→F18 (hidutil)
+and starts rearranging windows — don't test headlessly. Revert:
+`hidutil property --set '{"UserKeyMapping":[]}'`.
 
-## Architektura
+## Architecture
 
-Command bus: všechno (hotkey, bar, drag&drop) → `Command` enum →
-`WM.dispatch(Command, state:)` → `[Effect]` → AX vrstva effecty vykoná.
-Jedna cesta pro každou operaci, žádné obcházení.
+Command bus: everything (hotkey, bar, drag&drop) → `Command` enum →
+`WM.dispatch(Command, state:)` → `[Effect]` → the AX layer executes the effects.
+One path for every operation, no bypassing.
 
-| Modul | Role |
+| Module | Role |
 |---|---|
-| `Sources/WMCore` | čistý stav + reducer (WMState, Command, Effect). ZÁKAZ AX/AppKit importů — musí zůstat unit-testable. Definuje `Layout` protokol; `Monitor.swift` = multi-monitor placement (`WorkspaceAssignment.plan`, `WM.reconcileMonitors`) |
-| `Sources/LayoutEngine` | implementace layoutů (DwindleLayout; scroll = M5). Stateless value typy |
-| `Sources/AXBridge` | AXUIElement/AXObserver, WindowTracker + delegate, DisplayManager (stabilní ID displayů + reconfigurace), OffscreenParking (parking workaround izolovaný ZDE — při rozbití macOS updatem se patchuje jen tento soubor) |
-| `Sources/InputSystem` | hidutil remap, CGEventTap. Nezávislý na WMCore — resolvuje jen binding stringy ("hyper-shift-h") přes callback |
-| `Sources/Config` | TOMLKit schema + loader, `~/.config/ancre/ancre.toml`, validace s warningy (nikdy crash na config typo) |
-| `Sources/Animator` | animace přeskládávání oken, závisí na WMCore + AXBridge |
-| `Sources/Bar` | workspace bar (menu bar / pod notch), závisí na WMCore |
-| `App/` | executable target `ancre`: main.swift + WindowManagerController (glue AX↔WMCore↔Input) |
-| `ancrectl` | executable target, CLI klient (socket/MCP) |
+| `Sources/WMCore` | pure state + reducer (WMState, Command, Effect). NO AX/AppKit imports allowed — must stay unit-testable. Defines the `Layout` protocol; `Monitor.swift` = multi-monitor placement (`WorkspaceAssignment.plan`, `WM.reconcileMonitors`) |
+| `Sources/LayoutEngine` | layout implementations (DwindleLayout; scroll = M5). Stateless value types |
+| `Sources/AXBridge` | AXUIElement/AXObserver, WindowTracker + delegate, DisplayManager (stable display IDs + reconfiguration), OffscreenParking (parking workaround isolated HERE — if a macOS update breaks it, only this file needs patching) |
+| `Sources/InputSystem` | hidutil remap, CGEventTap. Independent of WMCore — resolves only binding strings ("hyper-shift-h") via callback |
+| `Sources/Config` | TOMLKit schema + loader, `~/.config/ancre/ancre.toml`, validation with warnings (never crash on a config typo) |
+| `Sources/Animator` | window rearrangement animations, depends on WMCore + AXBridge |
+| `Sources/Bar` | workspace bar (menu bar / under the notch), depends on WMCore |
+| `App/` | executable target `ancre`: main.swift + WindowManagerController (AX↔WMCore↔Input glue) |
+| `ancrectl` | executable target, CLI client (socket/MCP) |
 
-## Threading — nejdůležitější invariant
+## Threading — the most important invariant
 
-Veškerý WM stav (WMState, cache v controlleru i WindowTrackeru) žije na
-**axQueue** (`AXRunLoopThread.shared`, AXBridge). AXObserver callbacky tam
-hoppují, controller marshaluje přes `tracker.perform {}`. Nikdy nemutovat
-stav z jiného kontextu (Timer, notifikace, tap thread). CGEventTap callback
-musí zůstat triviální (jinak ho systém killne timeoutem).
+All WM state (WMState, caches in both the controller and WindowTracker) lives
+on **axQueue** (`AXRunLoopThread.shared`, AXBridge). AXObserver callbacks hop
+there, the controller marshals through `tracker.perform {}`. Never mutate
+state from another context (Timer, notification, tap thread). The CGEventTap
+callback must stay trivial (otherwise the system kills it on timeout).
 
-## Konvence
+## Conventions
 
-- Swift language mode v5 (AX C API nejsou Sendable; nepřepínat na v6 bez plánu)
-- `AXWindowID` (UInt32, CGWindowID) ↔ `WMCore.WindowID` je 1:1 mapování
-- Souřadnice: AX = top-left origin, NSScreen = bottom-left; konverze JEN v
+- Swift language mode v5 (AX C APIs aren't Sendable; don't switch to v6 without a plan)
+- `AXWindowID` (UInt32, CGWindowID) ↔ `WMCore.WindowID` is a 1:1 mapping
+- Coordinates: AX = top-left origin, NSScreen = bottom-left; convert ONLY in
   `DisplayManager.cgRect(fromNSScreenRect:primaryHeight:)`
-- Monitor ID: hardware-derived `vendor:model:serial` (ne CGDirectDisplayID, ten
-  se mezi sessions mění). Parking cílí na union všech displayů, ne na jeden
-- Workspace placement je čistá funkce (workspace names, config, connected
-  monitors) → replug reprodukuje totéž; žádná imperativní migrace
-- Okna odmítající frame: neválčit — snap-back má limit 3 pokusů, pak akceptovat
-- `ponytail:` komentáře = vědomé zkratky s known ceiling; při úpravě okolí zvážit
-- Command stringy v configu ↔ `Command.parse` držet v sync se
+- Monitor ID: hardware-derived `vendor:model:serial` (not CGDirectDisplayID,
+  which changes between sessions). Parking targets the union of all displays,
+  not a single one
+- Workspace placement is a pure function (workspace names, config, connected
+  monitors) → replug reproduces the same result; no imperative migration
+- Windows refusing a frame: don't fight it — snap-back has a 3-attempt limit,
+  then accept it
+- `ponytail:` comments = deliberate shortcuts with a known ceiling; consider
+  when touching nearby code
+- Keep command strings in config ↔ `Command.parse` in sync with
   `Sources/Config/default.toml`
-- Testy: čistá logika (WMCore/LayoutEngine/Config) má unit testy; AX/Input
-  runtime chování se ověřuje manuálně (vyžaduje permissions + display session)
+- Tests: pure logic (WMCore/LayoutEngine/Config) has unit tests; AX/Input
+  runtime behavior is verified manually (requires permissions + a display
+  session)

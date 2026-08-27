@@ -1,84 +1,91 @@
-# Review dokumentačního webu — 9 person + kontrola úplnosti (2026-08-26)
+# Documentation website review — 9 personas + completeness check (2026-08-26)
 
-Persony: junior dev, docs reviewer, junior mac user, Hyprland veterán,
-designer, frontend dev, první MacBook, macOS poweruser, kancelářský manažer.
-Desátý agent porovnal web proti kódu (Command.parse, MCPServer, default.toml,
-README, PLAN).
+Personas: junior dev, docs reviewer, junior Mac user, Hyprland veteran,
+designer, frontend dev, first MacBook, macOS power user, office manager.
+A tenth agent compared the website against the code (Command.parse, MCPServer,
+default.toml, README, PLAN).
 
-## Kritické (shoda více person)
+## Critical (agreement across multiple personas)
 
-1. **Chybí Uninstall / vypnutí** — revert hidutil, smazání app/configu,
-   revoke permissions, LaunchAgent. Nová sekce v installation nebo vlastní
-   stránka. (junior mac, poweruser, manažer, completeness)
-2. **CapsLock varování je slabé a pozdě** — vysvětlit CO se stane s CapsLock
-   (velká písmena?), jak změnit klávesu (`[hyper].key` s příkladem), Karabiner
-   konflikt (poweruser: dvě remap vrstvy se perou). Přesunout výš.
-3. **Instalace předpokládá vývojáře** — chybí prerekvizity (Xcode CLT, verze
-   Swift/macOS), `git clone` přímo na stránce, Gatekeeper/ad-hoc podpis
-   poznámka, Homebrew (aspoň "coming soon"), autostart/LaunchAgent,
-   onboarding okno (`ancre --onboarding`) web vůbec nezná.
-4. **Cesta k `ancrectl`** nekonzistentní: installation mluví o bundle.sh,
-   scripting o `.build/debug/ancrectl`; release/Homebrew cesta chybí.
-5. **Chování vůči macOS Spaces / native fullscreen / Stage Manager** — nikde.
-   Pro yabai/Aerospace/Hyprland příchozí otázka č. 1.
+1. **Missing Uninstall / teardown** — hidutil revert, deleting the
+   app/config, revoking permissions, LaunchAgent. New section in
+   installation or its own page. (junior mac, power user, manager,
+   completeness)
+2. **CapsLock warning is weak and comes too late** — explain WHAT happens to
+   CapsLock (uppercase letters?), how to change the key (`[hyper].key` with
+   an example), Karabiner conflict (power user: two remap layers fighting).
+   Move it earlier.
+3. **Installation assumes a developer** — missing prerequisites (Xcode CLT,
+   Swift/macOS versions), `git clone` right on the page, a Gatekeeper/ad-hoc
+   signature note, Homebrew (at least "coming soon"), autostart/LaunchAgent,
+   the onboarding window (`ancre --onboarding`) isn't mentioned on the site
+   at all.
+4. **Path to `ancrectl`** is inconsistent: installation talks about
+   bundle.sh, scripting about `.build/debug/ancrectl`; the release/Homebrew
+   path is missing.
+5. **Behavior with macOS Spaces / native fullscreen / Stage Manager** —
+   nowhere. First question for anyone coming from yabai/Aerospace/Hyprland.
 
-## Úplnost vs. kód (fakta, agent ověřil v Sources)
+## Completeness vs. code (facts, agent verified against Sources)
 
-Web faktově nelže, ale nepokrývá:
+The website doesn't lie, but doesn't cover:
 
-- commandy `preset`, `preset-save`, `open-config` (Command.parse je má)
-- MCP tool `ancre_arrange` (tabulka má 5/6 nástrojů)
+- the `preset`, `preset-save`, `open-config` commands (Command.parse has them)
+- the `ancre_arrange` MCP tool (the table shows 5/6 tools)
 - `ancrectl subscribe` (JSON event stream)
-- priority list `[workspaces] "1" = ["PHL", "Built-in"]`
-- `reload-config` = jen IPC/menu, není bindovatelný — nevysvětleno
-- README sekce "Coming from Hyprland" + known gaps (window rules, exec-once,
-  globální gaps, scratchpad = 1 app) na webu chybí
+- the priority list `[workspaces] "1" = ["PHL", "Built-in"]`
+- `reload-config` = IPC/menu only, not bindable — unexplained
+- the README's "Coming from Hyprland" section + known gaps (window rules,
+  exec-once, global gaps, scratchpad = 1 app) are missing from the website
 
-## Vysoká priorita
+## High priority
 
-- **Kompletní command reference** — tabulka všech command stringů
-  (gramatika `[keybindings]` formátu, argumenty) + JSON schéma/ukázka
-  `ancrectl state`. (Hyprlanďan, poweruser)
-- **Troubleshooting tenký** — permission neudělena/ztracena po OS update
-  (`tccutil`), MCP se neobjeví v Claude Code, bar na notchi, "vypnutí před
-  screen sharem" recept (manažer).
-- **index.mdx "Where next"** nelinkuje polovinu stránek (layouts,
+- **Complete command reference** — a table of every command string
+  (grammar of the `[keybindings]` format, arguments) + a JSON
+  schema/example for `ancrectl state`. (Hyprland user, power user)
+- **Troubleshooting is thin** — permission not granted / lost after an OS
+  update (`tccutil`), MCP not showing up in Claude Code, bar on the notch,
+  a "turn off before screen sharing" recipe (manager).
+- **index.mdx "Where next"** doesn't link half the pages (layouts,
   multi-monitor, bar, troubleshooting).
-- **Glosář / první výskyt pojmů** — tiling, workspace, floating, bundle ID
-  (jak zjistit), notch, unix socket. (první MacBook, junior mac)
-- **Use-case recepty** — "Teams call + poznámky", "review workspace" —
-  dokumentace je čistě referenční. (manažer)
-- **OG/Twitter meta** chybí (sdílené odkazy bez náhledu). Pozn.: nález
-  "chybí sitemap" je FALEŠNÝ — Starlight ji generuje, ověřeno v build logu.
-- Fonty: přejít na `latin` subsety @fontsource (úspora KB).
+- **Glossary / first-use of terms** — tiling, workspace, floating, bundle ID
+  (how to find it), notch, unix socket. (first MacBook, junior mac)
+- **Use-case recipes** — "Teams call + notes", "review workspace" — the
+  documentation is purely reference. (manager)
+- **OG/Twitter meta** missing (shared links have no preview). Note: the
+  "missing sitemap" finding is FALSE — Starlight generates it, verified in
+  the build log.
+- Fonts: switch to `latin` subsets on @fontsource (saves KB).
 
-## Nízká
+## Low
 
-- architecture.md odkazuje na CLAUDE.md/PLAN.md bez GitHub linku; přidat
-  "developer-only" poznámku.
-- controls ↔ scripting bez vzájemného odkazu ("každá zkratka má CLI
-  ekvivalent").
-- custom-layouts: chybí složitější příklad než 3 okna.
-- Sémantika focus/move na kraji monitoru (wrap? nic? přeskok?) — doplnit větu.
+- architecture.md references CLAUDE.md/PLAN.md without a GitHub link; add a
+  "developer-only" note.
+- controls ↔ scripting have no cross-link ("every shortcut has a CLI
+  equivalent").
+- custom-layouts: missing a more complex example than 3 windows.
+- Focus/move semantics at a monitor edge (wrap? nothing? skip?) — add a
+  sentence.
 
-## Media plán (designer + frontend)
+## Media plan (designer + frontend)
 
-Jediné tvrdé porušení brand manuálu: index nemá "visible workspace/layout
-example". Web nemá ani jeden obrázek.
+The only hard brand-manual violation: the index page has no "visible
+workspace/layout example". The website has zero images.
 
-Styl: reálný desktop na Ink pozadí, žádné mocky/glow. Uložení:
-`website/src/assets/media/<page>/<page>-<popis>.{png,mp4}`. PNG 2x retina
-přes `astro:assets` Image (auto WebP, žádný CLS). Video: H.264 MP4
-`<video autoplay muted loop playsinline preload="none">` s `poster` —
-ne GIF (velké, bez pause).
+Style: a real desktop on an Ink background, no mockups/glow. Storage:
+`website/src/assets/media/<page>/<page>-<description>.{png,mp4}`. PNG 2x
+retina via `astro:assets` Image (auto WebP, no CLS). Video: H.264 MP4
+`<video autoplay muted loop playsinline preload="none">` with a `poster` —
+not GIF (large, no pause).
 
-Top 5 assetů k výrobě:
+Top 5 assets to produce:
 
-1. `index-dwindle-workspace.png` — 3–4 okna v dwindle (plní brand manuál)
-2. `layouts-dwindle-scroll-stack.png` — 3-panel, stejná okna, tři layouty
-3. `bar-positions-menubar-notch.png` — 4-panel srovnání pozic
-4. `controls-hyper-drag-move.mp4` — drag s placeholder preview
-5. `controls-cheatsheet-overlay.png` — hyper held 2 s
+1. `index-dwindle-workspace.png` — 3–4 windows in dwindle (satisfies the
+   brand manual)
+2. `layouts-dwindle-scroll-stack.png` — 3-panel, same windows, three layouts
+3. `bar-positions-menubar-notch.png` — 4-panel position comparison
+4. `controls-hyper-drag-move.mp4` — drag with a placeholder preview
+5. `controls-cheatsheet-overlay.png` — hyper held for 2 s
 
-Další: bar drag&drop, multi-monitor replug, config reload, MCP demo
-(tabulka v designer reportu).
+Others: bar drag&drop, multi-monitor replug, config reload, MCP demo
+(table in the designer report).

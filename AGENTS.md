@@ -1,86 +1,90 @@
-# ancre — instrukce pro agenty
+# ancre — instructions for agents
 
-Hyprland-inspired tiling window manager pro macOS. Swift, veřejné Accessibility
-API, žádný SIP zásah. Detailní architektura a konvence: `CLAUDE.md`.
-Plán a milestones: `docs/PLAN.md`.
+Hyprland-inspired tiling window manager for macOS. Swift, public Accessibility
+API, no SIP tampering. Detailed architecture and conventions: `CLAUDE.md`.
+Plan and milestones: `docs/PLAN.md`.
 
-## Než něco spustíš — přečti si tohle
+## Before running anything — read this
 
-Projekt je **macOS-only**: `AppKit`, `ApplicationServices` (AX API),
-CoreGraphics display API. `Package.swift` má `platforms: [.macOS(.v14)]`.
+The project is **macOS-only**: `AppKit`, `ApplicationServices` (AX API),
+CoreGraphics display API. `Package.swift` has `platforms: [.macOS(.v14)]`.
 
-V Linuxovém sandboxu (default OpenHands runtime) **nic z toho nepřeloží** —
-`swift build` ani `swift test` tam nedávají smysl a chybějící `import AppKit`
-není bug k opravě. Pokud běžíš v Linux containeru:
+In a Linux sandbox (default OpenHands runtime) **none of this compiles** —
+`swift build` and `swift test` don't make sense there, and a missing
+`import AppKit` is not a bug to fix. If you're running in a Linux container:
 
-- edituj Swift kód surgical, bez „opravování" macOS importů,
-- neměň `Package.swift` platforms ani language mode (v5 je vědomé, viz CLAUDE.md),
-- do reportu napiš, že build/testy jsou **UNVERIFIED** (spustí je maintainer na Macu).
+- edit Swift code surgically, without "fixing" macOS imports,
+- don't change `Package.swift` platforms or the language mode (v5 is
+  deliberate, see CLAUDE.md),
+- state in your report that build/tests are **UNVERIFIED** (the maintainer
+  runs them on a Mac).
 
-Není tu žádný setup script — v Linuxu není co instalovat, na macOS stačí Xcode
-toolchain (Swift 6.0, language mode v5).
+There's no setup script — on Linux there's nothing to install, on macOS an
+Xcode toolchain suffices (Swift 6.0, language mode v5).
 
-## Build & test (jen macOS 14+)
+## Build & test (macOS 14+ only)
 
 ```
-swift build            # celý balíček
-swift test             # unit testy (WMCore, LayoutEngine, Config)
-Scripts/bundle.sh      # .build/ancre.app (ad-hoc podpis)
+swift build            # whole package
+swift test              # unit tests (WMCore, LayoutEngine, Config)
+Scripts/bundle.sh      # .build/ancre.app (ad-hoc signed)
 ```
 
-Žádný `.xcodeproj`. CI (`.github/workflows/`) běží na `macos-15` runneru:
-`ci.yml` na push/PR do `main` (mimo změny jen v `website/`, `docs/`, `*.md`)
-dělá `swift build` → `swift test` → `Scripts/bundle.sh`; `release.yml` na tagu
-`vX.Y.Z` staví universal (arm64+x86_64) bundle a publikuje GitHub Release;
-`deploy-docs.yml` nasazuje `website/` na GitHub Pages (běží na
-`ubuntu-latest`, jen Astro build — nesouvisí se Swift kódem).
+No `.xcodeproj`. CI (`.github/workflows/`) runs on a `macos-15` runner:
+`ci.yml` on push/PR to `main` (excluding changes limited to `website/`,
+`docs/`, `*.md`) runs `swift build` → `swift test` → `Scripts/bundle.sh`;
+`release.yml` on a `vX.Y.Z` tag builds a universal (arm64+x86_64) bundle and
+publishes a GitHub Release; `deploy-docs.yml` deploys `website/` to GitHub
+Pages (runs on `ubuntu-latest`, just an Astro build — unrelated to the Swift
+code).
 
-## NIKDY nespouštěj appku automatizovaně
+## NEVER launch the app automated
 
-`open .build/ancre.app` udělá dvě globální věci: přemapuje **CapsLock→F18**
-přes `hidutil` a začne **přeskládávat všechna okna** na ploše. Vyžaduje
-Accessibility + Input Monitoring permission a živou display session.
+`open .build/ancre.app` does two global things: remaps **CapsLock→F18** via
+`hidutil` and starts **rearranging every window** on the desktop. It requires
+Accessibility + Input Monitoring permission and a live display session.
 
-Revert remapu, pokud už appka běžela a zůstala v divném stavu:
+Revert the remap if the app already ran and left things in an odd state:
 
 ```
 hidutil property --set '{"UserKeyMapping":[]}'
 ```
 
-Runtime chování (AX, event tap, displaye) se ověřuje **ručně** na Macu, ne
-v agentním běhu.
+Runtime behavior (AX, event tap, displays) is verified **manually** on a Mac,
+not in an agent run.
 
-## Co je testovatelné a co ne
+## What's testable and what isn't
 
-| Vrstva | Verifikace |
+| Layer | Verification |
 |---|---|
-| `Sources/WMCore`, `Sources/LayoutEngine`, `Sources/Config` | XCTest (`swift test`) — čistá logika, sem přidávej testy |
-| `Sources/AXBridge`, `Sources/InputSystem`, `App/` | jen ruční test na Macu s permissions |
+| `Sources/WMCore`, `Sources/LayoutEngine`, `Sources/Config` | XCTest (`swift test`) — pure logic, add tests here |
+| `Sources/AXBridge`, `Sources/InputSystem`, `App/` | manual testing on a Mac with permissions only |
 
-Když měníš čistou logiku, přidej test. Když měníš AX/Input vrstvu, popiš
-v reportu ruční scénář, kterým to maintainer ověří (viz `docs/PLAN.md`,
-sekce Verification).
+When changing pure logic, add a test. When changing the AX/Input layer,
+describe in your report the manual scenario the maintainer should use to
+verify it (see `docs/PLAN.md`, Verification section).
 
-## Struktura
+## Structure
 
-| Cesta | Role |
+| Path | Role |
 |---|---|
-| `Sources/WMCore` | stav + reducer (`WMState`, `Command`, `Effect`, multi-monitor placement). ZÁKAZ AX/AppKit importů |
-| `Sources/LayoutEngine` | layouty (`DwindleLayout`), stateless value typy |
+| `Sources/WMCore` | state + reducer (`WMState`, `Command`, `Effect`, multi-monitor placement). NO AX/AppKit imports allowed |
+| `Sources/LayoutEngine` | layouts (`DwindleLayout`), stateless value types |
 | `Sources/AXBridge` | AXUIElement/AXObserver, `WindowTracker`, `DisplayManager`, `OffscreenParking` |
 | `Sources/InputSystem` | hidutil remap, CGEventTap |
 | `Sources/Config` | TOMLKit schema, `~/.config/ancre/ancre.toml` |
-| `Sources/Animator` | animace při přeskládávání oken |
+| `Sources/Animator` | window rearrangement animations |
 | `Sources/Bar` | workspace bar (menu bar / notch) |
 | `App/` | executable target `ancre`: `main.swift` + `WindowManagerController` (glue) |
-| `ancrectl` | executable target, CLI klient pro socket/MCP |
+| `ancrectl` | executable target, CLI client for socket/MCP |
 
-## Dvě věci, kde dokumentace lže, kdybys je nečetl
+## Two things the docs would lie about if you didn't read this
 
-1. **„Žádné privátní API"** platí s jednou vědomou výjimkou:
-   `_AXUIElementGetWindow` přes `dlsym` v `Sources/AXBridge/AXWindow.swift`
-   (jediná cesta ke stabilnímu `CGWindowID`, dělá to každý AX window manager).
-   Nepřepisovat, nehlásit jako nález.
-2. **Threading**: veškerý WM stav žije na `axQueue` (`AXRunLoopThread.shared`).
-   Nikdy nemutuj stav z Timeru, notifikace nebo tap threadu. CGEventTap
-   callback musí zůstat triviální, jinak ho systém killne timeoutem.
+1. **"No private API"** holds with one deliberate exception:
+   `_AXUIElementGetWindow` via `dlsym` in `Sources/AXBridge/AXWindow.swift`
+   (the only way to get a stable `CGWindowID`, every AX window manager does
+   this). Don't rewrite it, don't report it as a finding.
+2. **Threading**: all WM state lives on `axQueue` (`AXRunLoopThread.shared`).
+   Never mutate state from a Timer, notification, or tap thread. The
+   CGEventTap callback must stay trivial, otherwise the system kills it on
+   timeout.

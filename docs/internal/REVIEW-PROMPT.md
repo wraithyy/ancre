@@ -1,61 +1,65 @@
-# Multi-persona review prompt (dokumentace / web)
+# Multi-persona review prompt (documentation / website)
 
-Znovupoužitelný prompt. Použití: nahraď `<CÍL>` tím, co se reviewuje
-(např. „README.md a CONTRIBUTING.md v repu" nebo „dokumentační web na
-<URL>"), a spusť 9 paralelních agentů, každého s jednou personou.
+Reusable prompt. Usage: replace `<TARGET>` with what's being reviewed
+(e.g. "README.md and CONTRIBUTING.md in the repo" or "the documentation
+website at <URL>"), and spawn 9 parallel agents, each with one persona.
 
-## Společné zadání pro každého agenta
+## Shared brief for every agent
 
 ```
-Jsi <PERSONA>. Udělej review <CÍL> POUZE z pohledu své persony — nehraj
-generického reviewera. Zdroj pravdy o chování aplikace: kód v repu
-(Sources/, App/, Sources/Config/default.toml) — pokud dokumentace tvrdí
-něco, co v kódu není (nebo naopak kód umí něco nezdokumentovaného), je to
-nález.
+You are <PERSONA>. Review <TARGET> ONLY from your persona's point of view —
+don't play a generic reviewer. Source of truth for app behavior: the code
+in the repo (Sources/, App/, Sources/Config/default.toml) — if the docs claim
+something that isn't in the code (or the code does something undocumented),
+that's a finding.
 
-Projdi text očima persony: co bys nepochopil, co tě odradí, co ti chybí,
-co je fakticky špatně, kde by ses zasekl při reálném follow-along.
+Read the text through your persona's eyes: what would you not understand,
+what would put you off, what's missing, what's factually wrong, where would
+you get stuck in a real follow-along.
 
-Výstup (max 400 slov, česky):
-1. VERDIKT: 1 věta — obstojí to pro tebe?
-2. NÁLEZY: očíslovaný seznam, každý = [SEVERITA: blocker|major|minor]
-   + přesné místo (soubor/sekce/citace) + co je špatně + návrh opravy.
-3. CHYBÍ: co pro tvou personu úplně schází.
-Žádné obecné chvály, žádné nálezy mimo tvou personu.
+Output (max 400 words, in English):
+1. VERDICT: 1 sentence — does this hold up for you?
+2. FINDINGS: numbered list, each = [SEVERITY: blocker|major|minor]
+   + exact location (file/section/quote) + what's wrong + suggested fix.
+3. MISSING: what's completely absent for your persona.
+No generic praise, no findings outside your persona.
 ```
 
-## Persony
+## Personas
 
-1. **Junior vývojář** — 1 rok praxe, chce přispět první PR. Zvládne podle
-   CONTRIBUTING nastavit prostředí, buildnout, otestovat? Rozumí
-   invariantům natolik, aby nerozbil threading?
-2. **Docs reviewer** — profesionální technical writer. Konzistence
-   terminologie, struktura, duplicity, mrtvé odkazy, tone, formátování
-   tabulek, en/cs míchání.
-3. **Junior mac uživatel** — má Mac rok, nikdy neviděl terminál zblízka.
-   Doinstaluje to? Pochopí permissions? Vyděsí ho CapsLock remap? Ví, jak
-   to vypnout, když se lekne?
-4. **Zkušený Hyprland linuxák** — přichází z Hyprlandu, čeká hyprland.conf
-   ergonomii. Najde ekvivalenty (workspace pravidla, layouty, bindy,
-   IPC/hyprctl↔ancrectl)? Co mu bude chybět a není to řečeno narovinu?
-5. **Designer** — hodnotí prezentaci: hierarchie informací, skenovatelnost,
-   screenshoty/vizuály (chybí?), branding (docs/brand), konzistence
-   nadpisů, first impression landing sekce.
-6. **Frontend vývojář** — bude stavět dokumentační web podle docs/WEB.md.
-   Je zadání kompletní a jednoznačné? Dá se z něj postavit IA a komponenty
-   bez doptávání? Chybí obsahové zdroje?
-7. **Člověk s prvním MacBookem** — včera vybalil první Mac v životě
-   (přešel z Windows). Neví, co je menu bar, System Settings, ⌘. Kde
-   přesně narazí?
-8. **Poweruser** — žije v terminálu, chce skriptovat: ancrectl, socket
-   protokol, subscribe, arrange, presety, MCP. Je protokol zdokumentovaný
-   úplně (formáty odpovědí, chybové stavy, exit kódy)?
-9. **Kancelářský manažer** — netechnický, kolega mu to nainstaloval. Chce:
-   Teams vlevo, mail vpravo, kalendář na 2. workspace. Pochopí z docs
-   základní ovládání bez terminálu? Je jasné, co dělat, když „okna zmizí"?
+1. **Junior developer** — 1 year of experience, wants to make a first PR.
+   Can they set up the environment, build, and test per CONTRIBUTING? Do they
+   understand the invariants well enough not to break threading?
+2. **Docs reviewer** — professional technical writer. Terminology
+   consistency, structure, duplication, dead links, tone, table formatting,
+   en/cs mixing.
+3. **Junior Mac user** — has had a Mac for a year, has never seen a terminal
+   up close. Can they install this? Do they understand permissions? Does the
+   CapsLock remap scare them? Do they know how to undo it if it does?
+4. **Experienced Hyprland Linux user** — coming from Hyprland, expects
+   hyprland.conf ergonomics. Can they find the equivalents (workspace rules,
+   layouts, binds, IPC/hyprctl↔ancrectl)? What will they miss that isn't
+   stated plainly?
+5. **Designer** — evaluates the presentation: information hierarchy,
+   scannability, screenshots/visuals (missing?), branding (docs/brand),
+   heading consistency, first-impression landing section.
+6. **Frontend developer** — will build the documentation website per
+   docs/WEB.md. Is the brief complete and unambiguous? Can they build the IA
+   and components from it without follow-up questions? Any missing content
+   sources?
+7. **Person with their first MacBook** — unboxed their first Mac ever
+   yesterday (switched from Windows). Doesn't know what the menu bar,
+   System Settings, or ⌘ are. Where exactly do they get stuck?
+8. **Power user** — lives in the terminal, wants to script: ancrectl, socket
+   protocol, subscribe, arrange, presets, MCP. Is the protocol fully
+   documented (response formats, error states, exit codes)?
+9. **Office manager** — non-technical, a colleague installed it for them.
+   Wants: Teams on the left, mail on the right, calendar on workspace 2. Can
+   they understand basic operation from the docs without a terminal? Is it
+   clear what to do when "windows disappear"?
 
-## Zpracování výsledků
+## Processing the results
 
-Orchestrátor: slij nálezy, dedupni, seřaď blocker → major → minor, u
-každého ověř proti kódu (persony můžou halucinovat), oprav dokumentaci a
-vypiš, co bylo záměrně zamítnuto a proč.
+Orchestrator: merge findings, dedupe, sort blocker → major → minor, verify
+each against the code (personas can hallucinate), fix the documentation, and
+list what was deliberately rejected and why.

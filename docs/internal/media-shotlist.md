@@ -1,93 +1,98 @@
-# Shotlist — screenshoty a videa pro dokumentaci
+# Shotlist — screenshots and videos for the documentation
 
-Cíl: pokrýt web (website/src/content/docs) + README hero. Formáty:
-statický screenshot = PNG (Retina, 2x), pohyblivé = krátké GIF/MP4 (5–15 s,
-bez zvuku). Před natáčením: čistá plocha, jednotná wallpaper, stejná sada
-appek (terminál, browser, editor), skrýt osobní data (maily, jména oken).
+Goal: cover the website (website/src/content/docs) + README hero. Formats:
+static screenshot = PNG (Retina, 2x), motion = short GIF/MP4 (5–15 s, no
+sound). Before recording: clean desktop, uniform wallpaper, same set of apps
+(terminal, browser, editor), hide personal data (emails, window titles).
 
 ## Hero / README
 
-- [ ] **Hero screenshot** — plný desktop, dwindle layout se 3–4 okny + bar.
-      Nejfotogeničtější záběr, jde do README i index.mdx.
-- [ ] **Hero video (MP4, ~20 s)** — otevření 3 oken (auto-tile), focus
-      přepínání, přesun okna, přepnutí workspace. „Co to je" za 20 sekund.
+- [ ] **Hero screenshot** — full desktop, dwindle layout with 3–4 windows +
+      bar. Most photogenic shot, goes in README and index.mdx.
+- [ ] **Hero video (MP4, ~20 s)** — opening 3 windows (auto-tile), focus
+      switching, moving a window, switching workspace. "What this is" in
+      20 seconds.
 
 ## installation.md
 
-- [ ] Screenshot: dialog macOS Accessibility permission (System Settings →
-      Privacy & Security → Accessibility s ancre v seznamu).
-- [ ] Screenshot: Input Monitoring permission tamtéž.
-- [ ] Screenshot: první spuštění — stav, kdy app čeká na permission.
+- [ ] Screenshot: macOS Accessibility permission dialog (System Settings →
+      Privacy & Security → Accessibility with ancre in the list).
+- [ ] Screenshot: Input Monitoring permission, same place.
+- [ ] Screenshot: first launch — state where the app waits for permission.
 
 ## controls.md
 
-- [ ] GIF: focus movement (hyper+h/j/k/l) mezi 3 okny — zvýraznění fokusu.
-- [ ] GIF: swap/move okna v rámci layoutu.
-- [ ] GIF: přepnutí workspace 1→2→1.
-- [ ] GIF: přesun okna na jiný workspace.
-- [ ] GIF: toggle floating + zpět do tile.
+- [ ] GIF: focus movement (hyper+h/j/k/l) across 3 windows — focus
+      highlighted.
+- [ ] GIF: swap/move a window within the layout.
+- [ ] GIF: switching workspace 1→2→1.
+- [ ] GIF: moving a window to another workspace.
+- [ ] GIF: toggle floating and back to tiled.
 - [ ] GIF: fullscreen toggle.
-- [ ] GIF: resize oken (interactive resize / ratio změna).
-- [ ] GIF: drag & drop okna myší do jiné pozice v layoutu.
+- [ ] GIF: resizing windows (interactive resize / ratio change).
+- [ ] GIF: drag & drop a window with the mouse to another position in the layout.
 
 ## layouts.md
 
-- [ ] Screenshot: dwindle se 2, 3, 4 okny (série 3 obrázků — jak se dělí).
-- [ ] GIF: postupné otevírání oken — vidět dwindle splitting živě.
-- [ ] Screenshot/GIF: master-stack, pokud existuje; jinak vynechat.
+- [ ] Screenshot: dwindle with 2, 3, 4 windows (series of 3 images — how it
+      splits).
+- [ ] GIF: opening windows one after another — dwindle splitting live.
+- [ ] Screenshot/GIF: master-stack, if it exists; otherwise skip.
 
 ## bar.md
 
-- [ ] Screenshot: bar v menu bar režimu (detail, crop horní lišty).
-- [ ] Screenshot: bar pod notchem (na MacBook displeji).
-- [ ] GIF: klik na workspace v baru → přepnutí.
-- [ ] Screenshot: bar s aktivním/neaktivním workspace — stavy indikátorů.
+- [ ] Screenshot: bar in menu bar mode (close-up, cropped top strip).
+- [ ] Screenshot: bar under the notch (on a MacBook display).
+- [ ] GIF: clicking a workspace in the bar → switches.
+- [ ] Screenshot: bar with active/inactive workspace — indicator states.
 
 ## multi-monitor.md
 
-- [ ] Screenshot: dva monitory, každý vlastní workspace + bar.
-- [ ] GIF: přesun okna mezi monitory.
-- [ ] GIF: odpojení/připojení monitoru — okna se přeskládají a vrátí
-      (nejsilnější demo — workspace placement je čistá funkce).
+- [ ] Screenshot: two monitors, each with its own workspace + bar.
+- [ ] GIF: moving a window between monitors.
+- [ ] GIF: disconnecting/reconnecting a monitor — windows rearrange and come
+      back (strongest demo — workspace placement is a pure function).
 
 ## configuration.md + config-reference.md
 
-- [ ] Screenshot: `ancre.toml` v editoru se syntax highlightem (ukázková
-      sekce bindings + layout).
-- [ ] GIF: live reload — úprava configu (např. gap) → uložení → okna se
-      okamžitě přeskládají.
-- [ ] Screenshot: warning výstup při typu v configu (validace nikdy
-      necrashne — ukázat log/notifikaci).
+- [ ] Screenshot: `ancre.toml` in an editor with syntax highlighting
+      (sample bindings + layout section).
+- [ ] GIF: live reload — editing the config (e.g. a gap) → save → windows
+      rearrange immediately.
+- [ ] Screenshot: warning output for a config typo (validation never
+      crashes — show the log/notification).
 
 ## scripting.md
 
-- [ ] Screenshot/GIF: `ancrectl` v terminálu — `ancre_state` výstup,
-      příkaz na přesun okna a viditelný efekt vedle v okně.
-- [ ] GIF: MCP/socket demo — příkaz z CLI okamžitě hýbe okny.
+- [ ] Screenshot/GIF: `ancrectl` in a terminal — `ancre_state` output, a
+      command that moves a window and the visible effect next to it in
+      the window.
+- [ ] GIF: MCP/socket demo — a command from the CLI moves windows
+      immediately.
 
 ## troubleshooting.md
 
-- [ ] Screenshot: hidutil revert příkaz + stav (CapsLock→F18 remap).
-- [ ] Screenshot: okno odmítající frame / snap-back situace, pokud jde
-      reprodukovat (jinak vynechat).
+- [ ] Screenshot: hidutil revert command + state (CapsLock→F18 remap).
+- [ ] Screenshot: a window refusing a frame / snap-back situation, if it
+      can be reproduced (otherwise skip).
 
 ## architecture.md
 
-- žádné foto — diagramy generovat (mermaid), ne točit.
+- no photos — generate diagrams (mermaid), don't record footage.
 
-## Technické poznámky k natáčení
+## Technical notes for recording
 
-- Nahrávat: QuickTime / `screencapture -v`, ořez na 16:10, GIF přes
-  `ffmpeg` (palettegen) nebo Gifski — cíl < 5 MB na GIF.
-- Screenshoty: `screencapture -x` (bez zvuku), stín vypnout
+- Recording: QuickTime / `screencapture -v`, crop to 16:10, GIF via
+  `ffmpeg` (palettegen) or Gifski — target < 5 MB per GIF.
+- Screenshots: `screencapture -x` (no sound), disable the shadow
   (`defaults write com.apple.screencapture disable-shadow -bool true`).
-- Kurzor: viditelný jen v GIFech kde kliká, jinak schovat.
-- Zvýraznění kláves: overlay typu KeyCastr do GIFů s hotkeys.
-- Světlý vs. tmavý režim: točit v tmavém (kontrast s barem), držet
-  konzistentně všude.
-- Uložení: `website/src/assets/` (Astro optimalizuje), pojmenování
-  `<stránka>-<akce>.{png,gif,mp4}`.
-- Placeholdery s finálními názvy souborů už jsou zakomentované přímo ve
-  stránkách (EN i cs/) — `grep -rn "media (shotlist" website/src/content/docs`
-  a v README/index.mdx hero blok. Po natočení stačí soubor uložit pod tím
-  názvem a placeholder odkomentovat.
+- Cursor: visible only in GIFs where it clicks, otherwise hide it.
+- Key highlighting: a KeyCastr-style overlay for GIFs involving hotkeys.
+- Light vs. dark mode: record in dark (contrast with the bar), keep it
+  consistent everywhere.
+- Storage: `website/src/assets/` (Astro optimizes), naming
+  `<page>-<action>.{png,gif,mp4}`.
+- Placeholders with the final filenames are already commented out directly
+  in the pages (EN and cs/) — `grep -rn "media (shotlist" website/src/content/docs`
+  and the README/index.mdx hero block. Once recorded, just save the file
+  under that name and uncomment the placeholder.
