@@ -3,7 +3,7 @@ name: Release
 # Tag-driven releases: push a tag `vX.Y.Z` and this builds a universal
 # (arm64 + x86_64) ancre.app + ancrectl, zips them, and publishes a GitHub
 # Release with auto-generated notes. The job summary prints the sha256 and
-# a ready-to-paste version bump for the Homebrew cask
+# Release with auto-generated notes, then bumps the Homebrew cask
 # (wraithyy/homebrew-tap, Casks/ancre.rb).
 
 on:
@@ -46,13 +46,35 @@ jobs:
             --title "ancre $VERSION" \
             --generate-notes
 
-      - name: Cask bump summary
+      # Pushes the version+sha straight into the tap. Needs the
+      # HOMEBREW_TAP_TOKEN secret (fine-grained PAT, contents:write on
+      # wraithyy/homebrew-tap); without it the run only prints the bump.
+      - name: Bump Homebrew cask
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
           SHA=$(cut -d' ' -f1 checksum.txt)
-          {
-            echo "## Homebrew cask bump (wraithyy/homebrew-tap → Casks/ancre.rb)"
-            echo '```ruby'
-            echo "  version \"$VERSION\""
-            echo "  sha256 \"$SHA\""
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          if [ -z "$GH_TOKEN" ]; then
+            {
+              echo "## Homebrew cask bump — no HOMEBREW_TAP_TOKEN, do it by hand"
+              echo '```ruby'
+              echo "  version \"$VERSION\""
+              echo "  sha256 \"$SHA\""
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git clone --depth 1 \
+            "https://x-access-token:$GH_TOKEN@github.com/wraithyy/homebrew-tap.git" tap
+          cd tap
+          sed -i '' -e "s|version \".*\"|version \"$VERSION\"|" \
+                    -e "s|sha256 \".*\"|sha256 \"$SHA\"|" Casks/ancre.rb
+          if git diff --quiet; then
+            echo "cask already at $VERSION"
+            exit 0
+          fi
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -am "ancre $VERSION"
+          git push
+          echo "## Homebrew cask bumped to $VERSION" >> "$GITHUB_STEP_SUMMARY"
