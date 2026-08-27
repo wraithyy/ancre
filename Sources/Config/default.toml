@@ -204,3 +204,12 @@ offset-y = 0
 # [app-workspaces]
 # "com.spotify.client" = "9"
 # "com.microsoft.teams2" = "5"
+
+# User notifications ancre may show. Master switch + per-category suppression.
+# Categories: auto-stack (workspace force-stacked), auto-float (window refused
+# its tile and was floated), tap-disabled (macOS disabled the hotkey tap),
+# ax-permission (Accessibility permission lost), remap-failed (hidutil hyper
+# remap failed), config (config reloaded with warnings).
+# [notifications]
+# enabled = true
+# disable = ["auto-float"]

@@ -361,6 +361,28 @@ public struct AppConfig: Codable {
         }
     }
 
+    /// User notifications ancre may show (auto-stack, auto-float, tap
+    /// re-enabled, lost permissions, remap failure, config warnings).
+    public struct Notifications: Codable {
+        /// Master switch.
+        public var enabled: Bool
+        /// Categories to suppress; see `knownCategories`.
+        public var disable: [String]
+
+        public static let knownCategories: Set<String> = [
+            "auto-stack", "auto-float", "tap-disabled", "ax-permission",
+            "remap-failed", "config",
+        ]
+
+        enum CodingKeys: String, CodingKey { case enabled, disable }
+
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
+            disable = try c.decodeIfPresent([String].self, forKey: .disable) ?? []
+        }
+    }
+
     /// Per-workspace appearance in the bar. All fields optional: `name` is a
     /// custom label, `icon` a short string (emoji) shown before it,
     /// `show-number` toggles the workspace number (default on).
@@ -439,9 +461,12 @@ public struct AppConfig: Codable {
     public var scratchpad: Scratchpad?
     /// `[bar-overrides]`: per-monitor partial [bar] overrides.
     public var barOverrides: [String: BarOverride]?
+    /// `[notifications]`: master switch + per-category suppression; absent =
+    /// everything on.
+    public var notifications: Notifications?
 
     enum CodingKeys: String, CodingKey {
-        case general, hyper, keybindings, bar, workspaces, theme, border, help, preview, scratchpad
+        case general, hyper, keybindings, bar, workspaces, theme, border, help, preview, scratchpad, notifications
         case barOverrides = "bar-overrides"
         case workspaceLabels = "workspace-labels"
         case appWorkspaces = "app-workspaces"
@@ -584,6 +609,9 @@ public enum ConfigLoader {
                 warnings.append("config: [workspaces] entries with an empty monitor are ignored: \(empty.joined(separator: ", "))")
                 config.workspaces = assignments.filter { !$0.value.values.allSatisfy { $0.trimmingCharacters(in: .whitespaces).isEmpty } }
             }
+        }
+        if let unknown = config.notifications?.disable.filter({ !AppConfig.Notifications.knownCategories.contains($0) }), !unknown.isEmpty {
+            warnings.append("config: unknown [notifications] disable categories ignored: \(unknown.joined(separator: ", ")) (known: \(AppConfig.Notifications.knownCategories.sorted().joined(separator: ", ")))")
         }
         let validPositions = ["top", "bottom", "left", "right", "menubar", "notch"]
         if !validPositions.contains(config.bar.position) {

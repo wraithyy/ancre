@@ -28,6 +28,9 @@ final class EventTapManager {
     /// Every NON-captured mouse-up, observe-only (the event passes through) —
     /// ends native window drags the WM adopted. Tap thread — dispatch only.
     var onObservedMouseUp: ((HyperMouseButton, CGPoint) -> Void)?
+    /// macOS disabled the tap (timeout / user input) and it was re-enabled.
+    /// Tap thread — dispatch only.
+    var onTapDisabled: (() -> Void)?
     /// Button captured by a hyper+mousedown; its drag/up events are swallowed
     /// until release even if hyper is let go mid-drag.
     private var capturedButton: HyperMouseButton?
@@ -117,6 +120,7 @@ final class EventTapManager {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             NSLog("ancre: event tap disabled (\(type == .tapDisabledByTimeout ? "timeout" : "user input")), re-enabling")
             if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
+            onTapDisabled?()
             return Unmanaged.passRetained(event)
         }
 

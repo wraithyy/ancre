@@ -200,7 +200,29 @@ final class WindowManagerController: WindowTrackerDelegate {
         }
 
         start_inputOnly()
+
+        let notifySnapshot = Self.notifySettings(config)
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.notifyConfig = notifySnapshot
+            // Accessibility permission can vanish while running (TCC reset,
+            // OS update) — the AX layer then goes silently deaf. Poll it.
+            self.axTrustTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+                guard let self else { return }
+                if AXIsProcessTrusted() {
+                    self.axTrustLost = false
+                } else if !self.axTrustLost {
+                    self.axTrustLost = true
+                    NSLog("ancre: accessibility permission lost")
+                    self.notify(L10n.axPermissionLost, category: "ax-permission")
+                }
+            }
+        }
     }
+
+    /// AX permission poll state (main thread only).
+    private var axTrustTimer: Timer?
+    private var axTrustLost = false
 
     // MARK: - IPC (axQueue)
 
@@ -330,6 +352,13 @@ final class WindowManagerController: WindowTrackerDelegate {
             config = newConfig
             NSLog("ancre: config reloaded")
 
+            let notifySnapshot = Self.notifySettings(newConfig)
+            DispatchQueue.main.async { [weak self] in self?.notifyConfig = notifySnapshot }
+            if let first = warnings.first {
+                // A silently ignored typo is worse than one banner on reload.
+                notify(L10n.configWarnings(first: first, count: warnings.count), category: "config")
+            }
+
             DispatchQueue.main.async { L10n.language = newConfig.general.language }
             setBindings(ConfigLoader.resolveBindings(newConfig).bindings)
             animator = Animator(settings: .init(
@@ -433,6 +462,13 @@ final class WindowManagerController: WindowTrackerDelegate {
                         helpOverlay.hide()
                     }
                 }
+            },
+            onTapDisabled: { [weak self] in
+                // Longer throttle: a starved tap can bounce repeatedly.
+                self?.notify(L10n.tapDisabled, category: "tap-disabled", throttle: 300)
+            },
+            onRemapFailure: { [weak self] _ in
+                self?.notify(L10n.remapFailed, category: "remap-failed")
             }
         )
     }
@@ -1311,7 +1347,7 @@ final class WindowManagerController: WindowTrackerDelegate {
                     NSLog("ancre: workspace %@ doesn't fit %@ (%d windows), auto-stacking", name, monitor.id, count)
                     autoStackedOriginals[name] = current
                     applyLayout(named: "stack", toWorkspace: name, isAutoStack: true)
-                    notify(L10n.autoStacked(name))
+                    notify(L10n.autoStacked(name), category: "auto-stack")
                 } else if fits, let original = autoStackedOriginals[name],
                           count < thrashStackCounts[name] ?? Int.max {
                     NSLog("ancre: workspace %@ fits again, restoring layout %@", name, original)
@@ -1340,25 +1376,49 @@ final class WindowManagerController: WindowTrackerDelegate {
             .flatMap(\.workspaces).first { $0.name == name }?.tiledWindows.count ?? 0
         thrashCounts.removeValue(forKey: name)
         applyLayout(named: "stack", toWorkspace: name, isAutoStack: true)
-        notify(L10n.autoStacked(name))
+        notify(L10n.autoStacked(name), category: "auto-stack")
         return true
     }
 
-    /// Fire-and-forget user notification. Skipped when running unbundled
+    /// Last delivery per category, for throttling. Main thread only.
+    private var lastNotified: [String: Date] = [:]
+    /// Snapshot of [notifications] config — main thread only (notify() may be
+    /// called from the tap thread, so it can't read `config` directly).
+    private var notifyConfig: (enabled: Bool, disabled: Set<String>) = (true, [])
+
+    private static func notifySettings(_ config: AppConfig) -> (enabled: Bool, disabled: Set<String>) {
+        (config.notifications?.enabled ?? true, Set(config.notifications?.disable ?? []))
+    }
+
+    /// Fire-and-forget user notification, rate-limited per category (a stable
+    /// identifier also makes macOS replace a still-visible banner instead of
+    /// stacking). Safe from any thread. Skipped when running unbundled
     /// (swift run) — UNUserNotificationCenter needs a real app bundle.
-    private func notify(_ body: String) {
-        guard Bundle.main.bundleIdentifier != nil else {
-            NSLog("ancre: notification (unbundled): %@", body)
-            return
+    private func notify(_ body: String, category: String, throttle: TimeInterval = 60) {
+        DispatchQueue.main.async { [self] in
+            guard notifyConfig.enabled, !notifyConfig.disabled.contains(category) else { return }
+            let now = Date()
+            if let last = lastNotified[category], now.timeIntervalSince(last) < throttle { return }
+            lastNotified[category] = now
+            guard Bundle.main.bundleIdentifier != nil else {
+                NSLog("ancre: notification (unbundled): %@", body)
+                return
+            }
+            let center = UNUserNotificationCenter.current()
+            center.requestAuthorization(options: [.alert]) { granted, _ in
+                guard granted else { return }
+                let content = UNMutableNotificationContent()
+                content.title = "ancre"
+                content.body = body
+                center.add(UNNotificationRequest(identifier: "ancre.\(category)", content: content, trigger: nil))
+            }
         }
-        let center = UNUserNotificationCenter.current()
-        center.requestAuthorization(options: [.alert]) { granted, _ in
-            guard granted else { return }
-            let content = UNMutableNotificationContent()
-            content.title = "ancre"
-            content.body = body
-            center.add(UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
-        }
+    }
+
+    /// Display name for a window's app, for notification bodies. (axQueue)
+    private func appName(_ wid: WindowID) -> String {
+        guard let node = state.windows[wid] else { return "?" }
+        return NSRunningApplication(processIdentifier: node.pid)?.localizedName ?? node.appBundleID
     }
 
     // MARK: - Move log (axQueue)
@@ -1468,6 +1528,7 @@ final class WindowManagerController: WindowTrackerDelegate {
         }
         while let (wid, frame) = pendingAutoFloats.popLast() {
             NSLog("ancre: window %u can't fit its tile, floating it", wid.rawValue)
+            notify(L10n.autoFloated(appName(wid)), category: "auto-float")
             execute(WM.floatWindow(wid, frame: frame, state: &state))
         }
     }
@@ -1812,6 +1873,7 @@ final class WindowManagerController: WindowTrackerDelegate {
             // App insists on its own frame — float it so the layout reflows
             // around it instead of leaving a mis-sized tile overlapping others.
             NSLog("ancre: window %u keeps resizing itself, floating it", id)
+            notify(L10n.autoFloated(appName(WindowID(id))), category: "auto-float")
             expectedFrames.removeValue(forKey: id)
             snapBackAttempts.removeValue(forKey: id)
             execute(WM.floatWindow(WindowID(id), frame: newFrame.cgRect, state: &state))

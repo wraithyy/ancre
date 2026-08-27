@@ -29,6 +29,7 @@ app (it falls back to defaults and logs a warning).
 | `[preview]` | drag&drop placeholder: `color`, `opacity` |
 | `[help]` | cheatsheet: `enabled`, `delay-ms`, `opacity`, `font-size`, `columns`, `corner-radius` |
 | `[scratchpad]` | `app` (bundle id), `width`, `height` (fractions of the screen), `command` (shell command opening a new window; default `open -n` on the app). Its window stays outside tiling: own window, no workspace, no tile |
+| `[notifications]` | `enabled` (master switch, default true), `disable` (categories to suppress: `auto-stack`, `auto-float`, `tap-disabled`, `ax-permission`, `remap-failed`, `config`). Notifications only fire on deviations: a workspace force-stacked, a window floated after refusing its tile, macOS disabling the hotkey tap, Accessibility permission lost, the hyper remap failing, or a config reload with warnings. Each category is rate-limited |
 
 ## Vertical bars, menubar mode, notch mode
 

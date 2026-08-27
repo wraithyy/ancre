@@ -23,6 +23,8 @@ final class HidutilRemap {
     private let srcUsage: UInt64
     private let dstUsage: UInt64
     private var deviceWatcher: HIDDeviceWatcher?
+    /// Fired when applying the remap fails (never for revert). Caller's thread.
+    var onApplyFailure: ((String) -> Void)?
 
     init(srcName: String = "caps_lock", dstName: String = "f18") {
         srcUsage = HIDUsage.code(for: srcName) ?? HIDUsage.byName["caps_lock"]!
@@ -36,18 +38,21 @@ final class HidutilRemap {
     }
 
     func apply() {
-        run(mapping: "[{\"HIDKeyboardModifierMappingSrc\":\(srcUsage),\"HIDKeyboardModifierMappingDst\":\(dstUsage)}]")
+        if let failure = run(mapping: "[{\"HIDKeyboardModifierMappingSrc\":\(srcUsage),\"HIDKeyboardModifierMappingDst\":\(dstUsage)}]") {
+            onApplyFailure?(failure)
+        }
     }
 
     func revert() {
-        run(mapping: "[]")
+        _ = run(mapping: "[]")
     }
 
     func reapply() {
         apply()
     }
 
-    private func run(mapping: String) {
+    /// Returns nil on success, a human-readable failure message otherwise.
+    private func run(mapping: String) -> String? {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/hidutil")
         process.arguments = ["property", "--set", "{\"UserKeyMapping\":\(mapping)}"]
@@ -63,9 +68,12 @@ final class HidutilRemap {
                 let data = errPipe.fileHandleForReading.readDataToEndOfFile()
                 let message = String(data: data, encoding: .utf8) ?? "unknown error"
                 NSLog("ancre: hidutil remap failed (status \(process.terminationStatus)): \(message)")
+                return message
             }
+            return nil
         } catch {
             NSLog("ancre: failed to launch hidutil: \(error)")
+            return String(describing: error)
         }
     }
 }

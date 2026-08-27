@@ -64,6 +64,17 @@ public enum L10n {
     public static func autoStacked(_ name: String) -> String {
         String(format: t("auto_stacked"), name)
     }
+    public static func autoFloated(_ app: String) -> String {
+        String(format: t("auto_floated"), app)
+    }
+    public static var tapDisabled: String { t("tap_disabled") }
+    public static var axPermissionLost: String { t("ax_permission_lost") }
+    public static var remapFailed: String { t("remap_failed") }
+    public static func configWarnings(first: String, count: Int) -> String {
+        count > 1
+            ? String(format: t("config_warnings_many"), first, count - 1)
+            : String(format: t("config_warnings_one"), first)
+    }
     public static func layoutMenu(_ current: String) -> String {
         String(format: t("layout_menu"), current)
     }
@@ -124,6 +135,12 @@ public enum L10n {
         "tip_hold": "cheatsheet with every shortcut",
         "onboarding_ai": "AI ready: agents can inspect and arrange your windows via the ancrectl CLI or its built-in MCP server — register with: claude mcp add ancre -- ancrectl mcp",
         "auto_stacked": "Workspace %@ can't fit its windows — switched to the stack layout.",
+        "auto_floated": "%@ refuses its tile size — window floated.",
+        "tap_disabled": "macOS disabled ancre's keyboard shortcuts — re-enabled.",
+        "ax_permission_lost": "Accessibility permission lost — ancre can't manage windows. Re-grant it in System Settings → Privacy & Security.",
+        "remap_failed": "Hyper key remap failed (hidutil) — hyper shortcuts may not work.",
+        "config_warnings_one": "Config: %@",
+        "config_warnings_many": "Config: %@ (+%d more warnings)",
     ]
 
     private static let tables: [String: [String: String]] = [
@@ -174,6 +191,12 @@ public enum L10n {
             "tip_hold": "nápověda se všemi zkratkami",
             "onboarding_ai": "AI ready: agenti můžou okna číst i přeskládat přes CLI ancrectl nebo jeho vestavěný MCP server. Registrace: claude mcp add ancre -- ancrectl mcp",
             "auto_stacked": "Workspace %@ — okna se nevešla, přepnuto na stack layout.",
+            "auto_floated": "%@ odmítá velikost dlaždice — okno floatuje.",
+            "tap_disabled": "macOS vypnul klávesové zkratky ancre — znovu zapnuto.",
+            "ax_permission_lost": "Ztraceno oprávnění Accessibility — ancre nemůže spravovat okna. Povol znovu v Nastavení systému → Soukromí a zabezpečení.",
+            "remap_failed": "Přemapování hyper klávesy selhalo (hidutil) — hyper zkratky nemusí fungovat.",
+            "config_warnings_one": "Config: %@",
+            "config_warnings_many": "Config: %@ (+%d dalších varování)",
         ],
     ]
 }

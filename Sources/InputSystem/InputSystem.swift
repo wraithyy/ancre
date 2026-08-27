@@ -21,9 +21,12 @@ public final class InputSystem {
         handler: @escaping Handler,
         onHyperMouse: ((HyperMouseButton, HyperMousePhase, CGPoint) -> Void)? = nil,
         onObservedMouseUp: ((HyperMouseButton, CGPoint) -> Void)? = nil,
-        onHyperStateChange: ((Bool) -> Void)? = nil
+        onHyperStateChange: ((Bool) -> Void)? = nil,
+        onTapDisabled: (() -> Void)? = nil,
+        onRemapFailure: ((String) -> Void)? = nil
     ) {
         let remap = HidutilRemap(srcName: hyperKeyName, dstName: "f18")
+        remap.onApplyFailure = onRemapFailure
         remap.apply()
         self.remap = remap
         InputSystem.installQuitSignalHandlers()
@@ -33,6 +36,7 @@ public final class InputSystem {
         tapManager.onHyperStateChange = onHyperStateChange
         tapManager.onHyperMouse = onHyperMouse
         tapManager.onObservedMouseUp = onObservedMouseUp
+        tapManager.onTapDisabled = onTapDisabled
         tapManager.start()
         self.tapManager = tapManager
     }
