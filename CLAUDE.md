@@ -3,7 +3,7 @@
 Hyprland-inspired tiling window manager for macOS. Swift, pure public
 Accessibility API — no private CGS/SkyLight API, no SIP tampering.
 Plan + milestones: `docs/PLAN.md` (M1–M8 done; backlog remains — command
-palette, config hooks, LaunchAgent). `AGENTS.md` = same instructions for
+palette, config hooks). `AGENTS.md` = same instructions for
 external agents (OpenHands), mainly what can't be verified in a Linux sandbox.
 
 ## Build & test

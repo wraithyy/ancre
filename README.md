@@ -14,7 +14,9 @@
 **Docs: https://wraithyy.github.io/ancre/**
 
 A Hyprland-inspired tiling window manager for macOS: your windows arrange
-themselves side by side and one key drives everything.
+themselves side by side and one key drives everything. Keyboard-first by
+design, but fully usable with the mouse — every action has a click, drag,
+or menu equivalent.
 
 > **ancre** /ɑ̃kʁ/ — French for *anchor*. Your windows stop drifting.
 
@@ -87,6 +89,14 @@ open /Applications/ancre.app
 
 The app is ad-hoc signed (no paid developer certificate); the cask clears
 the quarantine flag for you, so Gatekeeper won't complain.
+
+### Start at login
+
+Menubar icon -> **Start at login**. The checkmark registers the running
+bundle with `launchd` (`SMAppService`), so run it from the installed
+`/Applications/ancre.app` -- a `.build` bundle would be registered at that
+path and break on the next clean. If the item stays unchecked, ancre was
+switched off in System Settings -> General -> Login Items; allow it there.
 
 ### From source
 

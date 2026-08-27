@@ -39,6 +39,8 @@ public enum L10n {
     public static func updateAvailable(_ version: String) -> String {
         String(format: t("update_available"), version)
     }
+    public static var startAtLogin: String { t("start_at_login") }
+    public static var startAtLoginBlocked: String { t("start_at_login_blocked") }
     public static var openConfig: String { t("open_config") }
     public static var reloadConfig: String { t("reload_config") }
     public static var switcherPlaceholder: String { t("switcher_placeholder") }
@@ -113,6 +115,8 @@ public enum L10n {
         "scratchpad_off": "Scratchpad: not configured",
         "scratchpad_tooltip": "A drop-down window of one app, summoned over any workspace with hyper+s and hidden again. It lives outside tiling: no workspace, no tile, never rearranged. Set [scratchpad].app in the config.",
         "update_available": "Update to %@ available…",
+        "start_at_login": "Start at login",
+        "start_at_login_blocked": "Blocked in System Settings → General → Login Items. Allow ancre there.",
         "open_config": "Open config",
         "reload_config": "Reload config",
         "switcher_placeholder": "Search windows…",
@@ -169,6 +173,8 @@ public enum L10n {
             "scratchpad_off": "Scratchpad: nenastavený",
             "scratchpad_tooltip": "Vysouvací okno jedné aplikace, přivolané přes hyper+s nad jakoukoli workspace a stejně tak schované. Žije mimo tiling: žádná workspace, žádná dlaždice, nikdy se nepřeskládá. Nastav [scratchpad].app v configu.",
             "update_available": "Aktualizace %@ k dispozici…",
+            "start_at_login": "Spouštět po přihlášení",
+            "start_at_login_blocked": "Zakázáno v Nastavení systému → Obecné → Přihlašovací položky. Povol tam ancre.",
             "open_config": "Otevřít config",
             "reload_config": "Znovu načíst config",
             "switcher_placeholder": "Hledat okna…",

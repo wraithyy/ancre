@@ -3,6 +3,7 @@ import ApplicationServices
 import AXBridge
 import Bar
 import Config
+import ServiceManagement
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
@@ -11,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var onboarding: OnboardingWindow?
     private var pauseItem: NSMenuItem?
     private var scratchpadItem: NSMenuItem?
+    private var loginItem: NSMenuItem?
     private var scratchpadVisible = false
     private var scratchpadConfigured = false
     private var updateTimer: Timer?
@@ -160,6 +162,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
             menu.addItem(.separator())
         }
+        // launchd (via SMAppService) is the single source of truth for the
+        // login item — no config key to drift out of sync with it.
+        let login = NSMenuItem(title: L10n.startAtLogin, action: #selector(toggleLoginItem), keyEquivalent: "")
+        login.target = self
+        menu.addItem(login)
+        loginItem = login
+        refreshLoginItem()
+        menu.addItem(.separator())
+
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         menu.delegate = self
         statusItem.menu = menu
@@ -178,6 +189,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         item.title = L10n.scratchpad(app: name, running: running)
         item.state = scratchpadVisible ? .on : .off
         scratchpadConfigured = bundleID != nil
+    }
+
+    /// `.requiresApproval` = the user turned ancre off in System Settings;
+    /// register() can't override that, so say so in the tooltip instead.
+    private func refreshLoginItem() {
+        guard let item = loginItem else { return }
+        let status = SMAppService.mainApp.status
+        item.state = status == .enabled ? .on : .off
+        item.toolTip = status == .requiresApproval ? L10n.startAtLoginBlocked : nil
+    }
+
+    @objc private func toggleLoginItem() {
+        let service = SMAppService.mainApp
+        do {
+            if service.status == .enabled {
+                try service.unregister()
+            } else {
+                try service.register()
+            }
+        } catch {
+            NSLog("ancre: login item toggle failed: \(error.localizedDescription)")
+        }
+        refreshLoginItem()
     }
 
     @objc private func toggleScratchpad() {
@@ -260,6 +294,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 extension AppDelegate: NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         refreshScratchpadItem()
+        refreshLoginItem()
     }
 
     /// Only the scratchpad item can be inert — an unconfigured scratchpad is

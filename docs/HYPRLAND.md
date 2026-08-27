@@ -13,7 +13,8 @@
 Known gaps, stated plainly: **no `submap`** (Hyprland's mode-switching
 keybind layer) — ancre's keybindings are a single flat map, not a stack of
 swappable modes; **no window rules by title/regex** (only bundle id), **no
-`exec-once`/autostart** section yet (use a LaunchAgent or Login Item),
+`exec-once`/autostart** section yet (ancre itself starts at login via the
+menubar toggle),
 **gaps are global** (no per-workspace gaps), scratchpad holds a single app.
 Window animations cover ancre's own placement moves, not arbitrary system
 animations.

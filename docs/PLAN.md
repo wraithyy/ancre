@@ -61,7 +61,8 @@ ancre/
 ```
 
 **Status**: M1–M8 done (tiling, multi-monitor, bar, animations, layouts,
-theming, mouse modes, IPC/MCP/AI). The LaunchAgent plist doesn't exist yet.
+theming, mouse modes, IPC/MCP/AI). Start-at-login goes through
+`SMAppService.mainApp` (menubar toggle) -- no LaunchAgent plist needed.
 Backlog: command palette in the switcher, config hooks, hidutil re-apply
 after wake, true infinite scroll, layout edit mode, rule-learning phase 2.
 
