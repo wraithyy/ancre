@@ -131,3 +131,92 @@ height = 0.5
 color = "#89b4fa"
 opacity = 0.3
 ```
+
+## Kompletní příklad
+
+Reálné nastavení jednoho uživatele, lehce upravené. Workspaces 1–5 žijí na tom
+externím monitoru, který je zrovna připojený, 6–7 zůstávají na notebooku a
+aplikace se při spuštění samy zařadí na svůj workspace.
+
+```toml
+[general]
+gaps-inner = 8
+gaps-outer = 4
+animations = true
+animation-duration-ms = 180
+# Aplikace, jejichž okna mění velikost moc pomalu na animaci.
+animations-exclude = ["com.microsoft.teams2"]
+# Xcode válčí s tilerem, takže ho ancre nechává být.
+ignore-apps = ["com.apple.dt.Xcode"]
+default-layout = "dwindle"
+language = "cs"
+
+[hyper]
+key = "caps_lock"
+
+[keybindings]
+"hyper-h" = "focus left"
+"hyper-j" = "focus down"
+"hyper-k" = "focus up"
+"hyper-l" = "focus right"
+"hyper-shift-h" = "move left"
+"hyper-shift-j" = "move down"
+"hyper-shift-k" = "move up"
+"hyper-shift-l" = "move right"
+"hyper-left" = "resize width -50"
+"hyper-right" = "resize width +50"
+"hyper-1" = "workspace 1"
+"hyper-shift-1" = "move-to-workspace 1"
+"hyper-v" = "toggle-floating"
+"hyper-f" = "toggle-fullscreen"
+"hyper-a" = "adopt-window"
+"hyper-t" = "layout scroll"
+"hyper-shift-t" = "layout dwindle"
+"hyper-comma" = "focus-monitor previous"
+"hyper-period" = "focus-monitor next"
+
+# Dva monitory, na každém stole jeden. Název se hledá jako podřetězec a
+# společný nemají, proto jsou uvedené oba — vyhraje první připojený.
+[workspaces]
+"1" = ["Studio Display", "U3423WE"]
+"2" = ["Studio Display", "U3423WE"]
+"3" = ["Studio Display", "U3423WE"]
+"6" = "Built-in"
+"7" = "Built-in"
+
+[workspace-labels]
+"1" = { icon = "\U0001F4BB", name = "term" }
+"2" = { icon = "\U0001F310", name = "web" }
+"3" = { icon = "\U0001F4AC", name = "chat" }
+"4" = { icon = "\U0001F3B5", name = "music", hide-when-empty = true }
+"8" = { hide-when-empty = true }
+"9" = { hide-when-empty = true }
+
+[app-workspaces]
+"com.mitchellh.ghostty" = "1"
+"com.microsoft.VSCode" = "1"
+"com.google.Chrome" = "2"
+"com.apple.Safari" = "2"
+"com.microsoft.Outlook" = "3"
+"com.spotify.client" = "4"
+"com.apple.Music" = "4"
+"com.apple.iCal" = "6"
+"com.apple.mail" = "6"
+
+[bar]
+enabled = true
+position = "menubar"
+opacity = 0.75
+peek = true
+idle-opacity = 0.55
+
+# Na vestavěném displeji se bar schová pod notch a vyjede při najetí myší.
+[bar-overrides.notch]
+position = "notch"
+
+# hyper-s hodí Ghostty přes střed obrazovky, dalším stiskem ho schová.
+[scratchpad]
+app = "com.mitchellh.ghostty"
+width = 0.6
+height = 0.5
+```

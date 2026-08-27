@@ -131,3 +131,91 @@ height = 0.5
 color = "#89b4fa"
 opacity = 0.3
 ```
+
+## A complete example
+
+A real single-user setup, lightly edited. Workspaces 1–5 live on whichever
+external monitor is connected, 6–7 stay on the laptop, and apps route
+themselves to a workspace on launch.
+
+```toml
+[general]
+gaps-inner = 8
+gaps-outer = 4
+animations = true
+animation-duration-ms = 180
+# Apps whose windows resize too slowly to animate well.
+animations-exclude = ["com.microsoft.teams2"]
+# Xcode fights the tiler, so ancre leaves it alone.
+ignore-apps = ["com.apple.dt.Xcode"]
+default-layout = "dwindle"
+
+[hyper]
+key = "caps_lock"
+
+[keybindings]
+"hyper-h" = "focus left"
+"hyper-j" = "focus down"
+"hyper-k" = "focus up"
+"hyper-l" = "focus right"
+"hyper-shift-h" = "move left"
+"hyper-shift-j" = "move down"
+"hyper-shift-k" = "move up"
+"hyper-shift-l" = "move right"
+"hyper-left" = "resize width -50"
+"hyper-right" = "resize width +50"
+"hyper-1" = "workspace 1"
+"hyper-shift-1" = "move-to-workspace 1"
+"hyper-v" = "toggle-floating"
+"hyper-f" = "toggle-fullscreen"
+"hyper-a" = "adopt-window"
+"hyper-t" = "layout scroll"
+"hyper-shift-t" = "layout dwindle"
+"hyper-comma" = "focus-monitor previous"
+"hyper-period" = "focus-monitor next"
+
+# Two monitors, one at each desk. Name matching is a substring, and the two
+# share none, so both are listed - the first connected one wins.
+[workspaces]
+"1" = ["Studio Display", "U3423WE"]
+"2" = ["Studio Display", "U3423WE"]
+"3" = ["Studio Display", "U3423WE"]
+"6" = "Built-in"
+"7" = "Built-in"
+
+[workspace-labels]
+"1" = { icon = "\U0001F4BB", name = "term" }
+"2" = { icon = "\U0001F310", name = "web" }
+"3" = { icon = "\U0001F4AC", name = "chat" }
+"4" = { icon = "\U0001F3B5", name = "music", hide-when-empty = true }
+"8" = { hide-when-empty = true }
+"9" = { hide-when-empty = true }
+
+[app-workspaces]
+"com.mitchellh.ghostty" = "1"
+"com.microsoft.VSCode" = "1"
+"com.google.Chrome" = "2"
+"com.apple.Safari" = "2"
+"com.microsoft.Outlook" = "3"
+"com.spotify.client" = "4"
+"com.apple.Music" = "4"
+"com.apple.iCal" = "6"
+"com.apple.mail" = "6"
+
+[bar]
+enabled = true
+position = "menubar"
+opacity = 0.75
+peek = true
+idle-opacity = 0.55
+
+# On the built-in display the bar hides under the notch and slides out on hover.
+[bar-overrides.notch]
+position = "notch"
+
+# hyper-s drops Ghostty over the middle of the screen; press again to hide it.
+[scratchpad]
+app = "com.mitchellh.ghostty"
+width = 0.6
+height = 0.5
+```

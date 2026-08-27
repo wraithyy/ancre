@@ -78,7 +78,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Rebuilt after the controller starts so titles use the config language.
     private func buildMenu() {
         let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "ancre", action: nil, keyEquivalent: ""))
+        let version = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String).map { " \($0)" } ?? ""
+        menu.addItem(NSMenuItem(title: "ancre\(version)", action: nil, keyEquivalent: ""))
         menu.addItem(.separator())
 
         if let version = availableUpdate {
