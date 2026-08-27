@@ -27,6 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func scheduleUpdateChecks() {
         let check = { [weak self] in
             UpdateChecker.check { version in
+                NSLog("ancre: update %@ available", version)
                 self?.availableUpdate = version
                 self?.buildMenu()
             }
