@@ -400,9 +400,11 @@ public final class BarController {
         )
         window.setFrame(target, display: true)
         notchTargets[monitorID] = (target, safeTop, notchRect)
-        wrapInTracking(window: window, hosting: hosting) { [weak self] in
-            self?.conceal(monitorID: monitorID, window: window)
-        }
+        // Concealing is the reveal watcher's job alone. A mouseExited handler
+        // on the pill fired spuriously — every bar update rebuilds tracking
+        // areas (synthesizing an exit under a stationary cursor) and moving
+        // from the pill up into the notch band exits too — so the pill kept
+        // sliding in and out while hovered.
 
         if hoverPoll == nil {
             hoverPoll = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
@@ -465,8 +467,8 @@ public final class BarController {
         })
     }
 
-    /// Ensures the pill's content view is wrapped in a tracking container so
-    /// mouse-exit can hide it in notch mode.
+    /// Ensures the pill's content view is wrapped in a tracking container
+    /// (hover peek for edge-positioned bars).
     private func wrapInTracking(window: NSWindow, hosting: NSHostingView<BarView>, onEnter: (() -> Void)? = nil, onExit: @escaping () -> Void) {
         if let container = window.contentView as? TrackingView {
             container.onEnter = onEnter
