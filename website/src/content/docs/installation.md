@@ -27,11 +27,14 @@ open /Applications/ancre.app
 The app is ad-hoc signed (no paid developer certificate); the cask clears
 the quarantine flag for you, so Gatekeeper won't complain.
 
-## From source
+## From source (contributors)
 
-Plain Swift Package Manager, no `.xcodeproj`.
+Most users should install via Homebrew above. Building from source is for
+development — plain Swift Package Manager, no `.xcodeproj`.
 
 ```sh
+xcode-select --install    # once: compiler toolchain + git
+git clone https://github.com/wraithyy/ancre && cd ancre
 swift build -c release    # whole package
 swift test                # unit tests
 Scripts/bundle.sh         # builds .build/ancre.app (ad-hoc signed)
@@ -39,6 +42,12 @@ open .build/ancre.app
 ```
 
 ## Permissions
+
+<!-- media (shotlist: installation.md):
+![System Settings: Accessibility pane with ancre in the list](../../assets/installation-accessibility.png)
+![System Settings: Input Monitoring pane with ancre in the list](../../assets/installation-input-monitoring.png)
+![First launch: the onboarding window waiting for permissions](../../assets/installation-onboarding.png)
+-->
 
 On first launch the app requests the **Accessibility** permission
 (System Settings → Privacy & Security → Accessibility) and waits until it is

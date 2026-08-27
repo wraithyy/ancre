@@ -27,11 +27,14 @@ open /Applications/ancre.app
 App je ad-hoc podepsaná (bez placeného developer certifikátu); cask za tebe
 sundá quarantine flag, takže Gatekeeper si nebude stěžovat.
 
-## Ze zdrojů
+## Ze zdrojů (pro contributory)
 
-Čistý Swift Package Manager, žádný `.xcodeproj`.
+Většina uživatelů má instalovat přes Homebrew výše. Build ze zdrojů je pro
+vývoj — čistý Swift Package Manager, žádný `.xcodeproj`.
 
 ```sh
+xcode-select --install    # jednorázově: compiler toolchain + git
+git clone https://github.com/wraithyy/ancre && cd ancre
 swift build -c release    # celý balíček
 swift test                # unit testy
 Scripts/bundle.sh         # sestaví .build/ancre.app (ad-hoc podpis)
@@ -39,6 +42,12 @@ open .build/ancre.app
 ```
 
 ## Permissions
+
+<!-- media (shotlist: installation.md):
+![System Settings: panel Accessibility s ancre v seznamu](../../../assets/installation-accessibility.png)
+![System Settings: panel Input Monitoring s ancre v seznamu](../../../assets/installation-input-monitoring.png)
+![První spuštění: onboarding okno čekající na permissions](../../../assets/installation-onboarding.png)
+-->
 
 Při prvním spuštění si app vyžádá **Accessibility** permission
 (System Settings → Privacy & Security → Accessibility) a čeká, dokud ji

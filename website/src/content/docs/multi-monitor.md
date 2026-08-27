@@ -6,7 +6,15 @@ sidebar:
 ---
 
 Workspaces 1–9 spread across monitors with **stable assignment** that
-survives display unplug and replug.
+survives display unplug and replug: unplug at the office, replug at home,
+and every workspace lands back on the monitor you assigned it to.
+
+<!-- media (shotlist: multi-monitor.md):
+![Two monitors, each with its own workspace and bar](../../assets/multi-monitor-two-displays.png)
+![Moving a window between monitors](../../assets/multi-monitor-move-window.gif)
+![Unplugging and replugging a monitor — windows reflow and return](../../assets/multi-monitor-replug.gif)
+-->
+
 
 ## Assigning workspace → monitor
 

@@ -5,10 +5,18 @@ sidebar:
   order: 7
 ---
 
-Everything goes through the command bus, exposed on the unix socket
+Anything you can do with a shortcut, a script or an AI agent can do too:
+"set up my review workspace" becomes one command. Every operation goes
+through the same command bus, exposed on the unix socket
 `~/Library/Application Support/ancre/ancre.sock` (mode 0600 — only your user
 can control it). If ancre isn't running, any `ancrectl` call prints
 `cannot connect to <path> — is ancre running?` and exits 1.
+
+<!-- media (shotlist: scripting.md):
+![ancrectl in a terminal: state output, then a move command with the window visibly moving](../../assets/scripting-ancrectl.gif)
+![An MCP command from the CLI immediately rearranging windows](../../assets/scripting-mcp-demo.gif)
+-->
+
 
 ## CLI — `ancrectl`
 
@@ -35,8 +43,9 @@ individual window placement, active workspaces, and final focus.
 
 ## MCP server
 
-The MCP server is **built into the CLI** — no Node. Register it with Claude
-Code:
+MCP ([Model Context Protocol](https://modelcontextprotocol.io)) lets AI
+assistants like Claude call tools directly — here, control your windows. The
+server is **built into the CLI** — no Node. Register it with Claude Code:
 
 ```sh
 claude mcp add ancre --scope user -- ancrectl mcp

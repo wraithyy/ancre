@@ -5,17 +5,28 @@ sidebar:
   order: 4
 ---
 
-ancre ships three built-in layouts and a template language for custom ones.
+A layout decides where each window goes — you never position tiled windows
+by hand. ancre ships three built-in layouts and a template language for
+custom ones.
 
 ## Built-in
 
-- **dwindle** — binary splitting like Hyprland; every new window splits the
+<!-- media (shotlist: layouts.md):
+![Dwindle layout with 2 windows](../../assets/layouts-dwindle-2.png)
+![Dwindle layout with 3 windows](../../assets/layouts-dwindle-3.png)
+![Dwindle layout with 4 windows](../../assets/layouts-dwindle-4.png)
+![Opening windows one by one — dwindle splitting live](../../assets/layouts-dwindle-splitting.gif)
+-->
+
+- **dwindle** — each new window splits the previous one in half, spiraling
+  toward a corner (Hyprland's signature layout); every new window splits the
   leaf it's inserted after. The split axis follows that leaf's current
   aspect ratio — wider splits side by side, taller splits stacked — and a
   new split always starts at a 0.5 ratio; only a manual resize moves it.
   The default (`[general].default-layout`).
 - **scroll** — columns side by side, inspired by scrolling layouts.
-- **stack** — monocle: one window fills the screen, the rest sit behind it.
+- **stack** — one window fills the screen, the rest sit behind it (what
+  other WMs call *monocle*).
 
 Switching: `hyper+t` (scroll), `hyper+shift+t` (dwindle), or generally
 `ancrectl layout <name>`. Per-workspace layout is set in

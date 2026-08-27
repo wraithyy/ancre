@@ -10,6 +10,13 @@ supports drag&drop. Everything is driven by the `[bar]` section.
 
 ![The ancre workspace bar sitting in the menu bar, dark theme](../../assets/ancre-menubar-preview-dark.png)
 
+<!-- media (shotlist: bar.md):
+![The bar tucked under the notch on a MacBook display](../../assets/bar-notch.png)
+![Clicking a workspace in the bar switches to it](../../assets/bar-workspace-click.gif)
+![Bar indicator states: active vs. inactive workspace](../../assets/bar-states.png)
+-->
+
+
 ## Position
 
 ```toml

@@ -13,6 +13,13 @@ Changes apply via **Reload config** in the menu bar menu (or
 `ancrectl reload-config`) without a restart. A config error never crashes the
 app — it falls back to defaults with a warning in the log.
 
+<!-- media (shotlist: configuration.md):
+![ancre.toml in an editor with syntax highlighting](../../assets/configuration-editor.png)
+![Live reload: editing a gap value and saving — windows rearrange instantly](../../assets/configuration-live-reload.gif)
+![Validation warning after a config typo — the app keeps running](../../assets/configuration-warning.png)
+-->
+
+
 :::caution
 A *missing* key is always safe — it falls back to that key's default and the
 rest of your config is kept. A key with the *wrong type* is not: it aborts the

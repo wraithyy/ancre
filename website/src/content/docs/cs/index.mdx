@@ -1,36 +1,45 @@
 ---
 title: ancre
-description: Hyprland-inspired tiling window manager pro macOS — čisté veřejné Accessibility API, žádný zásah do SIP.
+description: Hyprland-inspired tiling window manager pro macOS — okna se skládají sama, jedna klávesa řídí všechno.
 ---
 
-Hyprland-inspired tiling window manager pro macOS. Žádné privátní
-CGS/SkyLight window API, žádný zásah do SIP — s jednou zdokumentovanou
-výjimkou: `_AXUIElementGetWindow` přes `dlsym`, použité k získání stabilního
-`CGWindowID` z `AXUIElement` (stejný trik používá yabai i Amethyst, protože
-pro to neexistuje veřejné API).
+ancre je **tiling window manager** pro macOS inspirovaný
+[Hyprlandem](https://hypr.land): okna se sama skládají vedle sebe a všechno
+řídí jediná klávesa — CapsLock jako *hyper*.
 
-- **Layouty** — dwindle (Hyprland), columns („scroll”), stack (monocle),
-  vlastní layouty ze šablon v configu
+{/* media: hero-desktop.png + hero-demo.mp4 (shotlist: Hero / README)
+![ancre tiluje celou plochu: dwindle layout se čtyřmi okny a workspace barem](../../../assets/hero-desktop.png)
+*/}
+
+*Tiling neznáš?* Místo vršení oken na sebe dá tiling window manager každému
+oknu vlastní slot v layoutu a využije celou obrazovku. Přepínáš se mezi
+číslovanými **workspaces** (virtuálními plochami) a fokus ovládáš
+klávesnicí.
+
+- **Layouty** — dwindle (spirálové dělení jako v Hyprlandu), sloupce
+  („scroll”), stack (jedno okno naráz), vlastní layouty ze šablon v configu
 - **Workspaces 1–9** napříč monitory se stabilním přiřazením (přežije replug)
 - **Workspace bar** — ikonky oken, drag&drop, badge notifikací; pozice včetně
   menubaru a notche
 - **Hyper klávesa** (CapsLock) pro všechny zkratky + myší módy (hyper+drag)
-- **AI ready** — unix socket + `ancrectl` CLI + vestavěný MCP server +
-  Claude skill
+- **AI ready** — `ancrectl` CLI, unix socket, vestavěný MCP server, Claude
+  skill: agent přeuspořádá celý setup jedním voláním
+- **Nativní a bezpečné** — čisté veřejné Accessibility API, žádný zásah do
+  SIP, žádné kernel extensions ([detaily](/ancre/cs/architecture/))
 
 ## Rychlý start
 
 ```sh
-git clone https://github.com/wraithyy/ancre && cd ancre
-swift build -c release
-Scripts/bundle.sh
-open .build/ancre.app
+brew tap wraithyy/tap
+brew trust wraithyy/tap          # third-party tap potřebuje jednorázový trust
+brew install --cask ancre
+open /Applications/ancre.app
 ```
 
-Preferuješ Homebrew? Viz [Instalace](/ancre/cs/installation/).
+Preferuješ build ze zdrojů? Viz [Instalace](/ancre/cs/installation/).
 
-Povol **Accessibility** a **Input Monitoring**, až se zeptá — detaily
-v [Instalaci](/ancre/cs/installation/). Pak:
+První spuštění zobrazí onboarding okno, které tě provede dvěma potřebnými
+permissions (**Accessibility**, **Input Monitoring**). Pak:
 
 ```sh
 hyper+1..9        # přepnutí workspace   (hyper = CapsLock)
@@ -53,6 +62,10 @@ Podržení hyperu 2 s zobrazí celý [cheatsheet zkratek](/ancre/cs/controls/).
 - App je ad-hoc podepsaná, ne notarizovaná — Gatekeeper je spokojený díky
   Homebrew casku (nebo ručnímu sundání quarantine při buildu ze zdrojů), ale
   Apple notarization ticket chybí.
+- Jedna zdokumentovaná výjimka z „čistě veřejného API”:
+  `_AXUIElementGetWindow` přes `dlsym`, použité k získání stabilního
+  `CGWindowID` z `AXUIElement` (stejný trik používá yabai i Amethyst);
+  degraduje elegantně, kdyby symbol někdy zmizel.
 
 ## Kam dál
 

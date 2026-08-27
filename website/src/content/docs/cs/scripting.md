@@ -5,10 +5,18 @@ sidebar:
   order: 7
 ---
 
-Vše jde přes command bus, vystavený na unix socketu
+Cokoli zvládne zkratka, zvládne i skript nebo AI agent: „připrav mi review
+workspace" je jeden příkaz. Každá operace jde přes stejný command bus,
+vystavený na unix socketu
 `~/Library/Application Support/ancre/ancre.sock` (práva 0600 — ovládá jen
 tvůj uživatel). Pokud ancre neběží, každé volání `ancrectl` vypíše
 `cannot connect to <path> — is ancre running?` a skončí s exit 1.
+
+<!-- media (shotlist: scripting.md):
+![ancrectl v terminálu: výstup state a přesun okna s viditelným efektem](../../../assets/scripting-ancrectl.gif)
+![MCP příkaz z CLI okamžitě přeskládává okna](../../../assets/scripting-mcp-demo.gif)
+-->
+
 
 ## CLI — `ancrectl`
 
@@ -35,7 +43,9 @@ appek, umístění jednotlivých oken, aktivní workspaces a finální fokus.
 
 ## MCP server
 
-MCP server je **vestavěný v CLI** — žádný Node. Registrace do Claude Code:
+MCP ([Model Context Protocol](https://modelcontextprotocol.io)) umožňuje AI
+asistentům jako Claude volat nástroje přímo — tady ovládat tvoje okna.
+Server je **vestavěný v CLI** — žádný Node. Registrace do Claude Code:
 
 ```sh
 claude mcp add ancre --scope user -- ancrectl mcp

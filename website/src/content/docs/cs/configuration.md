@@ -13,6 +13,13 @@ Změny aplikuje **Znovu načíst config** v menubar menu (nebo
 `ancrectl reload-config`) bez restartu. Chyba v configu nikdy neshodí app —
 fallback na defaulty s warningem v logu.
 
+<!-- media (shotlist: configuration.md):
+![ancre.toml v editoru se syntax highlightem](../../../assets/configuration-editor.png)
+![Live reload: úprava gap hodnoty a uložení — okna se okamžitě přeskládají](../../../assets/configuration-live-reload.gif)
+![Warning po překlepu v configu — app běží dál](../../../assets/configuration-warning.png)
+-->
+
+
 :::caution
 *Chybějící* klíč je vždy bezpečný — doplní se jeho default a zbytek configu
 zůstane nedotčený. Klíč se *špatným typem* bezpečný není: shodí celé

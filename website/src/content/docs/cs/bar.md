@@ -10,6 +10,13 @@ drag&drop. Vše řídí sekce `[bar]`.
 
 ![Workspace bar ancre v menu baru, tmavý motiv](../../../assets/ancre-menubar-preview-dark.png)
 
+<!-- media (shotlist: bar.md):
+![Bar schovaný pod notchem na MacBook displeji](../../../assets/bar-notch.png)
+![Klik na workspace v baru ji přepne](../../../assets/bar-workspace-click.gif)
+![Stavy indikátorů: aktivní vs. neaktivní workspace](../../../assets/bar-states.png)
+-->
+
+
 ## Pozice
 
 ```toml

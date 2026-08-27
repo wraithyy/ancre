@@ -1,36 +1,46 @@
 ---
 title: ancre
-description: Hyprland-inspired tiling window manager for macOS — no private CGS/SkyLight window APIs, no SIP tampering.
+description: Hyprland-inspired tiling window manager for macOS — your windows arrange themselves, one key drives everything.
 ---
 
-Hyprland-inspired tiling window manager for macOS. No private CGS/SkyLight
-window APIs, no SIP tampering — with one documented exception:
-`_AXUIElementGetWindow` via `dlsym`, used to get a stable `CGWindowID` from
-an `AXUIElement` (the same trick yabai and Amethyst rely on, since there's
-no public API for it).
+ancre is a **tiling window manager** for macOS, inspired by
+[Hyprland](https://hypr.land): your windows arrange themselves side by side
+and one key — CapsLock as *hyper* — drives everything.
 
-- **Layouts** — dwindle (Hyprland), columns ("scroll"), stack (monocle),
-  custom layouts from config templates
+{/* media: hero-desktop.png + hero-demo.mp4 (shotlist: Hero / README)
+![ancre tiling a full desktop: dwindle layout with four windows and the workspace bar](../../assets/hero-desktop.png)
+*/}
+
+*New to tiling?* Instead of stacking windows on top of each other, a tiling
+window manager gives every window its own slot in a layout and keeps the
+screen fully used. You switch between numbered **workspaces** (virtual
+desktops) and move focus with the keyboard.
+
+- **Layouts** — dwindle (Hyprland-style spiral splitting), columns
+  ("scroll"), stack (one window at a time), custom layouts from config
+  templates
 - **Workspaces 1–9** across monitors with stable assignment (survives replug)
 - **Workspace bar** — window icons, drag&drop, notification badges; positions
   include the menu bar and the notch
 - **Hyper key** (CapsLock) for every shortcut + mouse modes (hyper+drag)
-- **AI ready** — unix socket + `ancrectl` CLI + built-in MCP server +
-  Claude skill
+- **AI ready** — `ancrectl` CLI, unix socket, built-in MCP server, Claude
+  skill: an agent rearranges your whole setup in one call
+- **Native and safe** — pure public Accessibility API, no SIP tampering, no
+  kernel extensions ([details](/ancre/architecture/))
 
 ## Quick start
 
 ```sh
-git clone https://github.com/wraithyy/ancre && cd ancre
-swift build -c release
-Scripts/bundle.sh
-open .build/ancre.app
+brew tap wraithyy/tap
+brew trust wraithyy/tap          # third-party taps need a one-time trust
+brew install --cask ancre
+open /Applications/ancre.app
 ```
 
-Prefer Homebrew? See [Installation](/ancre/installation/).
+Prefer building from source? See [Installation](/ancre/installation/).
 
-Grant **Accessibility** and **Input Monitoring** when asked — details in
-[Installation](/ancre/installation/). Then:
+First launch shows an onboarding window that walks you through the two
+needed permissions (**Accessibility**, **Input Monitoring**). Then:
 
 ```sh
 hyper+1..9        # switch workspace     (hyper = CapsLock)
@@ -53,6 +63,10 @@ Hold hyper for 2 s to see the full [shortcut cheatsheet](/ancre/controls/).
 - The app is ad-hoc signed, not notarized — Gatekeeper is satisfied via the
   Homebrew cask (or a manual quarantine clear from source), but there's no
   Apple notarization ticket.
+- One documented exception to "public API only":
+  `_AXUIElementGetWindow` via `dlsym`, used to get a stable `CGWindowID`
+  from an `AXUIElement` (the same trick yabai and Amethyst rely on); it
+  degrades gracefully if the symbol is ever unavailable.
 
 ## Where next
 

@@ -6,7 +6,15 @@ sidebar:
 ---
 
 Workspaces 1–9 se rozprostírají napříč monitory se **stabilním přiřazením**,
-které přežije odpojení a znovupřipojení monitoru.
+které přežije odpojení a znovupřipojení monitoru: odpojíš v kanceláři,
+připojíš doma, a každá workspace skončí zpátky na monitoru, kam patří.
+
+<!-- media (shotlist: multi-monitor.md):
+![Dva monitory, každý s vlastní workspace a barem](../../../assets/multi-monitor-two-displays.png)
+![Přesun okna mezi monitory](../../../assets/multi-monitor-move-window.gif)
+![Odpojení a připojení monitoru — okna se přeskládají a vrátí](../../../assets/multi-monitor-replug.gif)
+-->
+
 
 ## Přiřazení workspace → monitor
 

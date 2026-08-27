@@ -5,8 +5,10 @@ sidebar:
   order: 2
 ---
 
-Hyper = CapsLock (change the key via `[hyper].key` in the config). Holding
-hyper for more than 2 s shows a **cheatsheet of all shortcuts** as a
+Every ancre shortcut starts with a single modifier — the **hyper key**, by
+default CapsLock (change it via `[hyper].key` in the config). One key you
+never use for anything else, so no shortcut ever collides with an app.
+Holding hyper for more than 2 s shows a **cheatsheet of all shortcuts** as a
 translucent overlay.
 
 Using CapsLock as hyper means ancre remaps it to F18 via `hidutil` on launch,
@@ -23,6 +25,16 @@ with input-language switching. CapsLock avoids both.
 
 ## Keyboard shortcuts
 
+<!-- media (shotlist: controls.md):
+![Moving focus between three windows with hyper+h/j/k/l](../../assets/controls-focus.gif)
+![Swapping a window within the layout](../../assets/controls-swap.gif)
+![Switching workspaces 1 → 2 → 1](../../assets/controls-workspace-switch.gif)
+![Moving a window to another workspace](../../assets/controls-move-to-workspace.gif)
+![Toggling a window between floating and tiled](../../assets/controls-floating.gif)
+![Fullscreen toggle](../../assets/controls-fullscreen.gif)
+![Resizing — neighbors give way](../../assets/controls-resize.gif)
+-->
+
 | Shortcut | Action |
 |---|---|
 | `hyper+h/j/k/l` | focus in direction |
@@ -33,9 +45,9 @@ with input-language switching. CapsLock avoids both.
 | `hyper+v` | float / back to tiles |
 | `hyper+f` | fullscreen toggle |
 | `hyper+t` / `hyper+shift+t` | layout scroll / dwindle |
-| `hyper+space` | window switcher |
-| `hyper+s` | scratchpad |
-| `hyper+o` | hints (jump to window) |
+| `hyper+space` | window switcher (fuzzy search across all windows) |
+| `hyper+s` | scratchpad (a floating terminal/app summoned on demand) |
+| `hyper+o` | hints — every window gets a letter, press it to jump there |
 | `hyper+a` | adopt frontmost window into the current workspace |
 | `hyper+p` | pause tiling (toggle) |
 | `hyper+r` | rescan + retile everything |
@@ -45,6 +57,10 @@ Every shortcut can be remapped in the `[keybindings]` section — see
 [Configuration](/ancre/configuration/).
 
 ## Mouse
+
+<!-- media (shotlist: controls.md):
+![Dragging a window by mouse into another position in the layout](../../assets/controls-dragdrop.gif)
+-->
 
 - **`hyper+left drag`** — move a window. The tile pops out of the grid;
   dropping over another tile inserts it next to it (a placeholder shows the
