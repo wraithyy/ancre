@@ -12,6 +12,7 @@ import Bar
 import Config
 import InputSystem
 import LayoutEngine
+import UserNotifications
 import WMCore
 
 final class WindowManagerController: WindowTrackerDelegate {
@@ -64,6 +65,17 @@ final class WindowManagerController: WindowTrackerDelegate {
     /// Workspaces auto-switched to stack on a cramped monitor, with the
     /// layout to restore once they fit again. (axQueue)
     private var autoStackedOriginals: [String: String] = [:]
+    /// Divergence events per workspace within the current refusal burst;
+    /// above auto-stack-thrash-limit the workspace is auto-stacked. (axQueue)
+    private var thrashCounts: [String: Int] = [:]
+    /// Tiled-window count at the moment a workspace was thrash-stacked —
+    /// the width heuristic already said "fits" there, so restore the original
+    /// layout only once the count drops below it. (axQueue)
+    private var thrashStackCounts: [String: Int] = [:]
+    /// Refusal counters reset after a quiet period rather than per execute()
+    /// cascade: animated completions arrive at depth 0, and a per-cascade
+    /// reset wiped the counts every round (endless ping-pong). (axQueue)
+    private var lastDivergence = Date.distantPast
     /// Keybind cheatsheet (main thread only). Nil when disabled in config.
     private var helpOverlay: HelpOverlay?
     private var helpTimer: Timer?
@@ -594,7 +606,6 @@ final class WindowManagerController: WindowTrackerDelegate {
             },
             state: &state
         ))
-        applyAutoStack()
     }
 
     /// Carves the bar strip out of a monitor's usable area so tiles don't
@@ -731,8 +742,8 @@ final class WindowManagerController: WindowTrackerDelegate {
         case .openConfig:
             DispatchQueue.main.async { NSWorkspace.shared.open(ConfigLoader.userConfigURL) }
             return
-        case .switcher:
-            showSwitcher()
+        case .switcher(let commandsOnly):
+            showSwitcher(commandsOnly: commandsOnly)
             return
         case .scratchpad:
             toggleScratchpad()
@@ -765,6 +776,14 @@ final class WindowManagerController: WindowTrackerDelegate {
     func retile() {
         tracker.rescanWindows()
         tracker.perform { self.applyDisplays(DisplayManager.current()) }
+    }
+
+    func adoptWindowFromMenu() {
+        tracker.perform { self.adoptFrontmostWindow() }
+    }
+
+    func showSwitcherFromMenu() {
+        tracker.perform { self.showSwitcher() }
     }
 
     /// hyper+left drag = move (floats the window first; dropping over a tile
@@ -1113,8 +1132,9 @@ final class WindowManagerController: WindowTrackerDelegate {
         }
     }
 
-    /// Builds the switcher entries from state and shows the overlay. (axQueue)
-    private func showSwitcher() {
+    /// Builds the switcher entries from state and shows the overlay;
+    /// `commandsOnly` opens with the ">" palette prefix typed in. (axQueue)
+    private func showSwitcher(commandsOnly: Bool = false) {
         var entries: [SwitcherEntry] = []
         for monitor in state.monitors {
             for workspace in monitor.workspaces {
@@ -1135,6 +1155,22 @@ final class WindowManagerController: WindowTrackerDelegate {
             }
         }
         entries.sort { ($0.appName, $0.title) < ($1.appName, $1.title) }
+
+        // Command palette (">" prefix in the switcher): layouts, saved
+        // presets, and the controller-side toggles.
+        var palette: [PaletteEntry] = []
+        for layout in ["dwindle", "scroll", "stack"] + (config.customLayouts?.keys.sorted() ?? []) {
+            palette.append(PaletteEntry(command: "layout \(layout)", title: L10n.paletteLayout(layout)))
+        }
+        palette.append(PaletteEntry(command: "pause-tiling", title: tilingPaused ? L10n.resumeTiling : L10n.pauseTiling))
+        palette.append(PaletteEntry(command: "retile", title: L10n.retile))
+        palette.append(PaletteEntry(command: "adopt-window", title: L10n.adoptWindow))
+        palette.append(PaletteEntry(command: "scratchpad", title: L10n.paletteScratchpad))
+        palette.append(PaletteEntry(command: "open-config", title: L10n.openConfig))
+        for name in loadPresets().keys.sorted() {
+            palette.append(PaletteEntry(command: "preset \(name)", title: L10n.palettePreset(name)))
+        }
+
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             // hyper+space again = toggle off.
@@ -1143,18 +1179,25 @@ final class WindowManagerController: WindowTrackerDelegate {
                 return
             }
             if self.switcher == nil {
-                self.switcher = SwitcherOverlay { [weak self] windowID in
-                    guard let self else { return }
-                    self.tracker.perform {
-                        let wid = WindowID(windowID)
-                        guard let location = self.state.windowLocation[wid] else { return }
-                        self.run(.workspace(location.workspaceName))
-                        self.execute(WM.focusChangedExternally(wid, state: &self.state))
-                        self.execute([.focusWindow(wid)])
+                self.switcher = SwitcherOverlay(
+                    onChoose: { [weak self] windowID in
+                        guard let self else { return }
+                        self.tracker.perform {
+                            let wid = WindowID(windowID)
+                            guard let location = self.state.windowLocation[wid] else { return }
+                            self.run(.workspace(location.workspaceName))
+                            self.execute(WM.focusChangedExternally(wid, state: &self.state))
+                            self.execute([.focusWindow(wid)])
+                        }
+                    },
+                    onCommand: { [weak self] command in
+                        guard let self, let parsed = Command.parse(command) else { return }
+                        if case .switcher = parsed { return }
+                        self.tracker.perform { self.run(parsed) }
                     }
-                }
+                )
             }
-            self.switcher?.show(entries: entries)
+            self.switcher?.show(entries: entries, palette: palette, initialQuery: commandsOnly ? ">" : "")
         }
     }
 
@@ -1246,15 +1289,17 @@ final class WindowManagerController: WindowTrackerDelegate {
         if !isAutoStack {
             // A manual layout choice overrides any pending auto-stack restore.
             autoStackedOriginals.removeValue(forKey: workspaceName)
+            thrashStackCounts.removeValue(forKey: workspaceName)
         }
         workspaceLayoutNames[workspaceName] = name
         execute(WM.setLayout(Self.makeLayout(named: name, config: config), workspaceNamed: workspaceName, state: &state))
     }
 
-    /// Migration crowding: workspaces whose tiled windows can't plausibly fit
-    /// their monitor switch to stack; they switch back once space returns.
+    /// Crowding: workspaces whose tiled windows can't plausibly fit their
+    /// monitor switch to stack; they switch back once space returns. Runs
+    /// after every top-level execute(), so incremental window adds count too.
     private func applyAutoStack() {
-        guard config.general.autoStack else { return }
+        guard config.general.autoStack, !tilingPaused else { return }
         let minWidth = config.general.autoStackMinWidth
         for monitor in state.monitors {
             for workspace in monitor.workspaces {
@@ -1266,12 +1311,53 @@ final class WindowManagerController: WindowTrackerDelegate {
                     NSLog("ancre: workspace %@ doesn't fit %@ (%d windows), auto-stacking", name, monitor.id, count)
                     autoStackedOriginals[name] = current
                     applyLayout(named: "stack", toWorkspace: name, isAutoStack: true)
-                } else if fits, let original = autoStackedOriginals[name] {
+                    notify(L10n.autoStacked(name))
+                } else if fits, let original = autoStackedOriginals[name],
+                          count < thrashStackCounts[name] ?? Int.max {
                     NSLog("ancre: workspace %@ fits again, restoring layout %@", name, original)
                     autoStackedOriginals.removeValue(forKey: name)
+                    thrashStackCounts.removeValue(forKey: name)
                     applyLayout(named: original, toWorkspace: name, isAutoStack: true)
                 }
             }
+        }
+    }
+
+    /// Runaway retiling: too many refused frames in one burst means the
+    /// workspace can't converge by adoption/floating (min-sizes beat every
+    /// tile the width heuristic accepted) — switch it to stack and tell the
+    /// user why the layout changed. Returns true when it stacked.
+    private func autoStackForThrash(_ wid: WindowID) -> Bool {
+        guard config.general.autoStack,
+              let name = state.windowLocation[wid]?.workspaceName else { return false }
+        let count = (thrashCounts[name] ?? 0) + 1
+        thrashCounts[name] = count
+        let current = workspaceLayoutNames[name] ?? config.general.defaultLayout
+        guard count > config.general.autoStackThrashLimit, current != "stack" else { return false }
+        NSLog("ancre: workspace %@ keeps thrashing (%d refusals), auto-stacking", name, count)
+        autoStackedOriginals[name] = current
+        thrashStackCounts[name] = state.monitors
+            .flatMap(\.workspaces).first { $0.name == name }?.tiledWindows.count ?? 0
+        thrashCounts.removeValue(forKey: name)
+        applyLayout(named: "stack", toWorkspace: name, isAutoStack: true)
+        notify(L10n.autoStacked(name))
+        return true
+    }
+
+    /// Fire-and-forget user notification. Skipped when running unbundled
+    /// (swift run) — UNUserNotificationCenter needs a real app bundle.
+    private func notify(_ body: String) {
+        guard Bundle.main.bundleIdentifier != nil else {
+            NSLog("ancre: notification (unbundled): %@", body)
+            return
+        }
+        let center = UNUserNotificationCenter.current()
+        center.requestAuthorization(options: [.alert]) { granted, _ in
+            guard granted else { return }
+            let content = UNMutableNotificationContent()
+            content.title = "ancre"
+            content.body = body
+            center.add(UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
         }
     }
 
@@ -1344,13 +1430,7 @@ final class WindowManagerController: WindowTrackerDelegate {
 
     private func execute(_ effects: [Effect]) {
         executeDepth += 1
-        // Adoption counters live for one cascade: clearing them mid-cascade
-        // (on a transient success) re-arms the ping-pong between two windows
-        // whose minimum sizes can't coexist and recursion never terminates.
-        defer {
-            executeDepth -= 1
-            if executeDepth == 0 { adoptAttempts.removeAll() }
-        }
+        defer { executeDepth -= 1 }
         for effect in effects {
             if tilingPaused {
                 switch effect {
@@ -1372,6 +1452,7 @@ final class WindowManagerController: WindowTrackerDelegate {
             }
         }
         if executeDepth == 1 {
+            applyAutoStack()
             drainPendingPlacements()
             updateFocusBorder()
             updateBar()
@@ -1445,6 +1526,13 @@ final class WindowManagerController: WindowTrackerDelegate {
         // first adopts the actual size into the layout — neighbors make room —
         // and floats only if adoption keeps failing.
         if actual.diverges(from: target, tolerance: 50) {
+            let now = Date()
+            if now.timeIntervalSince(lastDivergence) > 2 {
+                adoptAttempts.removeAll()
+                thrashCounts.removeAll()
+            }
+            lastDivergence = now
+            if autoStackForThrash(wid) { return }
             let attempts = (adoptAttempts[wid.rawValue] ?? 0) + 1
             adoptAttempts[wid.rawValue] = attempts
             if attempts > snapBackLimit {

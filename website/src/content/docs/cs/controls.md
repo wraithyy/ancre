@@ -46,7 +46,8 @@ s přepínáním jazyka vstupu. CapsLock se oběma vyhne.
 | `hyper+v` | float / zpět do dlaždic |
 | `hyper+f` | fullscreen toggle |
 | `hyper+t` / `hyper+shift+t` | layout scroll / dwindle |
-| `hyper+space` | přepínač oken (fuzzy hledání přes všechna okna) |
+| `hyper+space` | přepínač oken (fuzzy hledání přes všechna okna; `>` přepne na command palette, číslice skočí na workspace) |
+| `hyper+shift+space` | command palette — přepínač s předvyplněným `>` (layouty, presety, pauza, scratchpad…) |
 | `hyper+s` | scratchpad — terminál/appka přivolaná na požádání ve vlastním okně, mimo tiling (taky v menubar menu) |
 | `hyper+o` | hints — každé okno dostane písmeno, stiskem na něj skočíš |
 | `hyper+a` | adoptovat frontmost okno do aktuální workspace |

@@ -17,7 +17,7 @@ final class CommandParsingTests: XCTestCase {
         "move-to-workspace 7", "move-to-workspace 8", "move-to-workspace 9",
         "toggle-floating", "toggle-fullscreen", "adopt-window",
         "layout scroll", "layout dwindle", "layout stack",
-        "pause-tiling", "retile", "open-config", "switcher", "scratchpad", "hints", "preset focus", "preset-save focus",
+        "pause-tiling", "retile", "open-config", "switcher", "switcher commands", "scratchpad", "hints", "preset focus", "preset-save focus",
         "focus-monitor previous", "focus-monitor next",
     ]
 

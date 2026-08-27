@@ -20,6 +20,16 @@ public enum L10n {
     public static var toggleFullscreen: String { t("toggle_fullscreen") }
     public static var pauseTiling: String { t("pause_tiling") }
     public static var retile: String { t("retile") }
+    public static var adoptWindow: String { t("adopt_window") }
+    public static var switcher: String { t("switcher") }
+    public static var resumeTiling: String { t("resume_tiling") }
+    public static var paletteScratchpad: String { t("palette_scratchpad") }
+    public static func paletteLayout(_ name: String) -> String {
+        String(format: t("palette_layout"), name)
+    }
+    public static func palettePreset(_ name: String) -> String {
+        String(format: t("palette_preset"), name)
+    }
     public static var monitors: String { t("monitors") }
     public static func scratchpad(app: String?, running: Bool) -> String {
         guard let app else { return t("scratchpad_off") }
@@ -51,6 +61,9 @@ public enum L10n {
             (t("tip_hold_key"), t("tip_hold")),
         ]
     }
+    public static func autoStacked(_ name: String) -> String {
+        String(format: t("auto_stacked"), name)
+    }
     public static func layoutMenu(_ current: String) -> String {
         String(format: t("layout_menu"), current)
     }
@@ -77,6 +90,12 @@ public enum L10n {
         "toggle_fullscreen": "Toggle fullscreen",
         "pause_tiling": "Pause tiling",
         "retile": "Retile windows",
+        "adopt_window": "Adopt frontmost window",
+        "switcher": "Window switcher…",
+        "resume_tiling": "Resume tiling",
+        "palette_scratchpad": "Toggle scratchpad",
+        "palette_layout": "Layout: %@",
+        "palette_preset": "Preset: %@",
         "monitors": "Monitors (click to copy id)",
         "scratchpad_running": "Scratchpad: %@ (running)",
         "scratchpad_idle": "Scratchpad: %@ (not running)",
@@ -104,6 +123,7 @@ public enum L10n {
         "tip_hold_key": "hold hyper",
         "tip_hold": "cheatsheet with every shortcut",
         "onboarding_ai": "AI ready: agents can inspect and arrange your windows via the ancrectl CLI or its built-in MCP server — register with: claude mcp add ancre -- ancrectl mcp",
+        "auto_stacked": "Workspace %@ can't fit its windows — switched to the stack layout.",
     ]
 
     private static let tables: [String: [String: String]] = [
@@ -120,6 +140,12 @@ public enum L10n {
             "toggle_fullscreen": "Přepnout fullscreen",
             "pause_tiling": "Pozastavit tiling",
             "retile": "Přeskládat okna",
+            "adopt_window": "Adoptovat aktivní okno",
+            "switcher": "Přepínač oken…",
+            "resume_tiling": "Obnovit tiling",
+            "palette_scratchpad": "Přepnout scratchpad",
+            "palette_layout": "Layout: %@",
+            "palette_preset": "Preset: %@",
             "monitors": "Monitory (klik zkopíruje id)",
             "scratchpad_running": "Scratchpad: %@ (běží)",
             "scratchpad_idle": "Scratchpad: %@ (neběží)",
@@ -147,6 +173,7 @@ public enum L10n {
             "tip_hold_key": "podržet hyper",
             "tip_hold": "nápověda se všemi zkratkami",
             "onboarding_ai": "AI ready: agenti můžou okna číst i přeskládat přes CLI ancrectl nebo jeho vestavěný MCP server. Registrace: claude mcp add ancre -- ancrectl mcp",
+            "auto_stacked": "Workspace %@ — okna se nevešla, přepnuto na stack layout.",
         ],
     ]
 }

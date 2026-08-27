@@ -28,7 +28,8 @@ system shortcuts.
 | `hyper + arrows` | resize focused window — neighbors adjust |
 | `hyper + 1…9` | switch workspace |
 | `hyper + shift + 1…9` | send focused window to workspace |
-| `hyper + space` | window switcher (fuzzy search) |
+| `hyper + space` | window switcher (fuzzy search; typing `>` switches it to the command palette, typing digits jumps to that workspace) |
+| `hyper + shift + space` | command palette — the switcher opened with `>` pre-typed (layouts, presets, pause, scratchpad…) |
 | `hyper + s` | scratchpad toggle (own window, outside tiling; also in the menu bar menu) |
 | `hyper + o` | window hints (focus by letter) |
 | `hyper + v` | toggle floating (window leaves the grid and moves freely) |
@@ -49,7 +50,8 @@ and forth.
 Everything is rebindable in `[keybindings]`; your entries merge with the
 defaults and an empty string `""` unbinds a default. Any command from the
 [request grammar](SCRIPTING.md) can be bound, including `preset <name>`,
-`preset-save <name>`, `layout <custom>`, `open-config`, `switcher`, `hints`.
+`preset-save <name>`, `layout <custom>`, `open-config`, `switcher`,
+`switcher commands` (the command palette), `hints`.
 (`reload-config` is IPC/menu-only — it is not a bindable command.)
 
 ## Mouse
@@ -73,5 +75,8 @@ wants attention. Dashed ring = floating window.
 
 The ancre icon in the menu bar (the strip along the top of the screen,
 right side): pause tiling (the anchor diamond turns red while paused),
-retile, monitor list (click copies the stable id for config), open config,
-reload config, quit. Everything here works without a terminal.
+retile, adopt frontmost window, window switcher, scratchpad, monitor list
+(click copies the stable id for config), open config, reload config, quit.
+A newer release turns the top-left bracket of the icon green and adds an
+update item (`update-check`, nothing installs itself). Everything here
+works without a terminal.

@@ -45,6 +45,7 @@ Keybinding-grammar commands (via `ancre_command` or CLI):
 | `pause-tiling` | toggle: stop/resume all tiling |
 | `retile` | rescan windows + re-place everything (fixes any mess) |
 | `switcher` | open the Spotlight-style window switcher |
+| `switcher commands` | open the switcher as a command palette (`>` pre-typed) |
 | `scratchpad` | toggle the scratchpad window |
 | `hints` | show window hints (focus by letter) |
 | `open-config` | open the config file in the default editor |

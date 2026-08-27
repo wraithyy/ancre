@@ -24,8 +24,9 @@ back to defaults with a warning in the log. For a guided tour see
 | `animations-exclude` | string array | `[]` | bundle IDs | apps that always place instantly |
 | `language` | string | `"en"` | `"en"` \| `"cs"` (not validated) | bar menu/tooltip language |
 | `follow-native-focus` | bool | `true` | — | switch to a window's workspace when macOS activates its app |
-| `auto-stack` | bool | `true` | — | workspace migrated to a too-small monitor temporarily stacks |
+| `auto-stack` | bool | `true` | — | a workspace whose windows can't fit its monitor temporarily stacks (checked on every window change) |
 | `auto-stack-min-width` | number | `300` | — | threshold: `count × min-width > monitor width` triggers auto-stack |
+| `auto-stack-thrash-limit` | number | `8` | — | refused frames in one burst before a workspace is force-stacked (with a notification) — catches windows whose min-size defeats the width heuristic |
 | `move-log` | bool | `true` | — | log manual moves to `move-log.jsonl` (bundle ID + workspaces, no titles) |
 | `ignore-apps` | string[] | `[]` | bundle ids | apps ancre never manages; reload releases already-managed windows |
 | `float-apps` | string[] | `[]` | bundle ids | new windows of these apps start floating |

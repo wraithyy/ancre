@@ -13,11 +13,16 @@ default-layout = "dwindle"   # dwindle | scroll | stack (monocle)
 # Follow native focus: when macOS activates an app (URL opened from another
 # app...), switch to that window's workspace. Default on.
 # follow-native-focus = true
-# Auto-stack: a workspace migrated to a monitor too small for its windows
+# Auto-stack: a workspace whose monitor is too small for its windows
 # (count x auto-stack-min-width > monitor width) temporarily switches to the
-# stack layout and back when space returns. Default on.
+# stack layout and back when space returns. Checked on every window change,
+# not just monitor migration. Default on.
 # auto-stack = true
 # auto-stack-min-width = 300
+# Windows with large minimum sizes can thrash even when the width heuristic
+# says they fit: after this many refused frames in one burst the workspace
+# is force-stacked (with a notification) instead of bouncing forever.
+# auto-stack-thrash-limit = 8
 # Log manual window moves (bundle id + workspaces, no titles) to
 # ~/Library/Application Support/ancre/move-log.jsonl — feed it to an agent
 # to suggest [app-workspaces] rules. Default on; false disables.
@@ -75,6 +80,7 @@ key = "caps_lock"
 "hyper-p" = "pause-tiling"
 "hyper-r" = "retile"
 "hyper-space" = "switcher"
+"hyper-shift-space" = "switcher commands"
 "hyper-s" = "scratchpad"
 "hyper-o" = "hints"
 "hyper-comma" = "focus-monitor previous"

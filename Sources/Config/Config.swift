@@ -36,6 +36,9 @@ public struct AppConfig: Codable {
         public var autoStack: Bool
         /// Minimum sensible width per tiled window for the fit heuristic.
         public var autoStackMinWidth: Double
+        /// Refused frames per workspace within one burst before the workspace
+        /// is force-switched to stack (min-sizes the width heuristic missed).
+        public var autoStackThrashLimit: Int
         /// Log manual window moves to Application Support/ancre/move-log.jsonl
         /// (input for agent-suggested [app-workspaces] rules).
         public var moveLog: Bool
@@ -60,6 +63,7 @@ public struct AppConfig: Codable {
             case followNativeFocus = "follow-native-focus"
             case autoStack = "auto-stack"
             case autoStackMinWidth = "auto-stack-min-width"
+            case autoStackThrashLimit = "auto-stack-thrash-limit"
             case moveLog = "move-log"
             case ignoreApps = "ignore-apps"
             case floatApps = "float-apps"
@@ -78,6 +82,7 @@ public struct AppConfig: Codable {
             followNativeFocus = try c.decodeIfPresent(Bool.self, forKey: .followNativeFocus) ?? true
             autoStack = try c.decodeIfPresent(Bool.self, forKey: .autoStack) ?? true
             autoStackMinWidth = lenientDouble(c, .autoStackMinWidth) ?? 300
+            autoStackThrashLimit = try c.decodeIfPresent(Int.self, forKey: .autoStackThrashLimit) ?? 8
             moveLog = try c.decodeIfPresent(Bool.self, forKey: .moveLog) ?? true
             ignoreApps = try c.decodeIfPresent([String].self, forKey: .ignoreApps) ?? []
             floatApps = try c.decodeIfPresent([String].self, forKey: .floatApps) ?? []

@@ -15,7 +15,7 @@ app (it falls back to defaults and logs a warning).
 
 | Section | Controls |
 |---|---|
-| `[general]` | `gaps-inner/outer`, `animations` + `animation-duration-ms` + `animations-exclude` (bundle ids), `default-layout`, `language` (`"en"`/`"cs"`), `follow-native-focus`, `auto-stack` + `auto-stack-min-width`, `move-log` |
+| `[general]` | `gaps-inner/outer`, `animations` + `animation-duration-ms` + `animations-exclude` (bundle ids), `default-layout`, `language` (`"en"`/`"cs"`), `follow-native-focus`, `auto-stack` + `auto-stack-min-width` + `auto-stack-thrash-limit`, `move-log` |
 | `[hyper]` | physical hyper key (`caps_lock`, `f13`–`f20`, `right_cmd`, `right_option`) |
 | `[keybindings]` | shortcut → command; merges with defaults, `""` unbinds |
 | `[workspaces]` | workspace → monitor: stable id (`vendor:model:serial`, copy from the menu bar) or a name substring; also a **priority list** `"1" = ["PHL", "Built-in"]` — first connected match wins |
@@ -44,9 +44,13 @@ Monitors get hardware-stable ids (`vendor:model:serial`) that survive
 replugs and reboots — CGDirectDisplayIDs don't. Workspace placement is a
 pure function of (names, config, connected monitors), so disconnecting a
 display migrates its workspaces to a connected one and replugging restores
-the exact previous arrangement. If a migrated workspace doesn't fit
-(too many windows for the monitor's width), **auto-stack** temporarily
-switches it to the stack layout and back when space returns.
+the exact previous arrangement. If a workspace doesn't fit its monitor
+(too many windows for the monitor's width — checked on every window
+change, not just migration), **auto-stack** temporarily switches it to
+the stack layout and back when space returns. Windows with large minimum
+sizes can defeat the width heuristic; after `auto-stack-thrash-limit`
+(default 8) refused frames in one burst the workspace is force-stacked
+with a notification instead of retiling forever.
 
 ## Learning your habits
 

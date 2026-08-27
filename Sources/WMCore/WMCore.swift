@@ -247,7 +247,7 @@ public enum Command: Equatable {
     case pauseTiling
     case retile
     case openConfig
-    case switcher
+    case switcher(commandsOnly: Bool)
     case scratchpad
     case hints
     case presetApply(String)
@@ -298,8 +298,11 @@ public enum Command: Equatable {
             guard parts.count == 1 else { return nil }
             return .openConfig
         case "switcher":
-            guard parts.count == 1 else { return nil }
-            return .switcher
+            // "switcher" = windows, "switcher commands" = opens with the ">"
+            // command-palette prefix typed in.
+            if parts.count == 1 { return .switcher(commandsOnly: false) }
+            guard parts.count == 2, parts[1] == "commands" else { return nil }
+            return .switcher(commandsOnly: true)
         case "scratchpad":
             guard parts.count == 1 else { return nil }
             return .scratchpad

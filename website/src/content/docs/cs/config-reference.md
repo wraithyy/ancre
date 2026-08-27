@@ -23,8 +23,9 @@ na defaulty s warningem v logu. Průvodce: [Konfigurace](/ancre/cs/configuration
 | `animations-exclude` | pole stringů | `[]` | bundle ID | appky s okamžitým placementem |
 | `language` | string | `"en"` | `"en"` \| `"cs"` (nevalidováno) | jazyk bar menu/tooltipů |
 | `follow-native-focus` | bool | `true` | — | při nativní aktivaci appky přepnout na její workspace |
-| `auto-stack` | bool | `true` | — | workspace na malém monitoru dočasně do stack layoutu |
+| `auto-stack` | bool | `true` | — | workspace, jehož okna se na monitor nevejdou, dočasně do stack layoutu (kontrola při každé změně oken) |
 | `auto-stack-min-width` | číslo | `300` | — | práh: `počet × min-width > šířka monitoru` |
+| `auto-stack-thrash-limit` | číslo | `8` | — | počet odmítnutých framů v jednom burstu, po kterém se workspace force-stackne (s notifikací) — chytá okna s min-size, které šířková heuristika nevidí |
 | `move-log` | bool | `true` | — | log ručních přesunů do `move-log.jsonl` (bundle ID + workspaces, bez titulků) |
 | `ignore-apps` | string[] | `[]` | bundle ids | appky, které ancre nikdy nespravuje; reload pustí i už spravovaná okna |
 | `float-apps` | string[] | `[]` | bundle ids | nová okna těchto appek začínají jako floating |

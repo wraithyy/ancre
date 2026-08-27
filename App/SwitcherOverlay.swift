@@ -1,5 +1,7 @@
 // Window switcher (hyper+space): a Spotlight-style panel — type to filter
 // tracked windows, see which workspace each lives on, Enter focuses it.
+// Doubles as a command palette: ">" prefixes commands (layout, pause,
+// preset...), an all-digit query jumps to that workspace.
 // Main-thread only. The panel is non-activating so it takes keyboard input
 // without dragging our accessory app into the foreground.
 
@@ -17,6 +19,14 @@ struct SwitcherEntry: Identifiable, Equatable {
     let isFocused: Bool
 }
 
+/// A palette action. `command` is a raw command-grammar string, dispatched
+/// through `Command.parse` — the same single path as keybindings.
+struct PaletteEntry: Identifiable, Equatable {
+    var id: String { command }
+    let command: String
+    let title: String
+}
+
 /// Borderless windows refuse key status by default — the whole point of the
 /// switcher is typing into it.
 private final class KeyablePanel: NSPanel {
@@ -27,14 +37,16 @@ final class SwitcherOverlay {
     private var panel: NSPanel?
     private var resignObserver: NSObjectProtocol?
     private let onChoose: (UInt32) -> Void
+    private let onCommand: (String) -> Void
 
-    init(onChoose: @escaping (UInt32) -> Void) {
+    init(onChoose: @escaping (UInt32) -> Void, onCommand: @escaping (String) -> Void) {
         self.onChoose = onChoose
+        self.onCommand = onCommand
     }
 
     var isVisible: Bool { panel != nil }
 
-    func show(entries: [SwitcherEntry]) {
+    func show(entries: [SwitcherEntry], palette: [PaletteEntry], initialQuery: String = "") {
         hide()
         let panel = KeyablePanel(
             contentRect: .zero,
@@ -51,9 +63,15 @@ final class SwitcherOverlay {
         panel.contentView = NSHostingView(
             rootView: SwitcherView(
                 entries: entries,
+                palette: palette,
+                initialQuery: initialQuery,
                 onChoose: { [weak self] id in
                     self?.hide()
                     self?.onChoose(id)
+                },
+                onCommand: { [weak self] command in
+                    self?.hide()
+                    self?.onCommand(command)
                 },
                 onCancel: { [weak self] in self?.hide() }
             )
@@ -88,16 +106,61 @@ final class SwitcherOverlay {
     }
 }
 
+private enum SwitcherRowItem: Identifiable, Equatable {
+    case window(SwitcherEntry)
+    case command(PaletteEntry)
+
+    var id: String {
+        switch self {
+        case .window(let entry): return "w\(entry.id)"
+        case .command(let entry): return "c\(entry.id)"
+        }
+    }
+}
+
 private struct SwitcherView: View {
     let entries: [SwitcherEntry]
+    let palette: [PaletteEntry]
     let onChoose: (UInt32) -> Void
+    let onCommand: (String) -> Void
     let onCancel: () -> Void
 
-    @State private var query = ""
+    @State private var query: String
     @State private var selection = 0
     @FocusState private var searchFocused: Bool
 
-    private var filtered: [SwitcherEntry] {
+    init(
+        entries: [SwitcherEntry],
+        palette: [PaletteEntry],
+        initialQuery: String,
+        onChoose: @escaping (UInt32) -> Void,
+        onCommand: @escaping (String) -> Void,
+        onCancel: @escaping () -> Void
+    ) {
+        self.entries = entries
+        self.palette = palette
+        self.onChoose = onChoose
+        self.onCommand = onCommand
+        self.onCancel = onCancel
+        _query = State(initialValue: initialQuery)
+    }
+
+    private var rows: [SwitcherRowItem] {
+        let q = query.trimmingCharacters(in: .whitespaces)
+        if q.hasPrefix(">") {
+            let needle = q.dropFirst().trimmingCharacters(in: .whitespaces).lowercased()
+            let hits = needle.isEmpty ? palette : palette.filter {
+                $0.title.lowercased().contains(needle) || $0.command.lowercased().contains(needle)
+            }
+            return hits.map(SwitcherRowItem.command)
+        }
+        if !q.isEmpty, q.allSatisfy(\.isNumber) {
+            return [.command(PaletteEntry(command: "workspace \(q)", title: L10n.switchToWorkspace(q)))]
+        }
+        return filteredWindows(q).map(SwitcherRowItem.window)
+    }
+
+    private func filteredWindows(_ query: String) -> [SwitcherEntry] {
         guard !query.isEmpty else { return entries }
         let needle = query.lowercased()
         let matches = entries.filter {
@@ -113,6 +176,13 @@ private struct SwitcherView: View {
         }
     }
 
+    private func choose(_ row: SwitcherRowItem) {
+        switch row {
+        case .window(let entry): onChoose(entry.id)
+        case .command(let entry): onCommand(entry.command)
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             TextField(L10n.switcherPlaceholder, text: $query)
@@ -122,10 +192,10 @@ private struct SwitcherView: View {
                 .focused($searchFocused)
                 .onChange(of: query) { _, _ in selection = 0 }
                 .onSubmit {
-                    if filtered.indices.contains(selection) { onChoose(filtered[selection].id) }
+                    if rows.indices.contains(selection) { choose(rows[selection]) }
                 }
                 .onKeyPress(.downArrow) {
-                    selection = min(selection + 1, max(0, filtered.count - 1))
+                    selection = min(selection + 1, max(0, rows.count - 1))
                     return .handled
                 }
                 .onKeyPress(.upArrow) {
@@ -142,17 +212,24 @@ private struct SwitcherView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 1) {
-                        ForEach(Array(filtered.enumerated()), id: \.element.id) { index, entry in
-                            SwitcherRow(entry: entry, isSelected: index == selection)
-                                .id(entry.id)
-                                .onTapGesture { onChoose(entry.id) }
+                        ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                            Group {
+                                switch row {
+                                case .window(let entry):
+                                    SwitcherRow(entry: entry, isSelected: index == selection)
+                                case .command(let entry):
+                                    PaletteRow(entry: entry, isSelected: index == selection)
+                                }
+                            }
+                            .id(row.id)
+                            .onTapGesture { choose(row) }
                         }
                     }
                     .padding(6)
                 }
                 .onChange(of: selection) { _, new in
-                    if filtered.indices.contains(new) {
-                        proxy.scrollTo(filtered[new].id)
+                    if rows.indices.contains(new) {
+                        proxy.scrollTo(rows[new].id)
                     }
                 }
             }
@@ -161,6 +238,31 @@ private struct SwitcherView: View {
         .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(.regularMaterial))
         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.primary.opacity(0.1), lineWidth: 1))
         .onAppear { searchFocused = true }
+    }
+}
+
+private struct PaletteRow: View {
+    let entry: PaletteEntry
+    let isSelected: Bool
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(isSelected ? Color.white.opacity(0.8) : .secondary)
+                .frame(width: 26)
+            Text(entry.title)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(isSelected ? Color.white : .primary)
+            Spacer(minLength: 12)
+            Text(entry.command)
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(isSelected ? Color.white.opacity(0.7) : .secondary)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(RoundedRectangle(cornerRadius: 8).fill(isSelected ? Color.accentColor : Color.clear))
+        .contentShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 

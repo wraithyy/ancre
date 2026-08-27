@@ -15,6 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var scratchpadConfigured = false
     private var updateTimer: Timer?
     private var availableUpdate: String?
+    private var tilingPaused = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -33,6 +34,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 NSLog("ancre: update %@ available", version)
                 self?.availableUpdate = version
                 self?.buildMenu()
+                self?.refreshIcon()
             }
         }
         check()
@@ -43,16 +45,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSWorkspace.shared.open(UpdateChecker.releasesURL)
     }
 
+    private func refreshIcon() {
+        statusItem.button?.image = AppDelegate.menubarIcon(paused: tilingPaused, updateAvailable: availableUpdate != nil)
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         controller?.stop()
     }
 
     /// Brand menubar mark drawn from the AncreMenuTemplate.svg geometry
     /// (22x22: two corner brackets + center diamond). Normal state is a
-    /// template image so macOS tints it; paused swaps to a non-template
-    /// variant whose diamond is brand danger red (brackets follow
-    /// labelColor, resolved per appearance at draw time).
-    static func menubarIcon(paused: Bool) -> NSImage {
+    /// template image so macOS tints it; paused turns the diamond brand
+    /// danger red, an available update turns the top-left bracket green
+    /// (either swaps to non-template; the rest follows labelColor,
+    /// resolved per appearance at draw time).
+    static func menubarIcon(paused: Bool, updateAvailable: Bool = false) -> NSImage {
+        let template = !paused && !updateAvailable
         let image = NSImage(size: NSSize(width: 18, height: 18), flipped: true) { rect in
             let s = rect.width / 22.0
             func polygon(_ points: [(CGFloat, CGFloat)]) -> NSBezierPath {
@@ -64,18 +72,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 path.close()
                 return path
             }
-            let brackets = [
-                polygon([(4, 4), (11, 4), (11, 6), (6, 6), (6, 11), (4, 11)]),
-                polygon([(18, 18), (11, 18), (11, 16), (16, 16), (16, 11), (18, 11)]),
-            ]
+            let base: NSColor = template ? .black : .labelColor
+            let topLeftBracket = polygon([(4, 4), (11, 4), (11, 6), (6, 6), (6, 11), (4, 11)])
+            let bottomRightBracket = polygon([(18, 18), (11, 18), (11, 16), (16, 16), (16, 11), (18, 11)])
             let diamond = polygon([(11, 7), (15, 11), (11, 15), (7, 11)])
-            (paused ? NSColor.labelColor : .black).setFill()
-            brackets.forEach { $0.fill() }
-            (paused ? NSColor(red: 1.0, green: 0.384, blue: 0.384, alpha: 1.0) : .black).setFill()
+            (updateAvailable ? NSColor.systemGreen : base).setFill()
+            topLeftBracket.fill()
+            base.setFill()
+            bottomRightBracket.fill()
+            (paused ? NSColor(red: 1.0, green: 0.384, blue: 0.384, alpha: 1.0) : base).setFill()
             diamond.fill()
             return true
         }
-        image.isTemplate = !paused
+        image.isTemplate = template
         return image
     }
 
@@ -102,6 +111,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let retile = NSMenuItem(title: L10n.retile, action: #selector(retile), keyEquivalent: "")
             retile.target = self
             menu.addItem(retile)
+
+            // Frontmost app at menu-open time is the one the user was in —
+            // opening a status-item menu doesn't activate ancre.
+            let adopt = NSMenuItem(title: L10n.adoptWindow, action: #selector(adoptWindow), keyEquivalent: "a")
+            adopt.target = self
+            menu.addItem(adopt)
+
+            let switcher = NSMenuItem(title: L10n.switcher, action: #selector(showSwitcher), keyEquivalent: "")
+            switcher.target = self
+            menu.addItem(switcher)
 
             menu.addItem(.separator())
 
@@ -173,6 +192,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller?.retile()
     }
 
+    @objc private func adoptWindow() {
+        controller?.adoptWindowFromMenu()
+    }
+
+    @objc private func showSwitcher() {
+        controller?.showSwitcherFromMenu()
+    }
+
     @objc private func copyMonitorID(_ sender: NSMenuItem) {
         guard let id = sender.representedObject as? String else { return }
         NSPasteboard.general.clearContents()
@@ -216,7 +243,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.pauseItem?.state = paused ? .on : .off
             // Paused tiling is visible at a glance: the anchor diamond
             // in the menubar mark turns red.
-            self?.statusItem.button?.image = AppDelegate.menubarIcon(paused: paused)
+            self?.tilingPaused = paused
+            self?.refreshIcon()
         }
         controller.onScratchpadVisibleChanged = { [weak self] visible in
             self?.scratchpadVisible = visible
