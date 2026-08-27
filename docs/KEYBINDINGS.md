@@ -2,6 +2,12 @@
 
 > Nicer rendering: https://wraithyy.github.io/ancre/controls/
 
+ancre is keyboard-first, but nothing requires the keyboard: dragging and
+resizing windows the normal macOS way routes through the tiling engine
+([Mouse](#mouse)), the workspace bar handles switching and moving windows by
+click and drag&drop ([Bar](#bar)), and the menu bar icon covers pause,
+layouts, and the scratchpad ([Menu bar](#menu-bar)).
+
 Hyper = CapsLock (change the physical key via `[hyper].key`; `f13`–`f20`,
 `right_cmd`, `right_option` also work). Hold hyper ~2 s → cheatsheet overlay
 with every binding; using a shortcut resets the timer.

@@ -11,6 +11,11 @@ jinak nepoužíváš, takže žádná zkratka nekoliduje s aplikacemi. Podržen�
 hyperu déle než 2 s zobrazí **cheatsheet všech zkratek** jako průsvitný
 overlay.
 
+ancre je keyboard-first, ale nic klávesnici *nevyžaduje*: okna jde přesouvat
+a resizovat běžným macOS způsobem (viz [Myš](#myš) níže), workspace bar
+přepíná workspaces a přesouvá okna klikem a drag&dropem a ikona v menubaru
+nabízí pauzu, layouty i scratchpad.
+
 Použití CapsLock jako hyperu znamená, že ho ancre při spuštění přemapuje na
 F18 přes `hidutil`, a globální event tap, který ho zachytává, vyžaduje
 permission **Input Monitoring** — viz

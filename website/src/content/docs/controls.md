@@ -11,6 +11,11 @@ never use for anything else, so no shortcut ever collides with an app.
 Holding hyper for more than 2 s shows a **cheatsheet of all shortcuts** as a
 translucent overlay.
 
+ancre is keyboard-first, but nothing *requires* the keyboard: windows can be
+dragged and resized the normal macOS way (see [Mouse](#mouse) below), the
+workspace bar switches workspaces and moves windows by click and drag&drop,
+and the menu bar icon exposes pause, layouts, and the scratchpad.
+
 Using CapsLock as hyper means ancre remaps it to F18 via `hidutil` on launch,
 and the global event tap that catches it requires the **Input Monitoring**
 permission — see [Installation](/ancre/installation/#permissions) and
