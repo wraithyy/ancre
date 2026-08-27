@@ -57,9 +57,12 @@ final class PermissionsModel: ObservableObject {
     }
 }
 
-final class OnboardingWindow {
+final class OnboardingWindow: NSObject, NSWindowDelegate {
     private var window: NSWindow?
     private let model = PermissionsModel()
+    /// Set once the user hits Start, so closing the window afterwards is not
+    /// mistaken for a decline.
+    private var started = false
 
     /// Shows the onboarding and calls `onStart` when the user hits Start
     /// (enabled once every permission is granted).
@@ -73,9 +76,11 @@ final class OnboardingWindow {
         )
         window.title = "ancre"
         window.isReleasedWhenClosed = false
+        window.delegate = self
         window.center()
         window.contentView = NSHostingView(
             rootView: OnboardingView(model: model) { [weak self] in
+                self?.started = true
                 self?.close()
                 onStart()
             }
@@ -87,8 +92,19 @@ final class OnboardingWindow {
 
     func close() {
         model.stopPolling()
+        window?.delegate = nil
         window?.orderOut(nil)
         window = nil
+    }
+
+    /// Closing the window without granting the permissions means the user
+    /// declined: there is nothing ancre can do without them, so quit rather
+    /// than linger as an invisible menu bar item.
+    func windowWillClose(_ notification: Notification) {
+        guard !started else { return }
+        model.stopPolling()
+        NSLog("ancre: onboarding dismissed without permissions, quitting")
+        NSApp.terminate(nil)
     }
 }
 
