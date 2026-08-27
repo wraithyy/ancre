@@ -44,7 +44,7 @@ i float a při jiné hodnotě použijí vlastní default.
 | `[bar]` + `[bar-overrides.*]` | workspace bar — viz [Bar](/ancre/cs/bar/) |
 | `[border]` | rámeček fokusu: `enabled`, `color`, `width`, `radius` |
 | `[help]` | cheatsheet: `enabled`, `delay-ms`, `opacity`, `font-size`, `columns`, `corner-radius` |
-| `[scratchpad]` | app + rozměry plovoucího scratchpad okna |
+| `[scratchpad]` | app, rozměry a spouštěcí `command` plovoucího scratchpad okna |
 | `[preview]` | barva/průhlednost drag&drop preview |
 
 ## `[general]`
@@ -126,11 +126,18 @@ radius = 10         # default odpovídá systémovému radiusu oken
 app = "com.mitchellh.ghostty"
 width = 0.6
 height = 0.5
+# command = "open -na Ghostty"   # jak otevřít NOVÉ okno; default: `open -n` na appku
 
 [preview]
 color = "#89b4fa"
 opacity = 0.3
 ```
+
+Scratchpad má vlastní okno: `hyper+s` nikdy nepřebere okno, ve kterém právě
+pracuješ. První stisk jedno otevře — defaultně druhou instanci appky
+(`open -n`), nebo cokoli nastavíš v `command` — a každý další stisk už jen
+přepíná to samé okno. `command` nastav, když appka umí otevřít nové okno
+levněji než celou druhou instancí.
 
 ## Kompletní příklad
 

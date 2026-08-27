@@ -44,7 +44,7 @@ int or a float and fall back to their own default if the value is neither.
 | `[bar]` + `[bar-overrides.*]` | workspace bar — see [Bar](/ancre/bar/) |
 | `[border]` | focus border: `enabled`, `color`, `width`, `radius` |
 | `[help]` | cheatsheet: `enabled`, `delay-ms`, `opacity`, `font-size`, `columns`, `corner-radius` |
-| `[scratchpad]` | app + dimensions of the floating scratchpad window |
+| `[scratchpad]` | app, dimensions and spawn `command` of the floating scratchpad window |
 | `[preview]` | colour/opacity of the drag&drop preview |
 
 ## `[general]`
@@ -126,11 +126,18 @@ radius = 10         # default matches the system window corner radius
 app = "com.mitchellh.ghostty"
 width = 0.6
 height = 0.5
+# command = "open -na Ghostty"   # how to open a NEW window; default: `open -n` on the app
 
 [preview]
 color = "#89b4fa"
 opacity = 0.3
 ```
+
+The scratchpad owns its own window: `hyper+s` never hijacks a window you are
+already working in. The first press opens one — a second instance of the app
+by default (`open -n`), or whatever `command` you set — and every later press
+toggles that same window in and out. Set `command` when the app has a cheaper
+way to open a fresh window than a whole second instance.
 
 ## A complete example
 

@@ -868,36 +868,71 @@ final class WindowManagerController: WindowTrackerDelegate {
     }
 
     /// Hyprland-style scratchpad: drops a floating window of the configured
-    /// app over the current workspace, or hides (parks) it again. Launches
-    /// the app when it isn't running. (axQueue)
+    /// app over the current workspace, or hides (parks) it again. The
+    /// scratchpad owns its own window — it never hijacks a window you are
+    /// working in; the first toggle spawns one (a second app instance, or
+    /// `[scratchpad].command` when set). (axQueue)
     /// ponytail: switching workspaces parks the scratchpad with its home
     /// workspace — the next toggle may need a second press to re-sync.
     private var scratchpadWindow: WindowID?
+    /// Set while waiting for the spawned scratchpad window to register.
+    private var scratchpadPending = false
 
     private func toggleScratchpad() {
-        guard let bundleID = config.scratchpad?.app else {
+        guard let scratchpad = config.scratchpad, let bundleID = scratchpad.app else {
             NSLog("ancre: scratchpad has no [scratchpad].app configured")
             return
         }
-        guard let wid = state.windows.first(where: { $0.value.appBundleID == bundleID })?.key,
-              axWindows[wid.rawValue] != nil else {
-            NSLog("ancre: scratchpad app %@ has no window, launching it", bundleID)
-            if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
-                DispatchQueue.main.async { NSWorkspace.shared.openApplication(at: url, configuration: .init()) }
-            }
+        if let wid = scratchpadWindow, axWindows[wid.rawValue] == nil { scratchpadWindow = nil }
+        guard let wid = scratchpadWindow else {
+            spawnScratchpad(scratchpad, bundleID: bundleID)
             return
         }
 
-        if scratchpadWindow == wid, !parkedWindows.contains(wid.rawValue) {
+        if !parkedWindows.contains(wid.rawValue) {
             park(wid)
-            scratchpadWindow = nil
             updateFocusBorder()
             updateBar()
             return
         }
+        showScratchpad(wid)
+    }
 
-        // Show: float it (keeps current frame; no-op if floating) and drop it
-        // top-center on the focused monitor.
+    /// Opens a window dedicated to the scratchpad and adopts it on register().
+    private func spawnScratchpad(_ scratchpad: AppConfig.Scratchpad, bundleID: String) {
+        scratchpadPending = true
+        // Don't wait forever: a failed launch would otherwise steal whatever
+        // window of that app shows up next.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 15) { [weak self] in
+            self?.tracker.perform { self?.scratchpadPending = false }
+        }
+        if let command = scratchpad.command {
+            NSLog("ancre: scratchpad spawning via command: %@", command)
+            DispatchQueue.main.async {
+                let task = Process()
+                task.executableURL = URL(fileURLWithPath: "/bin/sh")
+                task.arguments = ["-c", command]
+                try? task.run()
+            }
+            return
+        }
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
+            NSLog("ancre: scratchpad app %@ not installed", bundleID)
+            scratchpadPending = false
+            return
+        }
+        let running = state.windows.values.contains { $0.appBundleID == bundleID }
+        let configuration = NSWorkspace.OpenConfiguration()
+        // A running app just gets activated by openApplication — ask for a
+        // separate instance so the scratchpad gets a window of its own.
+        configuration.createsNewApplicationInstance = running
+        NSLog("ancre: scratchpad launching %@ (new instance: %@)", bundleID, running ? "yes" : "no")
+        DispatchQueue.main.async { NSWorkspace.shared.openApplication(at: url, configuration: configuration) }
+    }
+
+    /// Floats the scratchpad window and drops it top-center on the focused
+    /// monitor.
+    private func showScratchpad(_ wid: WindowID) {
         execute(WM.setFloating(wid, floating: true, state: &state))
         guard state.monitors.indices.contains(state.focusedMonitorIndex) else { return }
         let usable = state.monitors[state.focusedMonitorIndex].visibleFrame
@@ -1458,15 +1493,20 @@ final class WindowManagerController: WindowTrackerDelegate {
         axWindows[window.id] = window
         windowPids[window.id] = app.pid
         let frame = window.frame.cgRect
+        let isScratchpad = scratchpadPending && bundleID == config.scratchpad?.app
         let node = WindowNode(
             id: WindowID(window.id),
             appBundleID: bundleID,
             pid: app.pid,
             title: window.title,
-            isFloating: config.general.floatApps.contains(bundleID),
+            isFloating: isScratchpad || config.general.floatApps.contains(bundleID),
             frame: frame
         )
         adopt(node, frame: frame)
+        if isScratchpad {
+            scratchpadPending = false
+            showScratchpad(node.id)
+        }
         let workspace = state.windowLocation[node.id]?.workspaceName ?? ""
         controlServer?.broadcast(
             "{\"event\":\"window-opened\",\"id\":\(node.id.rawValue),\"bundleID\":\"\(node.appBundleID)\",\"workspace\":\"\(workspace)\"}"

@@ -295,12 +295,17 @@ public struct AppConfig: Codable {
         /// Size as fractions of the monitor's usable area.
         public var width: Double
         public var height: Double
+        /// Shell command that opens a *new* window of the app; nil = launch a
+        /// second instance via `open -n`. The scratchpad never hijacks a window
+        /// you already work in — it owns its own.
+        public var command: String?
 
-        enum CodingKeys: String, CodingKey { case app, width, height }
+        enum CodingKeys: String, CodingKey { case app, width, height, command }
 
         public init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             app = try c.decodeIfPresent(String.self, forKey: .app)
+            command = try c.decodeIfPresent(String.self, forKey: .command)
             width = lenientDouble(c, .width) ?? 0.6
             height = lenientDouble(c, .height) ?? 0.5
         }

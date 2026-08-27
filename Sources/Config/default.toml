@@ -167,11 +167,14 @@ offset-y = 0
 # radius = 10         # default matches the system window corner radius
 
 # Scratchpad: hyper+s drops a floating window of this app over the current
-# workspace and hides it again (launches the app when not running).
+# workspace and hides it again. The scratchpad owns its own window — windows
+# you already work in are never hijacked; the first toggle opens a new one
+# (a second app instance by default, or `command` when set).
 # [scratchpad]
 # app = "com.mitchellh.ghostty"
 # width = 0.6
 # height = 0.5
+# command = "open -na Ghostty"   # shell command that opens a NEW window
 
 # Drag&drop layout preview (window drag, native or hyper+drag).
 # [preview]

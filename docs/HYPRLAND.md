@@ -6,7 +6,7 @@
 | `master` layout | a `[custom-layouts]` template, e.g. `"master" = "h(0.6, *, v(0.5, *, *))"` |
 | workspace rules (`workspace = 1, monitor:DP-1`) | `[workspaces]` — pin by stable id or name, with priority lists |
 | `windowrulev2` by app | `[app-workspaces]` (bundle id → workspace) |
-| special workspace | `[scratchpad]` — **one** configured app, not arbitrary windows |
+| special workspace | `[scratchpad]` — **one** configured app in its own dedicated window, not arbitrary windows |
 | `hyprctl` / socket IPC | `ancrectl` / unix socket (line protocol + JSON) |
 | `hyprctl dispatch` | `ancrectl <command>` |
 

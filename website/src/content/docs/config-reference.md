@@ -187,6 +187,7 @@ icon-size = 17
 | `app` | string | unset (feature off) | bundle ID of the drop-down app; launched when not running |
 | `width` | number | `0.6` | fraction of monitor width |
 | `height` | number | `0.5` | fraction of monitor height |
+| `command` | string | `open -n` on the app | shell command opening a **new** window; the scratchpad owns its own window and never hijacks one you work in |
 
 ## `[preview]`
 

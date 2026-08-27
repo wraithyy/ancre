@@ -298,9 +298,14 @@ jim přirozené souřadnice za hranou) a bar (ukazovat i zaparkovaná okna).
 - Non-activating KeyablePanel (borderless okna jinak nedostanou klávesnici).
 
 #### Task 8.3: Scratchpad (hyper+s) — HOTOVO
-- [scratchpad] app/width/height; toggle float top-center / park; launchne
-  appku když neběží. ponytail: přepnutí workspace zaparkuje scratchpad s jeho
-  domovskou ws — další toggle může chtít dva stisky.
+- [scratchpad] app/width/height/command; toggle float top-center / park.
+  Scratchpad má vlastní okno — nikdy nepřebírá existující okno té appky
+  (dřív bral první okno podle bundle ID, takže sebral to, ve kterém user
+  pracoval). První toggle bez okna spawnuje: `command` (shell), jinak
+  `NSWorkspace.openApplication` s `createsNewApplicationInstance` když app
+  běží; `scratchpadPending` (timeout 15 s) adoptuje nově registrované okno.
+  ponytail: přepnutí workspace zaparkuje scratchpad s jeho domovskou ws —
+  další toggle může chtít dva stisky.
 
 #### Task 8.4: Window hints (hyper+o) — HOTOVO
 - Písmenkové badge přes viditelná okna, stisk = focus, Esc = zavřít.
