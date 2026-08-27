@@ -8,7 +8,8 @@ public typealias AXWindowID = UInt32
 /// Resolves the private `_AXUIElementGetWindow` symbol via dlsym. This is the
 /// well-known exception used by every AX-based window manager (yabai, Amethyst,
 /// etc.) to get a stable CGWindowID for an AXUIElement — there is no public API
-/// for this. Falls back to a hash of the element if the symbol is unavailable.
+/// for this. Resolution fails when the symbol is unavailable — see
+/// `resolveWindowID` for why there is no fallback.
 private typealias AXUIElementGetWindowFn = @convention(c) (AXUIElement, UnsafeMutablePointer<UInt32>) -> AXError
 
 private let axUIElementGetWindowImpl: AXUIElementGetWindowFn? = {
