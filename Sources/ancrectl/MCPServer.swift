@@ -55,6 +55,14 @@ private let toolDefinitions: [[String: Any]] = [
         ],
     ],
     [
+        "name": "ancre_move_log",
+        "description": "Summary of the user's manual window moves (from ~/Library/Application Support/ancre/move-log.jsonl, written by the app when general.move-log is on). Returns per-app destination histograms: {days, totalMoves, apps: [{bundleID, moves, destinations, topWorkspace, topShare}]}. Purpose: suggest [app-workspaces] rules for ~/.config/ancre/ancre.toml — an app with moves >= 3 and topShare >= 0.8 is a candidate rule 'bundleID = \"workspace\"'. Before suggesting, read the config to skip apps that already have a rule; after editing, apply with the 'reload-config' command.",
+        "inputSchema": [
+            "type": "object",
+            "properties": ["days": ["type": "integer", "description": "look-back window in days (default 30)"]],
+        ],
+    ],
+    [
         "name": "ancre_set_floating",
         "description": "Float (true) or tile (false) a specific window.",
         "inputSchema": [
@@ -67,6 +75,43 @@ private let toolDefinitions: [[String: Any]] = [
         ],
     ],
 ]
+
+/// Aggregates the move log locally — no socket, works with the app not running.
+private func moveLogSummary(days: Int) -> String {
+    let url = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent("Library/Application Support/ancre/move-log.jsonl")
+    let cutoff = Int(Date().timeIntervalSince1970) - days * 86_400
+    var perApp: [String: [String: Int]] = [:] // bundleID -> destination workspace -> count
+    if let content = try? String(contentsOf: url, encoding: .utf8) {
+        for line in content.split(separator: "\n") {
+            guard let data = line.data(using: .utf8),
+                  let record = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+                  let ts = record["ts"] as? Int, ts >= cutoff,
+                  let bundleID = record["bundleID"] as? String,
+                  let to = record["to"] as? String else { continue }
+            perApp[bundleID, default: [:]][to, default: 0] += 1
+        }
+    }
+    let apps: [[String: Any]] = perApp.map { bundleID, destinations in
+        let total = destinations.values.reduce(0, +)
+        let top = destinations.max { $0.value < $1.value }!
+        return [
+            "bundleID": bundleID,
+            "moves": total,
+            "destinations": destinations,
+            "topWorkspace": top.key,
+            "topShare": (Double(top.value) / Double(total) * 100).rounded() / 100,
+        ]
+    }.sorted { ($0["moves"] as! Int) > ($1["moves"] as! Int) }
+    let summary: [String: Any] = [
+        "days": days,
+        "totalMoves": apps.reduce(0) { $0 + ($1["moves"] as! Int) },
+        "apps": apps,
+    ]
+    guard let data = try? JSONSerialization.data(withJSONObject: summary),
+          let json = String(data: data, encoding: .utf8) else { return "error: cannot serialize summary" }
+    return json
+}
 
 /// Maps one MCP tool call onto a control-socket request line.
 private func socketRequest(tool: String, arguments: [String: Any]) -> String? {
@@ -142,6 +187,15 @@ func runMCPServer() {
             let params = message["params"] as? [String: Any] ?? [:]
             let tool = params["name"] as? String ?? ""
             let arguments = params["arguments"] as? [String: Any] ?? [:]
+            if tool == "ancre_move_log" {
+                let days = arguments["days"] as? Int ?? 30
+                let text = moveLogSummary(days: days)
+                reply(id: id, result: [
+                    "content": [["type": "text", "text": text]],
+                    "isError": text.hasPrefix("error"),
+                ])
+                continue
+            }
             guard let request = socketRequest(tool: tool, arguments: arguments) else {
                 replyError(id: id, code: -32602, message: "unknown tool or bad arguments: \(tool)")
                 continue

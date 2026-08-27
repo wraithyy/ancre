@@ -14,7 +14,7 @@ command bus, exposed on a unix socket (`~/Library/Application Support/ancre/ancr
    the repo, or on PATH if installed)
 2. **MCP tools** (server `ancre`, built into the CLI: `ancrectl mcp`): `ancre_state`,
    `ancre_command`, `ancre_arrange`, `ancre_move_window`, `ancre_focus_window`,
-   `ancre_set_floating`
+   `ancre_set_floating`, `ancre_move_log`
 
 Prefer MCP tools when available; the CLI is the fallback.
 
@@ -73,6 +73,15 @@ events live, one JSON object per line.
 - **Clean up distractions**: state → windows with bundleID Teams/Discord/
   Mail → `move-window` each to their home workspace (see `[app-workspaces]`
   in `~/.config/ancre/ancre.toml`).
+- **Suggest [app-workspaces] rules from usage** ("vylepši mi config podle
+  toho, jak okna přesouvám"): `ancre_move_log` (or `cat "~/Library/Application
+  Support/ancre/move-log.jsonl"` when MCP unavailable) → per-app destination
+  histograms. An app with `moves >= 3` and `topShare >= 0.8` is a candidate
+  rule `"<bundleID>" = "<topWorkspace>"` under `[app-workspaces]` in
+  `~/.config/ancre/ancre.toml`. Read the config first and skip apps that
+  already have a rule (a logged move away from the rule's workspace means the
+  rule may be WRONG — flag it instead). Propose the diff to the user, edit on
+  approval, then `reload-config`.
 - **Something looks broken**: `retile`.
 - ancre not responding on the socket → check it's running
   (`pgrep ancre`), start with `open .build/ancre.app` from the repo.
