@@ -126,6 +126,7 @@ private struct OnboardingView: View {
                     Text(L10n.onboardingSubtitle)
                         .font(.system(size: 13))
                         .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true) // wrap, don't ellipsize
                 }
             }
 
@@ -204,6 +205,7 @@ private struct PermissionRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.system(size: 13, weight: .semibold))
                 Text(detail).font(.system(size: 11)).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
             if !granted {
