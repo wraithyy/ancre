@@ -30,7 +30,9 @@ final class HidutilRemap {
         srcUsage = HIDUsage.code(for: srcName) ?? HIDUsage.byName["caps_lock"]!
         dstUsage = HIDUsage.code(for: dstName) ?? HIDUsage.byName["f18"]!
 
-        NotificationCenter.default.addObserver(
+        // NSWorkspace notifications are posted on ITS OWN center, not the
+        // default one — observing the default center never fires.
+        NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification, object: nil, queue: nil
         ) { [weak self] _ in self?.reapply() }
 
@@ -47,8 +49,13 @@ final class HidutilRemap {
         _ = run(mapping: "[]")
     }
 
+    /// Reapply after wake / device attach. Delayed: the keyboard HID device is
+    /// not necessarily ready the instant the notification arrives, and hidutil
+    /// silently no-ops against a device that is still coming up.
     func reapply() {
-        apply()
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            self?.apply()
+        }
     }
 
     /// Returns nil on success, a human-readable failure message otherwise.
