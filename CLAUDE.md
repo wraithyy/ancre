@@ -21,6 +21,15 @@ AXIsProcessTrusted. Watch out: launching the app remaps CapsLock→F18 (hidutil)
 and starts rearranging windows — don't test headlessly. Revert:
 `hidutil property --set '{"UserKeyMapping":[]}'`.
 
+Runtime log (use `ancreLog`, never `NSLog` — NSLog's payload is redacted to
+`<private>` in the unified log):
+
+```
+/usr/bin/log show --last 1h --predicate 'subsystem == "com.ancre.wm"' --style syslog
+```
+
+In zsh `log` is a builtin, so the absolute path matters.
+
 ## Architecture
 
 Command bus: everything (hotkey, bar, drag&drop) → `Command` enum →

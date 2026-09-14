@@ -2,6 +2,7 @@
 // key can act as the "hyper" modifier without a kernel extension.
 
 import Foundation
+import WMCore
 #if canImport(IOKit)
 import IOKit.hid
 #endif
@@ -74,12 +75,12 @@ final class HidutilRemap {
             if process.terminationStatus != 0 {
                 let data = errPipe.fileHandleForReading.readDataToEndOfFile()
                 let message = String(data: data, encoding: .utf8) ?? "unknown error"
-                NSLog("ancre: hidutil remap failed (status \(process.terminationStatus)): \(message)")
+                ancreLog("ancre: hidutil remap failed (status \(process.terminationStatus)): \(message)")
                 return message
             }
             return nil
         } catch {
-            NSLog("ancre: failed to launch hidutil: \(error)")
+            ancreLog("ancre: failed to launch hidutil: \(error)")
             return String(describing: error)
         }
     }
@@ -116,7 +117,7 @@ final class HIDDeviceWatcher {
             IOHIDManagerScheduleWithRunLoop(manager, CFRunLoopGetCurrent(), CFRunLoopMode.defaultMode.rawValue)
             let result = IOHIDManagerOpen(manager, IOOptionBits(kIOHIDOptionsTypeNone))
             if result != kIOReturnSuccess {
-                NSLog("ancre: IOHIDManagerOpen failed: \(result)")
+                ancreLog("ancre: IOHIDManagerOpen failed: \(result)")
             }
             CFRunLoopRun()
         }

@@ -5,6 +5,7 @@
 import Foundation
 import CoreGraphics
 import Carbon.HIToolbox
+import WMCore
 
 public enum HyperMouseButton {
     case left, right
@@ -91,7 +92,7 @@ final class EventTapManager {
             },
             userInfo: refcon
         ) else {
-            NSLog("ancre: failed to create event tap — check Accessibility/Input Monitoring permissions")
+            ancreLog("ancre: failed to create event tap — check Accessibility/Input Monitoring permissions")
             return
         }
 
@@ -118,7 +119,7 @@ final class EventTapManager {
     // Handler implementations are expected to dispatch async themselves.
     private func handle(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-            NSLog("ancre: event tap disabled (\(type == .tapDisabledByTimeout ? "timeout" : "user input")), re-enabling")
+            ancreLog("ancre: event tap disabled (\(type == .tapDisabledByTimeout ? "timeout" : "user input")), re-enabling")
             if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
             onTapDisabled?()
             return Unmanaged.passRetained(event)

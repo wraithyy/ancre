@@ -8,6 +8,7 @@
 // (never a shell), and oversized requests drop the connection.
 
 import Foundation
+import WMCore
 
 final class ControlServer {
     /// Handles one request line; must call the reply exactly once (any thread).
@@ -59,7 +60,7 @@ final class ControlServer {
         guard bindResult == 0, listen(listenFD, 8) == 0, chmod(path, 0o600) == 0 else {
             close(listenFD)
             unlink(path)
-            NSLog("ancre: control socket setup failed at %@", path)
+            ancreLog("ancre: control socket setup failed at %@", path)
             return nil
         }
 
@@ -67,7 +68,7 @@ final class ControlServer {
         source.setEventHandler { [weak self] in self?.acceptConnection() }
         source.resume()
         acceptSource = source
-        NSLog("ancre: control socket at %@", path)
+        ancreLog("ancre: control socket at %@", path)
     }
 
     deinit {

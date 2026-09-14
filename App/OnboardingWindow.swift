@@ -7,6 +7,7 @@ import AppKit
 import Bar
 import IOKit.hid
 import SwiftUI
+import WMCore
 
 final class PermissionsModel: ObservableObject {
     @Published var accessibility = false
@@ -103,7 +104,7 @@ final class OnboardingWindow: NSObject, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         guard !started else { return }
         model.stopPolling()
-        NSLog("ancre: onboarding dismissed without permissions, quitting")
+        ancreLog("ancre: onboarding dismissed without permissions, quitting")
         NSApp.terminate(nil)
     }
 }

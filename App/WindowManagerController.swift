@@ -156,7 +156,7 @@ final class WindowManagerController: WindowTrackerDelegate {
     func start() {
         L10n.language = config.general.language
         let resolved = ConfigLoader.resolveBindings(config)
-        resolved.warnings.forEach { NSLog("ancre: %@", $0) }
+        resolved.warnings.forEach { ancreLog("ancre: %@", $0) }
         setBindings(resolved.bindings)
 
         bar = makeBarController()
@@ -213,7 +213,7 @@ final class WindowManagerController: WindowTrackerDelegate {
                     self.axTrustLost = false
                 } else if !self.axTrustLost {
                     self.axTrustLost = true
-                    NSLog("ancre: accessibility permission lost")
+                    ancreLog("ancre: accessibility permission lost")
                     self.notify(L10n.axPermissionLost, category: "ax-permission")
                 }
             }
@@ -347,10 +347,10 @@ final class WindowManagerController: WindowTrackerDelegate {
     func reloadConfig() {
         tracker.perform { [self] in
             let (newConfig, warnings) = ConfigLoader.load()
-            warnings.forEach { NSLog("ancre: %@", $0) }
+            warnings.forEach { ancreLog("ancre: %@", $0) }
             let oldHyperKey = config.hyper.key
             config = newConfig
-            NSLog("ancre: config reloaded")
+            ancreLog("ancre: config reloaded")
 
             let notifySnapshot = Self.notifySettings(newConfig)
             DispatchQueue.main.async { [weak self] in self?.notifyConfig = notifySnapshot }
@@ -400,7 +400,7 @@ final class WindowManagerController: WindowTrackerDelegate {
                 // to the current thread's run loop, and startup bound it to
                 // main; restarting from the axQueue would silently rebind the
                 // tap onto the axQueue's run loop.
-                NSLog("ancre: hyper key changed, restarting input")
+                ancreLog("ancre: hyper key changed, restarting input")
                 DispatchQueue.main.async { [weak self] in
                     guard let self else { return }
                     self.input.stop()
@@ -623,7 +623,7 @@ final class WindowManagerController: WindowTrackerDelegate {
 
     private func applyDisplays(_ infos: [DisplayInfo]) {
         guard !infos.isEmpty else { return }
-        NSLog("ancre: %d display(s): %@", infos.count,
+        ancreLog("ancre: %d display(s): %@", infos.count,
               infos.map { "\($0.name) [\($0.id)]" }.joined(separator: ", "))
         parkingBounds = infos.dropFirst().reduce(infos[0].frame) { $0.union($1.frame) }
         barConfigs = Dictionary(uniqueKeysWithValues: infos.map {
@@ -794,7 +794,7 @@ final class WindowManagerController: WindowTrackerDelegate {
             _ = savePreset(named: name)
             return
         case .quit:
-            NSLog("ancre: quit command — terminating")
+            ancreLog("ancre: quit command — terminating")
             DispatchQueue.main.async { NSApp.terminate(nil) }
             return
         default:
@@ -937,7 +937,7 @@ final class WindowManagerController: WindowTrackerDelegate {
 
     private func toggleScratchpad() {
         guard let scratchpad = config.scratchpad, let bundleID = scratchpad.app else {
-            NSLog("ancre: scratchpad has no [scratchpad].app configured")
+            ancreLog("ancre: scratchpad has no [scratchpad].app configured")
             return
         }
         guard let ax = scratchpadAX else {
@@ -960,7 +960,7 @@ final class WindowManagerController: WindowTrackerDelegate {
             self?.tracker.perform { self?.scratchpadPending = false }
         }
         if let command = scratchpad.command {
-            NSLog("ancre: scratchpad spawning via command: %@", command)
+            ancreLog("ancre: scratchpad spawning via command: %@", command)
             DispatchQueue.main.async {
                 let task = Process()
                 task.executableURL = URL(fileURLWithPath: "/bin/sh")
@@ -970,7 +970,7 @@ final class WindowManagerController: WindowTrackerDelegate {
             return
         }
         guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
-            NSLog("ancre: scratchpad app %@ not installed", bundleID)
+            ancreLog("ancre: scratchpad app %@ not installed", bundleID)
             scratchpadPending = false
             return
         }
@@ -979,7 +979,7 @@ final class WindowManagerController: WindowTrackerDelegate {
         // A running app just gets activated by openApplication — ask for a
         // separate instance so the scratchpad gets a window of its own.
         configuration.createsNewApplicationInstance = running
-        NSLog("ancre: scratchpad launching %@ (new instance: %@)", bundleID, running ? "yes" : "no")
+        ancreLog("ancre: scratchpad launching %@ (new instance: %@)", bundleID, running ? "yes" : "no")
         DispatchQueue.main.async { NSWorkspace.shared.openApplication(at: url, configuration: configuration) }
     }
 
@@ -1069,7 +1069,7 @@ final class WindowManagerController: WindowTrackerDelegate {
         guard let data = try? encoder.encode(presets) else { return "error: preset encoding failed" }
         do {
             try data.write(to: Self.presetsURL, options: .atomic)
-            NSLog("ancre: preset \"%@\" saved", name)
+            ancreLog("ancre: preset \"%@\" saved", name)
             return "ok"
         } catch {
             return "error: \(error.localizedDescription)"
@@ -1111,7 +1111,7 @@ final class WindowManagerController: WindowTrackerDelegate {
         guard let arrangement = loadPresets()[name] else {
             return "error: unknown preset \"\(name)\""
         }
-        NSLog("ancre: applying preset \"%@\"", name)
+        ancreLog("ancre: applying preset \"%@\"", name)
         return applyArrangement(arrangement)
     }
 
@@ -1311,7 +1311,7 @@ final class WindowManagerController: WindowTrackerDelegate {
     private func setTilingPausedOnQueue(_ paused: Bool) {
         guard paused != tilingPaused else { return }
         tilingPaused = paused
-        NSLog("ancre: tiling %@", paused ? "paused" : "resumed")
+        ancreLog("ancre: tiling %@", paused ? "paused" : "resumed")
         DispatchQueue.main.async { self.onTilingPausedChanged?(paused) }
         if paused {
             updateFocusBorder() // hides it
@@ -1344,13 +1344,13 @@ final class WindowManagerController: WindowTrackerDelegate {
                 let fits = count <= 1 || Double(count) * minWidth <= monitor.visibleFrame.width
                 let current = workspaceLayoutNames[name] ?? config.general.defaultLayout
                 if !fits, current != "stack", autoStackedOriginals[name] == nil {
-                    NSLog("ancre: workspace %@ doesn't fit %@ (%d windows), auto-stacking", name, monitor.id, count)
+                    ancreLog("ancre: workspace %@ doesn't fit %@ (%d windows), auto-stacking", name, monitor.id, count)
                     autoStackedOriginals[name] = current
                     applyLayout(named: "stack", toWorkspace: name, isAutoStack: true)
                     notify(L10n.autoStacked(name), category: "auto-stack")
                 } else if fits, let original = autoStackedOriginals[name],
                           count < thrashStackCounts[name] ?? Int.max {
-                    NSLog("ancre: workspace %@ fits again, restoring layout %@", name, original)
+                    ancreLog("ancre: workspace %@ fits again, restoring layout %@", name, original)
                     autoStackedOriginals.removeValue(forKey: name)
                     thrashStackCounts.removeValue(forKey: name)
                     applyLayout(named: original, toWorkspace: name, isAutoStack: true)
@@ -1370,7 +1370,7 @@ final class WindowManagerController: WindowTrackerDelegate {
         thrashCounts[name] = count
         let current = workspaceLayoutNames[name] ?? config.general.defaultLayout
         guard count > config.general.autoStackThrashLimit, current != "stack" else { return false }
-        NSLog("ancre: workspace %@ keeps thrashing (%d refusals), auto-stacking", name, count)
+        ancreLog("ancre: workspace %@ keeps thrashing (%d refusals), auto-stacking", name, count)
         autoStackedOriginals[name] = current
         thrashStackCounts[name] = state.monitors
             .flatMap(\.workspaces).first { $0.name == name }?.tiledWindows.count ?? 0
@@ -1401,7 +1401,7 @@ final class WindowManagerController: WindowTrackerDelegate {
             if let last = lastNotified[category], now.timeIntervalSince(last) < throttle { return }
             lastNotified[category] = now
             guard Bundle.main.bundleIdentifier != nil else {
-                NSLog("ancre: notification (unbundled): %@", body)
+                ancreLog("ancre: notification (unbundled): %@", body)
                 return
             }
             let center = UNUserNotificationCenter.current()
@@ -1451,7 +1451,7 @@ final class WindowManagerController: WindowTrackerDelegate {
         if let layout = LayoutFactory.make(name, customLayouts: config.customLayouts ?? [:]) {
             return layout
         }
-        NSLog("ancre: unknown layout \"%@\", using dwindle", name)
+        ancreLog("ancre: unknown layout \"%@\", using dwindle", name)
         return DwindleLayout()
     }
 
@@ -1527,7 +1527,7 @@ final class WindowManagerController: WindowTrackerDelegate {
             execute(WM.windowResizedByUser(wid, to: frame, state: &state))
         }
         while let (wid, frame) = pendingAutoFloats.popLast() {
-            NSLog("ancre: window %u can't fit its tile, floating it", wid.rawValue)
+            ancreLog("ancre: window %u can't fit its tile, floating it", wid.rawValue)
             notify(L10n.autoFloated(appName(wid)), category: "auto-float")
             execute(WM.floatWindow(wid, frame: frame, state: &state))
         }
@@ -1552,7 +1552,7 @@ final class WindowManagerController: WindowTrackerDelegate {
         // Some windows briefly report a zero/degenerate frame (seen as a tiny
         // border stuck in a screen corner) — hide instead of drawing garbage.
         guard frame.width > 40, frame.height > 40 else {
-            NSLog("ancre: focus border skipped, window %u reports frame %@",
+            ancreLog("ancre: focus border skipped, window %u reports frame %@",
                   wid.rawValue, String(describing: frame))
             DispatchQueue.main.async { [focusBorder] in focusBorder.hide() }
             return
@@ -1602,7 +1602,7 @@ final class WindowManagerController: WindowTrackerDelegate {
                 pendingAdoptions.append((wid, actual.cgRect))
             }
         } else if actual.diverges(from: target, tolerance: 2) {
-            NSLog("ancre: window %u refused frame (wanted %@, got %@)",
+            ancreLog("ancre: window %u refused frame (wanted %@, got %@)",
                   wid.rawValue, String(describing: target), String(describing: actual))
         }
         // Animated completions arrive outside execute() — resolve refusals now.
@@ -1640,7 +1640,7 @@ final class WindowManagerController: WindowTrackerDelegate {
                     } else {
                         // ponytail: if the tracked sibling tab closes later, the
                         // remaining tab stays unmanaged until focus/adopt-window.
-                        NSLog("ancre: window %u is a tab sibling of %@, not tiling it", window.id, app.name ?? "?")
+                        ancreLog("ancre: window %u is a tab sibling of %@, not tiling it", window.id, app.name ?? "?")
                     }
                 }
             }
@@ -1663,12 +1663,12 @@ final class WindowManagerController: WindowTrackerDelegate {
         if scratchpadPending, bundleID == config.scratchpad?.app {
             scratchpadPending = false
             scratchpadAX = window
-            NSLog("ancre: scratchpad claimed window %u of %@", window.id, bundleID)
+            ancreLog("ancre: scratchpad claimed window %u of %@", window.id, bundleID)
             showScratchpad(window)
             return
         }
         if config.general.ignoreApps.contains(bundleID) {
-            NSLog("ancre: ignore-apps: not managing window %u of %@", window.id, bundleID)
+            ancreLog("ancre: ignore-apps: not managing window %u of %@", window.id, bundleID)
             return
         }
         axWindows[window.id] = window
@@ -1823,7 +1823,7 @@ final class WindowManagerController: WindowTrackerDelegate {
             // snap-back so a window macOS insists on rescuing doesn't loop.
             let attempts = (snapBackAttempts[id] ?? 0) + 1
             guard attempts <= snapBackLimit else {
-                NSLog("ancre: window %u keeps escaping parking, leaving it visible", id)
+                ancreLog("ancre: window %u keeps escaping parking, leaving it visible", id)
                 return
             }
             snapBackAttempts[id] = attempts
@@ -1872,7 +1872,7 @@ final class WindowManagerController: WindowTrackerDelegate {
         if attempts > snapBackLimit {
             // App insists on its own frame — float it so the layout reflows
             // around it instead of leaving a mis-sized tile overlapping others.
-            NSLog("ancre: window %u keeps resizing itself, floating it", id)
+            ancreLog("ancre: window %u keeps resizing itself, floating it", id)
             notify(L10n.autoFloated(appName(WindowID(id))), category: "auto-float")
             expectedFrames.removeValue(forKey: id)
             snapBackAttempts.removeValue(forKey: id)

@@ -4,6 +4,7 @@ import AXBridge
 import Bar
 import Config
 import ServiceManagement
+import WMCore
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
@@ -33,7 +34,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func scheduleUpdateChecks() {
         let check = { [weak self] in
             UpdateChecker.check { version in
-                NSLog("ancre: update %@ available", version)
+                ancreLog("ancre: update %@ available", version)
                 self?.availableUpdate = version
                 self?.buildMenu()
                 self?.refreshIcon()
@@ -209,7 +210,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 try service.register()
             }
         } catch {
-            NSLog("ancre: login item toggle failed: \(error.localizedDescription)")
+            ancreLog("ancre: login item toggle failed: \(error.localizedDescription)")
         }
         refreshLoginItem()
     }
@@ -261,7 +262,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             startWindowManager()
             return
         }
-        NSLog("ancre: permissions missing, showing onboarding")
+        ancreLog("ancre: permissions missing, showing onboarding")
         onboarding = OnboardingWindow()
         onboarding?.show { [weak self] in
             self?.onboarding = nil
@@ -271,7 +272,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func startWindowManager() {
         let (config, warnings) = ConfigLoader.load()
-        warnings.forEach { NSLog("ancre: %@", $0) }
+        warnings.forEach { ancreLog("ancre: %@", $0) }
         let controller = WindowManagerController(config: config)
         controller.onTilingPausedChanged = { [weak self] paused in
             self?.pauseItem?.state = paused ? .on : .off
@@ -287,7 +288,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller.start()
         self.controller = controller
         buildMenu() // full menu, localized per config
-        NSLog("ancre: window manager started")
+        ancreLog("ancre: window manager started")
     }
 }
 
