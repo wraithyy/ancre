@@ -42,6 +42,11 @@ final class WindowManagerController: WindowTrackerDelegate {
     /// apps that clamp their own size.
     private var snapBackAttempts: [AXWindowID: Int] = [:]
     private let snapBackLimit = 3
+    /// Last automatic workspace switch driven by `follow-native-focus`, and the
+    /// minimum gap between two of them. Without the gap the switch feeds itself
+    /// through the parking it triggers (see `windowFocused`).
+    private var lastFollowFocusSwitch = Date.distantPast
+    private static let followFocusDebounce: TimeInterval = 0.5
     /// Windows parked offscreen for a hidden workspace. On display
     /// reconfiguration macOS "rescues" offscreen windows onto a remaining
     /// display; tracking membership lets enforceTiling send them back.
@@ -1704,10 +1709,18 @@ final class WindowManagerController: WindowTrackerDelegate {
         // Follow native focus: when macOS activates an app (a URL clicked in
         // Teams opening the browser...), pull that window's workspace into
         // view instead of leaving the window parked on a hidden one.
+        // The switch parks the outgoing workspace's windows, so macOS hands
+        // focus to some other app, whose window then pulls its own workspace
+        // back — two apps on two workspaces ping-pong tens of times a second
+        // until the WM is killed. Rate-limit the automatic switch: a real
+        // user-driven focus change is always slower than this window.
         if config.general.followNativeFocus,
            let location = state.windowLocation[wid],
            state.monitors.indices.contains(location.monitorIndex),
-           state.monitors[location.monitorIndex].activeWorkspace.name != location.workspaceName {
+           state.monitors[location.monitorIndex].activeWorkspace.name != location.workspaceName,
+           Date().timeIntervalSince(lastFollowFocusSwitch) > Self.followFocusDebounce {
+            lastFollowFocusSwitch = Date()
+            ancreLog("ancre: following native focus to workspace %@", location.workspaceName)
             run(.workspace(location.workspaceName))
         }
         execute(WM.focusChangedExternally(wid, state: &state))
