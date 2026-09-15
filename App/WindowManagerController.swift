@@ -42,6 +42,13 @@ final class WindowManagerController: WindowTrackerDelegate {
     /// apps that clamp their own size.
     private var snapBackAttempts: [AXWindowID: Int] = [:]
     private let snapBackLimit = 3
+    /// Last display reconfiguration, and how long AX frames stay untrustworthy
+    /// after one. Reconciling every monitor re-places every window while apps
+    /// still report stale or zero frames; treating those readings as refusals
+    /// burned through snapBackLimit and auto-floated whole workspaces on every
+    /// replug, wake, or spurious reconfiguration event.
+    private var lastDisplayChange = Date.distantPast
+    private static let displaySettleWindow: TimeInterval = 2
     /// Last automatic workspace switch driven by `follow-native-focus`, and the
     /// minimum gap between two of them. Without the gap the switch feeds itself
     /// through the parking it triggers (see `windowFocused`).
@@ -626,8 +633,18 @@ final class WindowManagerController: WindowTrackerDelegate {
 
     // MARK: - Displays (axQueue)
 
+    /// True while the display topology is still settling after a
+    /// reconfiguration — AX frames read in this window are not trustworthy.
+    private var displaysSettling: Bool {
+        Date().timeIntervalSince(lastDisplayChange) < Self.displaySettleWindow
+    }
+
     private func applyDisplays(_ infos: [DisplayInfo]) {
         guard !infos.isEmpty else { return }
+        lastDisplayChange = Date()
+        adoptAttempts.removeAll()
+        snapBackAttempts.removeAll()
+        thrashCounts.removeAll()
         ancreLog("ancre: %d display(s): %@", infos.count,
               infos.map { "\($0.name) [\($0.id)]" }.joined(separator: ", "))
         parkingBounds = infos.dropFirst().reduce(infos[0].frame) { $0.union($1.frame) }
@@ -1592,6 +1609,9 @@ final class WindowManagerController: WindowTrackerDelegate {
         // first adopts the actual size into the layout — neighbors make room —
         // and floats only if adoption keeps failing.
         if actual.diverges(from: target, tolerance: 50) {
+            // Frames read during a display reconfiguration are noise, not a
+            // refusal — keep the window tiled and let the next placement judge.
+            guard !displaysSettling else { return }
             let now = Date()
             if now.timeIntervalSince(lastDivergence) > 2 {
                 adoptAttempts.removeAll()
@@ -1879,6 +1899,12 @@ final class WindowManagerController: WindowTrackerDelegate {
                 drag.lastActionLocation = location
             }
             mouseDrag = drag
+            return
+        }
+        // Same reason as in finishAssign: a window nudged by the display
+        // reconfiguration itself must not count toward the auto-float limit.
+        guard !displaysSettling else {
+            ax.setFrame(expected)
             return
         }
         let attempts = (snapBackAttempts[id] ?? 0) + 1
