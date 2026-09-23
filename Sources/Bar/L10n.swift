@@ -15,6 +15,7 @@ public enum L10n {
     public static var moveFocusedHere: String { t("move_focused_here") }
     public static var focusWindow: String { t("focus_window") }
     public static var moveTo: String { t("move_to") }
+    public static var moveWorkspaceToMonitor: String { t("move_workspace_to_monitor") }
     public static var floatWindow: String { t("float_window") }
     public static var tileWindow: String { t("tile_window") }
     public static var toggleFullscreen: String { t("toggle_fullscreen") }
@@ -96,6 +97,7 @@ public enum L10n {
         "move_focused_here": "Move focused window here",
         "focus_window": "Focus window",
         "move_to": "Move to",
+        "move_workspace_to_monitor": "Move workspace to monitor",
         "layout_menu": "Layout: %@",
         "workspace_tooltip": "workspace %@ — layout: %@, windows: %d",
         "float_window": "Float window",
@@ -154,6 +156,7 @@ public enum L10n {
             "move_focused_here": "Přesunout fokusované okno sem",
             "focus_window": "Fokusovat okno",
             "move_to": "Přesunout do",
+            "move_workspace_to_monitor": "Přesunout workspace na monitor",
             "layout_menu": "Layout: %@",
             "workspace_tooltip": "workspace %@ — layout: %@, oken: %d",
             "float_window": "Floatovat okno",

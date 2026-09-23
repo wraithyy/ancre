@@ -75,6 +75,9 @@ public struct BarMonitorSnapshot: Equatable {
     public let isFocusedMonitor: Bool
     /// Every workspace across all monitors, for the "move to" menu.
     public let allWorkspaceNames: [BarWorkspaceRef]
+    /// The other connected monitors (`name` = stable id, `title` = display
+    /// name), for the "move workspace to monitor" menu.
+    public let otherMonitors: [BarWorkspaceRef]
     /// Layout names offered in the context menu (built-ins + custom).
     public let availableLayouts: [String]
     /// Menubar mode: `barFrame` is the menu-bar band and the window shrinks
@@ -84,12 +87,13 @@ public struct BarMonitorSnapshot: Equatable {
     /// controller-wide default theme.
     public let theme: BarTheme?
 
-    public init(monitorID: String, barFrame: NSRect, workspaces: [BarWorkspaceItem], isFocusedMonitor: Bool, allWorkspaceNames: [BarWorkspaceRef], availableLayouts: [String], compact: Bool = false, theme: BarTheme? = nil) {
+    public init(monitorID: String, barFrame: NSRect, workspaces: [BarWorkspaceItem], isFocusedMonitor: Bool, allWorkspaceNames: [BarWorkspaceRef], otherMonitors: [BarWorkspaceRef] = [], availableLayouts: [String], compact: Bool = false, theme: BarTheme? = nil) {
         self.monitorID = monitorID
         self.barFrame = barFrame
         self.workspaces = workspaces
         self.isFocusedMonitor = isFocusedMonitor
         self.allWorkspaceNames = allWorkspaceNames
+        self.otherMonitors = otherMonitors
         self.availableLayouts = availableLayouts
         self.compact = compact
         self.theme = theme
@@ -168,6 +172,7 @@ public final class BarController {
     private let onMoveFocusedWindow: (String) -> Void
     private let onFocusWindow: (UInt32) -> Void
     private let onSetLayout: (String, String) -> Void
+    private let onMoveWorkspace: (_ workspace: String, _ monitorID: String) -> Void
     private let onToggleFloat: (UInt32) -> Void
     private let onToggleFullscreen: (UInt32) -> Void
     private var windows: [String: NSWindow] = [:]
@@ -206,6 +211,7 @@ public final class BarController {
         onMoveFocusedWindow: @escaping (String) -> Void,
         onFocusWindow: @escaping (UInt32) -> Void,
         onSetLayout: @escaping (_ workspace: String, _ layout: String) -> Void,
+        onMoveWorkspace: @escaping (_ workspace: String, _ monitorID: String) -> Void,
         onToggleFloat: @escaping (UInt32) -> Void,
         onToggleFullscreen: @escaping (UInt32) -> Void
     ) {
@@ -215,6 +221,7 @@ public final class BarController {
         self.onMoveFocusedWindow = onMoveFocusedWindow
         self.onFocusWindow = onFocusWindow
         self.onSetLayout = onSetLayout
+        self.onMoveWorkspace = onMoveWorkspace
         self.onToggleFloat = onToggleFloat
         self.onToggleFullscreen = onToggleFullscreen
     }
@@ -234,6 +241,7 @@ public final class BarController {
             let rootView = BarView(
                 workspaces: snapshot.workspaces,
                 allWorkspaceNames: snapshot.allWorkspaceNames,
+                otherMonitors: snapshot.otherMonitors,
                 availableLayouts: snapshot.availableLayouts,
                 isFocused: snapshot.isFocusedMonitor,
                 fullWidth: !snapshot.compact,
@@ -243,6 +251,7 @@ public final class BarController {
                 onMoveFocusedWindow: onMoveFocusedWindow,
                 onFocusWindow: onFocusWindow,
                 onSetLayout: onSetLayout,
+                onMoveWorkspace: onMoveWorkspace,
                 onToggleFloat: onToggleFloat,
                 onToggleFullscreen: onToggleFullscreen
             )
@@ -498,6 +507,7 @@ public final class BarController {
 private struct BarView: View {
     let workspaces: [BarWorkspaceItem]
     let allWorkspaceNames: [BarWorkspaceRef]
+    let otherMonitors: [BarWorkspaceRef]
     let availableLayouts: [String]
     let isFocused: Bool
     /// false = menubar mode: just the pill, no full-strip spacers.
@@ -508,6 +518,7 @@ private struct BarView: View {
     let onMoveFocusedWindow: (String) -> Void
     let onFocusWindow: (UInt32) -> Void
     let onSetLayout: (String, String) -> Void
+    let onMoveWorkspace: (String, String) -> Void
     let onToggleFloat: (UInt32) -> Void
     let onToggleFullscreen: (UInt32) -> Void
 
@@ -553,6 +564,7 @@ private struct BarView: View {
             WorkspaceCell(
                 workspace: workspace,
                 allWorkspaceNames: allWorkspaceNames,
+                otherMonitors: otherMonitors,
                 availableLayouts: availableLayouts,
                 isFocusedMonitor: isFocused,
                 theme: theme,
@@ -561,6 +573,7 @@ private struct BarView: View {
                 onMoveFocusedWindow: onMoveFocusedWindow,
                 onFocusWindow: onFocusWindow,
                 onSetLayout: onSetLayout,
+                onMoveWorkspace: onMoveWorkspace,
                 onToggleFloat: onToggleFloat,
                 onToggleFullscreen: onToggleFullscreen
             )
@@ -583,6 +596,7 @@ private struct BarView: View {
 private struct WorkspaceCell: View {
     let workspace: BarWorkspaceItem
     let allWorkspaceNames: [BarWorkspaceRef]
+    let otherMonitors: [BarWorkspaceRef]
     let availableLayouts: [String]
     let isFocusedMonitor: Bool
     let theme: BarTheme
@@ -591,6 +605,7 @@ private struct WorkspaceCell: View {
     let onMoveFocusedWindow: (String) -> Void
     let onFocusWindow: (UInt32) -> Void
     let onSetLayout: (String, String) -> Void
+    let onMoveWorkspace: (String, String) -> Void
     let onToggleFloat: (UInt32) -> Void
     let onToggleFullscreen: (UInt32) -> Void
 
@@ -655,6 +670,13 @@ private struct WorkspaceCell: View {
         .contextMenu {
             Button(L10n.switchToWorkspace(workspace.name)) { onSelect(workspace.name) }
             Button(L10n.moveFocusedHere) { onMoveFocusedWindow(workspace.name) }
+            if !otherMonitors.isEmpty {
+                Menu(L10n.moveWorkspaceToMonitor) {
+                    ForEach(otherMonitors, id: \.name) { monitor in
+                        Button(monitor.title) { onMoveWorkspace(workspace.name, monitor.name) }
+                    }
+                }
+            }
             Menu(L10n.layoutMenu(workspace.layoutName)) {
                 ForEach(availableLayouts, id: \.self) { layout in
                     Button {

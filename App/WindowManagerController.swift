@@ -74,6 +74,8 @@ final class WindowManagerController: WindowTrackerDelegate {
     /// Effective [bar] config per monitor id ([bar] + [bar-overrides]),
     /// resolved at every display reconfiguration. (axQueue)
     private var barConfigs: [String: AppConfig.Bar] = [:]
+    /// Display names per stable monitor id, for the bar's monitor menu.
+    private var monitorNames: [String: String] = [:]
     /// Workspaces auto-switched to stack on a cramped monitor, with the
     /// layout to restore once they fit again. (axQueue)
     private var autoStackedOriginals: [String: String] = [:]
@@ -604,6 +606,10 @@ final class WindowManagerController: WindowTrackerDelegate {
                     guard let self else { return }
                     self.tracker.perform { self.applyLayout(named: layoutName, toWorkspace: workspaceName) }
                 },
+                onMoveWorkspace: { [weak self] workspaceName, monitorID in
+                    guard let self else { return }
+                    self.tracker.perform { self.moveWorkspace(workspaceName, toMonitor: monitorID) }
+                },
                 onToggleFloat: { [weak self] windowID in
                     guard let self else { return }
                     self.tracker.perform {
@@ -647,6 +653,7 @@ final class WindowManagerController: WindowTrackerDelegate {
         thrashCounts.removeAll()
         ancreLog("ancre: %d display(s): %@", infos.count,
               infos.map { "\($0.name) [\($0.id)]" }.joined(separator: ", "))
+        monitorNames = Dictionary(uniqueKeysWithValues: infos.map { ($0.id, $0.name) })
         parkingBounds = infos.dropFirst().reduce(infos[0].frame) { $0.union($1.frame) }
         barConfigs = Dictionary(uniqueKeysWithValues: infos.map {
             ($0.id, config.bar(forMonitorID: $0.id, name: $0.name, hasNotch: $0.hasNotch))
@@ -702,6 +709,7 @@ final class WindowManagerController: WindowTrackerDelegate {
             return BarWorkspaceRef(name: name, title: title)
         }
         let availableLayouts = ["dwindle", "scroll", "stack"] + (config.customLayouts?.keys.sorted() ?? [])
+        let monitorRefs = state.monitors.map { BarWorkspaceRef(name: $0.id, title: monitorNames[$0.id] ?? $0.id) }
         let snapshots = state.monitors.enumerated().map { index, monitor -> (String, CGRect, [BarWorkspaceItem], Bool, Bool, BarTheme) in
             let barConfig = barConfigs[monitor.id] ?? config.bar
             let strip: CGRect
@@ -766,6 +774,7 @@ final class WindowManagerController: WindowTrackerDelegate {
                     workspaces: items,
                     isFocusedMonitor: focused,
                     allWorkspaceNames: allWorkspaceNames,
+                    otherMonitors: monitorRefs.filter { $0.name != id },
                     availableLayouts: availableLayouts,
                     compact: compact,
                     theme: theme
@@ -1341,6 +1350,20 @@ final class WindowManagerController: WindowTrackerDelegate {
             // State kept evolving while effects were dropped — re-place all.
             applyDisplays(DisplayManager.current())
         }
+    }
+
+    /// Bar menu: re-place a workspace on another monitor. Placement is a pure
+    /// function of the assignments, so overriding the assignment and re-running
+    /// the planner is the whole move. Runtime only — a config reload restores
+    /// the `[workspaces]` assignments.
+    private func moveWorkspace(_ name: String, toMonitor monitorID: String) {
+        guard state.locate(workspace: name) != nil,
+              state.monitors.contains(where: { $0.id == monitorID }) else { return }
+        state.workspaceAssignments[name] = [monitorID]
+        applyDisplays(DisplayManager.current())
+        // Land on the moved workspace instead of leaving its windows hidden
+        // behind whatever the target monitor had active.
+        run(.workspace(name))
     }
 
     private func applyLayout(named name: String, toWorkspace workspaceName: String, isAutoStack: Bool = false) {
