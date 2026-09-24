@@ -756,6 +756,14 @@ private struct WorkspaceCell: View {
                     }
             }
         }
+        // The list is capped at max-icons — say how many windows are hidden
+        // instead of dropping them silently.
+        if workspace.windows.count > theme.maxIcons {
+            Text("+\(workspace.windows.count - theme.maxIcons)")
+                .font(theme.font(size: theme.fontSize * 0.8, weight: .semibold))
+                .opacity(theme.inactiveIconOpacity)
+                .help(L10n.hiddenWindows(workspace.windows.count - theme.maxIcons))
+        }
     }
 
     @ViewBuilder private var dropSlot: some View {

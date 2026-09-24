@@ -16,6 +16,9 @@ public enum L10n {
     public static var focusWindow: String { t("focus_window") }
     public static var moveTo: String { t("move_to") }
     public static var moveWorkspaceToMonitor: String { t("move_workspace_to_monitor") }
+    public static func hiddenWindows(_ count: Int) -> String {
+        String(format: t("hidden_windows"), count)
+    }
     public static var floatWindow: String { t("float_window") }
     public static var tileWindow: String { t("tile_window") }
     public static var toggleFullscreen: String { t("toggle_fullscreen") }
@@ -98,6 +101,7 @@ public enum L10n {
         "focus_window": "Focus window",
         "move_to": "Move to",
         "move_workspace_to_monitor": "Move workspace to monitor",
+        "hidden_windows": "%d more window(s) — raise max-icons in [bar] to show them",
         "layout_menu": "Layout: %@",
         "workspace_tooltip": "workspace %@ — layout: %@, windows: %d",
         "float_window": "Float window",
@@ -157,6 +161,7 @@ public enum L10n {
             "focus_window": "Fokusovat okno",
             "move_to": "Přesunout do",
             "move_workspace_to_monitor": "Přesunout workspace na monitor",
+            "hidden_windows": "o %d oken víc — zvyš max-icons v [bar]",
             "layout_menu": "Layout: %@",
             "workspace_tooltip": "workspace %@ — layout: %@, oken: %d",
             "float_window": "Floatovat okno",
