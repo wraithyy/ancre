@@ -189,6 +189,7 @@ public final class BarController {
     private var hoverPoll: Timer?
     /// Hyper held = keep notch pills out regardless of the cursor.
     private var hyperPeek = false
+    private var screenObserver: NSObjectProtocol?
     /// Fires with the CG-coordinate frames of visible bar windows whenever
     /// they change — the event tap passes hyper+clicks through them.
     public var onRegionsChanged: (([CGRect]) -> Void)?
@@ -224,6 +225,18 @@ public final class BarController {
         self.onMoveWorkspace = onMoveWorkspace
         self.onToggleFloat = onToggleFloat
         self.onToggleFullscreen = onToggleFullscreen
+        // On a display reconfiguration (wake, replug, re-enumeration) AppKit
+        // relocates windows that were on a vanished screen. The follow-up
+        // snapshot is usually identical to the last one, so the equality
+        // guard in update() would leave the bar stranded wherever AppKit
+        // dropped it — forget the cache so the next update re-applies frames.
+        screenObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.lastSnapshots.removeAll()
+        }
     }
 
     /// Replaces all bars with the given per-monitor snapshots. Bars for
@@ -348,6 +361,8 @@ public final class BarController {
 
     /// Closes all bar windows (hot-reload replaces the controller). Main thread.
     public func close() {
+        if let screenObserver { NotificationCenter.default.removeObserver(screenObserver) }
+        screenObserver = nil
         for window in windows.values { window.orderOut(nil) }
         for watcher in revealWatchers.values { watcher.invalidate() }
         hoverPoll?.invalidate()
