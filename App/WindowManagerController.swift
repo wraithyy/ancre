@@ -58,6 +58,10 @@ final class WindowManagerController: WindowTrackerDelegate {
     /// reconfiguration macOS "rescues" offscreen windows onto a remaining
     /// display; tracking membership lets enforceTiling send them back.
     private var parkedWindows: Set<AXWindowID> = []
+    /// Windows in native macOS fullscreen: out of the layout (no reserved
+    /// tile) and never a reason to switch workspace. Still kept in axWindows
+    /// so leaving fullscreen re-adopts them.
+    private var nativeFullscreenWindows: Set<AXWindowID> = []
     /// Created on the main thread (NSWindow requirement); the reference is
     /// owned by the axQueue, window operations happen via DispatchQueue.main.
     /// Nil when disabled.
@@ -1721,6 +1725,10 @@ final class WindowManagerController: WindowTrackerDelegate {
         }
         axWindows[window.id] = window
         windowPids[window.id] = app.pid
+        if window.isNativeFullscreen {
+            nativeFullscreenWindows.insert(window.id)
+            return
+        }
         let frame = window.frame.cgRect
         let node = WindowNode(
             id: WindowID(window.id),
@@ -1748,6 +1756,9 @@ final class WindowManagerController: WindowTrackerDelegate {
 
     func windowFocused(id: AXWindowID) {
         guard axWindows[id] != nil else { return }
+        // Focusing a native-fullscreen window means the user switched to its
+        // Space — following it would yank them back to the old workspace.
+        if syncNativeFullscreen(id) { return }
         let wid = WindowID(id)
         // Follow native focus: when macOS activates an app (a URL clicked in
         // Teams opening the browser...), pull that window's workspace into
@@ -1772,13 +1783,48 @@ final class WindowManagerController: WindowTrackerDelegate {
     }
 
     func windowMoved(id: AXWindowID, newFrame: AXFrame) {
+        if syncNativeFullscreen(id) { return }
         enforceTiling(id: id, newFrame: newFrame)
         updateFocusBorder()
     }
 
     func windowResized(id: AXWindowID, newFrame: AXFrame) {
+        if syncNativeFullscreen(id) { return }
         enforceTiling(id: id, newFrame: newFrame)
         updateFocusBorder()
+    }
+
+    /// Tracks native fullscreen transitions (no dedicated AX notification;
+    /// the transition shows up as move/resize/focus events). Entering drops
+    /// the window from the layout like minimize; leaving re-adopts it.
+    /// Returns true while the window is (or just was) fullscreen, so the
+    /// caller skips tiling and focus-follow for this event.
+    private func syncNativeFullscreen(_ id: AXWindowID) -> Bool {
+        guard let ax = axWindows[id] else { return false }
+        let isFullscreen = ax.isNativeFullscreen
+        let wasFullscreen = nativeFullscreenWindows.contains(id)
+        switch (wasFullscreen, isFullscreen) {
+        case (false, true):
+            nativeFullscreenWindows.insert(id)
+            expectedFrames.removeValue(forKey: id)
+            snapBackAttempts.removeValue(forKey: id)
+            parkedWindows.remove(id)
+            animator.cancel(id)
+            ancreLog("ancre: window %u entered native fullscreen, releasing its tile", id)
+            execute(WM.windowRemoved(WindowID(id), state: &state))
+            updateFocusBorder()
+            updateBar()
+            return true
+        case (true, false):
+            nativeFullscreenWindows.remove(id)
+            ancreLog("ancre: window %u left native fullscreen, re-tiling", id)
+            windowDeminiaturized(id: id)
+            return true
+        case (true, true):
+            return true
+        case (false, false):
+            return false
+        }
     }
 
     func windowMiniaturized(id: AXWindowID) {
@@ -1842,6 +1888,7 @@ final class WindowManagerController: WindowTrackerDelegate {
         snapBackAttempts.removeValue(forKey: id)
         adoptAttempts.removeValue(forKey: id)
         parkedWindows.remove(id)
+        nativeFullscreenWindows.remove(id)
         animator.cancel(id)
         execute(WM.windowRemoved(WindowID(id), state: &state))
     }

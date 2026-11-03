@@ -106,6 +106,12 @@ public final class AXWindow {
         return (value as? Bool) ?? false
     }
 
+    /// Native macOS fullscreen (own Space). "AXFullScreen" has no kAX constant
+    /// but is the public attribute the green button toggles.
+    public var isNativeFullscreen: Bool {
+        (copyAttribute("AXFullScreen") as? Bool) ?? false
+    }
+
     public var frame: AXFrame {
         var point = CGPoint.zero
         var size = CGSize.zero
