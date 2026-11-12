@@ -42,6 +42,7 @@ system shortcuts.
 | `hyper + f` | toggle fullscreen |
 | `hyper + t` / `hyper + shift + t` | layout scroll / dwindle |
 | `hyper + a` | adopt frontmost window into current workspace |
+| `hyper + shift + i` | ignore the focused app (adds it to `ignore-apps` in the config) |
 | `hyper + p` | pause tiling (toggle) |
 | `hyper + r` | retile — rescan windows and re-place everything |
 | `hyper + ,` / `hyper + .` | focus previous / next monitor |

@@ -12,7 +12,7 @@ private let toolDefinitions: [[String: Any]] = [
     ],
     [
         "name": "ancre_command",
-        "description": "Dispatch a window-manager command, same grammar as keybindings: 'workspace <name>', 'move-to-workspace <name>', 'focus left|down|up|right', 'move left|down|up|right', 'resize width|height <delta>', 'layout dwindle|scroll|stack|<custom>', 'toggle-floating', 'toggle-fullscreen', 'focus-monitor next|previous', 'adopt-window', 'pause-tiling', 'retile', 'preset <name>', 'preset-save <name>', 'reload-config'. Returns 'ok' or 'error: ...'.",
+        "description": "Dispatch a window-manager command, same grammar as keybindings: 'workspace <name>', 'move-to-workspace <name>', 'focus left|down|up|right', 'move left|down|up|right', 'resize width|height <delta>', 'layout dwindle|scroll|stack|<custom>', 'toggle-floating', 'toggle-fullscreen', 'focus-monitor next|previous', 'adopt-window', 'ignore-focused-app', 'pause-tiling', 'retile', 'preset <name>', 'preset-save <name>', 'reload-config'. Returns 'ok' or 'error: ...'.",
         "inputSchema": [
             "type": "object",
             "properties": ["command": ["type": "string", "description": "command string, e.g. 'workspace 3'"]],

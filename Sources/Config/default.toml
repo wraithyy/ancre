@@ -75,6 +75,8 @@ key = "caps_lock"
 "hyper-v" = "toggle-floating"
 "hyper-f" = "toggle-fullscreen"
 "hyper-a" = "adopt-window"
+# Add the focused window's app to [general] ignore-apps and stop managing it.
+"hyper-shift-i" = "ignore-focused-app"
 "hyper-t" = "layout scroll"
 "hyper-shift-t" = "layout dwindle"
 "hyper-p" = "pause-tiling"

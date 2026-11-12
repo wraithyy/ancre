@@ -633,20 +633,7 @@ final class WindowManagerController: WindowTrackerDelegate {
                 },
                 onIgnoreApp: { [weak self] bundleID in
                     guard let self else { return }
-                    self.tracker.perform {
-                        guard !self.config.general.ignoreApps.contains(bundleID) else { return }
-                        let url = ConfigLoader.userConfigURL
-                        do {
-                            let toml = try String(contentsOf: url, encoding: .utf8)
-                            try ConfigLoader.addingIgnoredApp(bundleID, to: toml)
-                                .write(to: url, atomically: true, encoding: .utf8)
-                            ancreLog("ancre: ignore-apps += %@ (from bar)", bundleID)
-                            // Reload drops the app's windows from management.
-                            self.reloadConfig()
-                        } catch {
-                            ancreLog("ancre: cannot add %@ to ignore-apps: %@", bundleID, "\(error)")
-                        }
-                    }
+                    self.tracker.perform { self.ignoreApp(bundleID) }
                 }
         )
     }
@@ -827,6 +814,13 @@ final class WindowManagerController: WindowTrackerDelegate {
             tracker.rescanWindows()
             applyDisplays(DisplayManager.current())
             return
+        case .ignoreFocusedApp:
+            let workspace = state.monitors.indices.contains(state.focusedMonitorIndex)
+                ? state.monitors[state.focusedMonitorIndex].activeWorkspace : nil
+            if let wid = workspace?.focusedWindow, let bundleID = state.windows[wid]?.appBundleID {
+                ignoreApp(bundleID)
+            }
+            return
         case .openConfig:
             DispatchQueue.main.async { NSWorkspace.shared.open(ConfigLoader.userConfigURL) }
             return
@@ -859,6 +853,22 @@ final class WindowManagerController: WindowTrackerDelegate {
 
     func toggleTilingPause() {
         tracker.perform { self.setTilingPausedOnQueue(!self.tilingPaused) }
+    }
+
+    /// Appends `bundleID` to ignore-apps in the user config and reloads it,
+    /// which drops the app's windows from management. Runs on axQueue.
+    private func ignoreApp(_ bundleID: String) {
+        guard !config.general.ignoreApps.contains(bundleID) else { return }
+        let url = ConfigLoader.userConfigURL
+        do {
+            let toml = try String(contentsOf: url, encoding: .utf8)
+            try ConfigLoader.addingIgnoredApp(bundleID, to: toml)
+                .write(to: url, atomically: true, encoding: .utf8)
+            ancreLog("ancre: ignore-apps += %@", bundleID)
+            reloadConfig()
+        } catch {
+            ancreLog("ancre: cannot add %@ to ignore-apps: %@", bundleID, "\(error)")
+        }
     }
 
     func retile() {
@@ -1253,6 +1263,7 @@ final class WindowManagerController: WindowTrackerDelegate {
         palette.append(PaletteEntry(command: "pause-tiling", title: tilingPaused ? L10n.resumeTiling : L10n.pauseTiling))
         palette.append(PaletteEntry(command: "retile", title: L10n.retile))
         palette.append(PaletteEntry(command: "adopt-window", title: L10n.adoptWindow))
+        palette.append(PaletteEntry(command: "ignore-focused-app", title: L10n.ignoreApp))
         palette.append(PaletteEntry(command: "scratchpad", title: L10n.paletteScratchpad))
         palette.append(PaletteEntry(command: "open-config", title: L10n.openConfig))
         for name in loadPresets().keys.sorted() {

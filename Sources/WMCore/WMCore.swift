@@ -246,6 +246,8 @@ public enum Command: Equatable {
     /// Controller-side commands (need AX/AppKit); dispatch() no-ops.
     case pauseTiling
     case retile
+    /// Add the focused window's app to ignore-apps (edits the config file).
+    case ignoreFocusedApp
     case openConfig
     case switcher(commandsOnly: Bool)
     case scratchpad
@@ -294,6 +296,9 @@ public enum Command: Equatable {
         case "retile":
             guard parts.count == 1 else { return nil }
             return .retile
+        case "ignore-focused-app":
+            guard parts.count == 1 else { return nil }
+            return .ignoreFocusedApp
         case "open-config":
             guard parts.count == 1 else { return nil }
             return .openConfig
@@ -363,7 +368,7 @@ public enum WM {
             return [] // AX-side, handled by the controller before dispatch
         case .setLayout:
             return [] // resolved by the controller (needs LayoutEngine)
-        case .pauseTiling, .retile, .openConfig, .switcher, .scratchpad, .hints, .presetApply, .presetSave, .quit:
+        case .pauseTiling, .retile, .ignoreFocusedApp, .openConfig, .switcher, .scratchpad, .hints, .presetApply, .presetSave, .quit:
             return [] // controller-side
         }
     }
