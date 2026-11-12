@@ -22,6 +22,8 @@ public enum L10n {
     public static var floatWindow: String { t("float_window") }
     public static var tileWindow: String { t("tile_window") }
     public static var toggleFullscreen: String { t("toggle_fullscreen") }
+    public static func copyBundleID(_ id: String) -> String { String(format: t("copy_bundle_id"), id) }
+    public static var ignoreApp: String { t("ignore_app") }
     public static var pauseTiling: String { t("pause_tiling") }
     public static var retile: String { t("retile") }
     public static var adoptWindow: String { t("adopt_window") }
@@ -107,6 +109,8 @@ public enum L10n {
         "float_window": "Float window",
         "tile_window": "Return to tiling",
         "toggle_fullscreen": "Toggle fullscreen",
+        "copy_bundle_id": "Copy bundle ID (%@)",
+        "ignore_app": "Ignore this app (add to ignore-apps)",
         "pause_tiling": "Pause tiling",
         "retile": "Retile windows",
         "adopt_window": "Adopt frontmost window",
@@ -167,6 +171,8 @@ public enum L10n {
             "float_window": "Floatovat okno",
             "tile_window": "Vrátit do dlaždic",
             "toggle_fullscreen": "Přepnout fullscreen",
+            "copy_bundle_id": "Zkopírovat bundle ID (%@)",
+            "ignore_app": "Ignorovat tuto aplikaci (do ignore-apps)",
             "pause_tiling": "Pozastavit tiling",
             "retile": "Přeskládat okna",
             "adopt_window": "Adoptovat aktivní okno",

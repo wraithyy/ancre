@@ -630,6 +630,23 @@ final class WindowManagerController: WindowTrackerDelegate {
                         self.execute([.focusWindow(WindowID(windowID))])
                         self.run(.toggleFullscreen)
                     }
+                },
+                onIgnoreApp: { [weak self] bundleID in
+                    guard let self else { return }
+                    self.tracker.perform {
+                        guard !self.config.general.ignoreApps.contains(bundleID) else { return }
+                        let url = ConfigLoader.userConfigURL
+                        do {
+                            let toml = try String(contentsOf: url, encoding: .utf8)
+                            try ConfigLoader.addingIgnoredApp(bundleID, to: toml)
+                                .write(to: url, atomically: true, encoding: .utf8)
+                            ancreLog("ancre: ignore-apps += %@ (from bar)", bundleID)
+                            // Reload drops the app's windows from management.
+                            self.reloadConfig()
+                        } catch {
+                            ancreLog("ancre: cannot add %@ to ignore-apps: %@", bundleID, "\(error)")
+                        }
+                    }
                 }
         )
     }

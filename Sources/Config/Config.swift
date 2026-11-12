@@ -548,6 +548,31 @@ public enum ConfigLoader {
         return (bindings, warnings)
     }
 
+    /// Adds `bundleID` to `[general] ignore-apps` as a text edit, so the
+    /// user's comments and formatting survive (re-encoding via TOMLKit would
+    /// drop them). Caller checks for duplicates against the loaded config.
+    public static func addingIgnoredApp(_ bundleID: String, to toml: String) -> String {
+        var lines = toml.components(separatedBy: "\n")
+        let item = "\"\(bundleID)\""
+        if let i = lines.firstIndex(where: { $0.trimmingCharacters(in: .whitespaces).hasPrefix("ignore-apps") }),
+           let open = lines[i].firstIndex(of: "[") {
+            let code = lines[i].split(separator: "#", maxSplits: 1, omittingEmptySubsequences: false)[0]
+            if code.trimmingCharacters(in: .whitespaces).hasSuffix("[") {
+                // Multi-line array: new item on its own line right after `[`.
+                lines.insert("  \(item),", at: i + 1)
+            } else if lines[i][open...].hasPrefix("[]") {
+                lines[i].replaceSubrange(open...lines[i].index(after: open), with: "[\(item)]")
+            } else {
+                lines[i].insert(contentsOf: "\(item), ", at: lines[i].index(after: open))
+            }
+        } else if let g = lines.firstIndex(where: { $0.trimmingCharacters(in: .whitespaces) == "[general]" }) {
+            lines.insert("ignore-apps = [\(item)]", at: g + 1)
+        } else {
+            lines += ["", "[general]", "ignore-apps = [\(item)]", ""]
+        }
+        return lines.joined(separator: "\n")
+    }
+
     // MARK: - Internals
 
     private static func decode(_ toml: String) throws -> AppConfig {

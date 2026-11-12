@@ -175,6 +175,7 @@ public final class BarController {
     private let onMoveWorkspace: (_ workspace: String, _ monitorID: String) -> Void
     private let onToggleFloat: (UInt32) -> Void
     private let onToggleFullscreen: (UInt32) -> Void
+    private let onIgnoreApp: (String) -> Void
     private var windows: [String: NSWindow] = [:]
     private var lastSnapshots: [String: BarMonitorSnapshot] = [:]
     /// Notch mode: which monitors currently have their pill revealed.
@@ -214,7 +215,8 @@ public final class BarController {
         onSetLayout: @escaping (_ workspace: String, _ layout: String) -> Void,
         onMoveWorkspace: @escaping (_ workspace: String, _ monitorID: String) -> Void,
         onToggleFloat: @escaping (UInt32) -> Void,
-        onToggleFullscreen: @escaping (UInt32) -> Void
+        onToggleFullscreen: @escaping (UInt32) -> Void,
+        onIgnoreApp: @escaping (_ bundleID: String) -> Void
     ) {
         self.theme = theme
         self.onSelect = onSelect
@@ -225,6 +227,7 @@ public final class BarController {
         self.onMoveWorkspace = onMoveWorkspace
         self.onToggleFloat = onToggleFloat
         self.onToggleFullscreen = onToggleFullscreen
+        self.onIgnoreApp = onIgnoreApp
         // On a display reconfiguration (wake, replug, re-enumeration) AppKit
         // relocates windows that were on a vanished screen. The follow-up
         // snapshot is usually identical to the last one, so the equality
@@ -266,7 +269,8 @@ public final class BarController {
                 onSetLayout: onSetLayout,
                 onMoveWorkspace: onMoveWorkspace,
                 onToggleFloat: onToggleFloat,
-                onToggleFullscreen: onToggleFullscreen
+                onToggleFullscreen: onToggleFullscreen,
+                onIgnoreApp: onIgnoreApp
             )
             // Reassign rootView so SwiftUI diffs the tree instead of a full
             // NSHostingView teardown on every change (focus ring, badges...).
@@ -536,6 +540,7 @@ private struct BarView: View {
     let onMoveWorkspace: (String, String) -> Void
     let onToggleFloat: (UInt32) -> Void
     let onToggleFullscreen: (UInt32) -> Void
+    let onIgnoreApp: (String) -> Void
 
     /// left/right positions render the pill vertically.
     private var isVertical: Bool { theme.position == "left" || theme.position == "right" }
@@ -590,7 +595,8 @@ private struct BarView: View {
                 onSetLayout: onSetLayout,
                 onMoveWorkspace: onMoveWorkspace,
                 onToggleFloat: onToggleFloat,
-                onToggleFullscreen: onToggleFullscreen
+                onToggleFullscreen: onToggleFullscreen,
+                onIgnoreApp: onIgnoreApp
             )
         }
     }
@@ -623,6 +629,7 @@ private struct WorkspaceCell: View {
     let onMoveWorkspace: (String, String) -> Void
     let onToggleFloat: (UInt32) -> Void
     let onToggleFullscreen: (UInt32) -> Void
+    let onIgnoreApp: (String) -> Void
 
     /// A drag hovers over this cell — highlight it as the drop target.
     @State private var isDropTarget = false
@@ -763,6 +770,15 @@ private struct WorkspaceCell: View {
                         Button(L10n.focusWindow) { onFocusWindow(window.windowID) }
                         Button(window.isFloating ? L10n.tileWindow : L10n.floatWindow) { onToggleFloat(window.windowID) }
                         Button(L10n.toggleFullscreen) { onToggleFullscreen(window.windowID) }
+                        if let bundleID = NSRunningApplication(processIdentifier: window.pid)?.bundleIdentifier {
+                            Divider()
+                            Button(L10n.copyBundleID(bundleID)) {
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(bundleID, forType: .string)
+                            }
+                            Button(L10n.ignoreApp) { onIgnoreApp(bundleID) }
+                            Divider()
+                        }
                         Menu(L10n.moveTo) {
                             ForEach(allWorkspaceNames.filter { $0.name != workspace.name }, id: \.name) { target in
                                 Button(target.title) { onMoveWindow(window.windowID, target.name) }
